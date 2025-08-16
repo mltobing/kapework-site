@@ -1,149 +1,162 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BlinkGrid — Kapework Vibe Lab</title>
-  <style>
-    :root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
-    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;display:flex;min-height:100svh}
-    .wrap{max-width:460px;margin:auto;padding:20px}
-    h1{margin:0 0 8px;font-weight:800}
-    .muted{color:#7a5e4b}
-    .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
-    .cell{aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#fff;touch-action:manipulation}
-    .cell.show{background:#ffe7cc;border-color:#f0caa0}
-    .cell.selected{background:#cfe8ff;border-color:#9dc7f5}
-    .row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
-    button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;font-weight:600}
-    button.primary{background:var(--accent);color:#fff;border-color:#a06d47}
-    .score{font-weight:700}
-    a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BlinkGrid — Kapework Vibe Lab</title>
+<style>
+:root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;display:flex;min-height:100svh}
+.wrap{max-width:460px;margin:auto;padding:20px}
+h1{margin:0 0 8px;font-weight:800}
+.muted{color:#7a5e4b}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.cell{aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#fff;touch-action:manipulation}
+.cell.show{background:#ffe7cc;border-color:#f0caa0}
+.cell.selected{background:#cfe8ff;border-color:#9dc7f5}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;font-weight:600}
+button.primary{background:var(--accent);color:#fff;border-color:#a06d47}
+.score{font-weight:700}
+a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>BlinkGrid</h1>
-    <div class="muted">Watch the pattern blink, then recreate it. <b>Daily or Endless.</b></div>
+<div class="wrap">
+  <h1>BlinkGrid</h1>
+  <div class="muted">Watch the pattern, then recreate it. Auto-submit on completion.</div>
 
-    <div class="panel">
-      <div id="msg" class="muted">Choose a mode to start.</div>
-      <div class="row">
-        <button id="daily" class="primary">Daily</button>
-        <button id="endless">Endless</button>
-        <div class="score">Round <span id="round">0</span><span id="of">/5</span> · ✓ <span id="hits">0</span></div>
-      </div>
+  <div class="panel">
+    <div id="msg" class="muted">Choose a mode to start.</div>
+    <div class="row">
+      <button id="daily" class="primary">Daily</button>
+      <button id="endless">Endless</button>
+      <div class="score">Round <span id="round">0</span><span id="of">/5</span> · ✓ <span id="hits">0</span></div>
+    </div>
 
-      <div id="grid" class="grid" aria-label="3 by 3 memory grid"></div>
+    <div id="grid" class="grid" aria-label="3 by 3 memory grid"></div>
 
-      <div class="row">
-        <button id="submit" class="primary" disabled>Submit</button>
-        <button id="clear" disabled>Clear</button>
-        <a href="/apps/">← Vibe Lab</a>
-      </div>
+    <div class="row">
+      <button id="reset">Reset selection</button>
+      <a href="/apps/">← Vibe Lab</a>
     </div>
   </div>
+</div>
 
-  <script>
-  // --- seeded RNG for Daily ---
-  function lcg(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
-  function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
+<script>
+// --- seeded RNG for Daily ---
+function lcg(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
+const ROUNDS_DAILY = 5;
 
-  const ROUNDS_DAILY = 5;
+// refs
+const gridEl=document.getElementById('grid'), msgEl=document.getElementById('msg');
+const roundEl=document.getElementById('round'), ofEl=document.getElementById('of'), hitsEl=document.getElementById('hits');
+const resetB=document.getElementById('reset');
 
-  // refs
-  const gridEl=document.getElementById('grid'), msgEl=document.getElementById('msg');
-  const roundEl=document.getElementById('round'), ofEl=document.getElementById('of'), hitsEl=document.getElementById('hits');
-  const submit=document.getElementById('submit'), clearB=document.getElementById('clear');
+// state
+let rng=Math.random, mode=null, round=0, hits=0, endless=false;
+let patternMask=0, selectMask=0, neededBits=0, busy=false;
 
-  // state
-  let rng=Math.random, mode=null, round=0, hits=0, endless=false;
-  let patternMask=0, selectMask=0, busy=false;
+// build 3×3 grid
+const cells=[];
+for(let i=0;i<9;i++){
+  const d=document.createElement('button');
+  d.className='cell'; d.setAttribute('aria-label','cell '+(i+1));
+  d.addEventListener('click',()=>onTap(i));
+  gridEl.appendChild(d); cells.push(d);
+}
 
-  // build 3×3 grid
-  const cells=[];
-  for(let i=0;i<9;i++){
-    const d=document.createElement('button');
-    d.className='cell'; d.setAttribute('aria-label','cell '+(i+1));
-    d.addEventListener('click',()=>{ if(busy)return;
-      selectMask ^= (1<<i);
-      d.classList.toggle('selected');
-      submit.disabled=false; clearB.disabled=false;
-      if(navigator.vibrate) navigator.vibrate(8);
-    });
-    gridEl.appendChild(d); cells.push(d);
-  }
+function bitCount(m){let c=0;while(m){m&=m-1;c++;}return c;}
 
-  function makePattern(bits){
-    let m=0, tries=0;
-    while(bits>0 && tries<64){
-      const i=Math.floor(rng()*9);
-      if(!(m&(1<<i))){ m|=(1<<i); bits--; }
-      tries++;
-    }
-    return m;
-  }
+function onTap(i){
+  if(busy) return;
+  // toggle
+  const bit=(1<<i);
+  if(selectMask & bit){ selectMask &= ~bit; cells[i].classList.remove('selected'); }
+  else { selectMask |= bit; cells[i].classList.add('selected'); if(navigator.vibrate) navigator.vibrate(8); }
 
-  async function showPattern(mask, ms){
+  const cnt=bitCount(selectMask);
+  if(cnt === neededBits){
+    // auto-submit
     busy=true;
-    cells.forEach((c,i)=> c.classList.toggle('show', !!(mask&(1<<i))));
-    await new Promise(r=>setTimeout(r, ms));
-    cells.forEach(c=> c.classList.remove('show'));
-    busy=false;
+    setTimeout(()=>{ // slight delay so the last tap visually applies
+      if(selectMask === patternMask){
+        hits++; hitsEl.textContent=hits;
+        msgEl.textContent='Nice! Next round…';
+        nextRound();
+      }else{
+        if(navigator.vibrate) navigator.vibrate([40,40,40]);
+        msgEl.textContent='Wrong pattern — game over.';
+        endGame();
+      }
+      busy=false;
+    },80);
+  } else if(cnt > neededBits){
+    // too many tiles picked → immediate fail
+    if(navigator.vibrate) navigator.vibrate([30,30]);
+    msgEl.textContent='Too many tiles — game over.';
+    endGame();
   }
+}
 
-  function nextRound(){
-    round++; roundEl.textContent=round; selectMask=0;
-    cells.forEach(c=>c.classList.remove('selected'));
-    submit.disabled=true; clearB.disabled=true;
-
-    if(!endless && round>ROUNDS_DAILY){ endGame(); return; }
-
-    msgEl.textContent=`Memorize the pattern… (${mode} mode)`;
-    const bits=Math.min(2+round,6);             // ramps difficulty
-    const showMs=Math.max(450,1000-round*100);  // shorter flashes over time
-    patternMask=makePattern(bits);
-    showPattern(patternMask, showMs).then(()=>{
-      msgEl.textContent='Recreate it, then Submit.';
-      submit.disabled=false; clearB.disabled=false;
-    });
+function makePattern(bits){
+  let m=0, tries=0;
+  while(bits>0 && tries<64){
+    const i=Math.floor(rng()*9);
+    if(!(m&(1<<i))){ m|=(1<<i); bits--; }
+    tries++;
   }
+  return m;
+}
 
-  function endGame(){
-    const key='blinkgrid_best_'+mode;
-    const best=Math.max(Number(localStorage.getItem(key)||0), hits);
-    localStorage.setItem(key, best);
-    msgEl.innerHTML=`Done! You matched <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
-    submit.disabled=true; clearB.disabled=true;
-  }
+async function showPattern(mask, ms){
+  busy=true;
+  cells.forEach((c,i)=> c.classList.toggle('show', !!(mask&(1<<i))));
+  await new Promise(r=>setTimeout(r, ms));
+  cells.forEach(c=> c.classList.remove('show'));
+  busy=false;
+}
 
-  submit.onclick=()=>{
-    if(busy)return;
-    if(selectMask===patternMask){
-      hits++; hitsEl.textContent=hits;
-      msgEl.textContent='Nice! Next round…';
-      nextRound();
-    }else{
-      msgEl.textContent='Not quite—pattern shown again.';
-      showPattern(patternMask,650);
-    }
-  };
-  clearB.onclick=()=>{ if(busy)return; selectMask=0; cells.forEach(c=>c.classList.remove('selected')); };
+function clearSelection(){
+  selectMask=0; cells.forEach(c=>c.classList.remove('selected'));
+}
+resetB.onclick=()=>{ if(!busy) clearSelection(); };
 
-  function start(m){
-    mode=m; endless=(m==='Endless');
-    rng=(m==='Daily')?lcg(dailySeed()):Math.random;
-    round=0; hits=0; hitsEl.textContent=hits; roundEl.textContent=0;
-    ofEl.textContent=endless?'':'/'+ROUNDS_DAILY; // hide '/5' in Endless
-    nextRound();
-    history.replaceState(null,'',location.pathname+(m==='Daily'?'?mode=daily':'?mode=endless'));
-  }
-  document.getElementById('daily').onclick  = ()=>start('Daily');
-  document.getElementById('endless').onclick= ()=>start('Endless');
+function nextRound(){
+  round++; roundEl.textContent=round; clearSelection();
 
-  // auto-start from URL param
-  if(new URLSearchParams(location.search).get('mode')==='daily') start('Daily');
-  </script>
+  if(!endless && round>ROUNDS_DAILY){ endGame(); return; }
+
+  msgEl.textContent=`Memorize the pattern… (${mode} mode)`;
+  neededBits = Math.min(2+round, 6);
+  const showMs = Math.max(450, 1000 - round*100);
+  patternMask = makePattern(neededBits);
+  showPattern(patternMask, showMs).then(()=>{
+    msgEl.textContent=`Select ${neededBits} tile${neededBits>1?'s':''}.`;
+  });
+}
+
+function endGame(){
+  const key='blinkgrid_best_'+mode;
+  const best=Math.max(Number(localStorage.getItem(key)||0), hits);
+  localStorage.setItem(key, best);
+  msgEl.innerHTML=`Done! Correct rounds: <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
+}
+
+function start(m){
+  mode=m; endless=(m==='Endless');
+  rng=(m==='Daily')?lcg(dailySeed()):Math.random;
+  round=0; hits=0; hitsEl.textContent=hits; roundEl.textContent=0;
+  ofEl.textContent=endless?'':'/'+ROUNDS_DAILY;
+  nextRound();
+  history.replaceState(null,'', location.pathname + (m==='Daily'?'?mode=daily':'?mode=endless'));
+}
+document.getElementById('daily').onclick  = ()=>start('Daily');
+document.getElementById('endless').onclick= ()=>start('Endless');
+
+// auto-start from URL param
+if(new URLSearchParams(location.search).get('mode')==='daily') start('Daily');
+</script>
 </body>
 </html>
