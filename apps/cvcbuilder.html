@@ -134,6 +134,19 @@ const WORDS = [
   // u
   "bug","bun","bus","cup","cut","sun","fun","run","rug","mug","tub","sub","gum","mud","hut","pup","cub","hug"
 ];
+  // Pictures for kid-friendly nouns we can show as emoji
+const HINTS = {
+  // a
+  cat:"🐱", cap:"🧢", can:"🥫", cab:"🚖", bag:"🎒", ram:"🐏", rat:"🐀", man:"👨", pan:"🍳", fan:"🪭", van:"🚐", map:"🗺️", nap:"😴",
+  // e
+  bed:"🛏", hen:"🐔", leg:"🦵", peg:"📌", pen:"🖊️", red:"🔴",
+  // i
+  pig:"🐷", pin:"📌", pit:"🕳️", bin:"🗑️", win:"🏆", kid:"🧒", kit:"🧰", dig:"⛏️", sip:"🥤",
+  // o
+  dog:"🐶", log:"🪵", cog:"⚙️", pot:"🍲", hot:"🔥", dot:"🔴", cop:"👮", mop:"🧹", top:"🪀", mom:"👩",
+  // u
+  bug:"🐞", bun:"🥯", bus:"🚌", cup:"☕", cut:"✂️", sun:"☀️", fun:"🎉", run:"🏃", tub:"🛁", sub:"🥪", gum:"🍬", hut:"🛖", pup:"🐶", cub:"🐻", hug:"🤗"
+};
 
 // ===== state refs =====
 const msg  = document.getElementById('msg');
@@ -202,7 +215,8 @@ function getBest(){ return Number(localStorage.getItem(dailyBestKey())||0); }
 
 function newDailyDeck(){
   rng = lcg(dailySeed());
-  todayDeck = rngPick(WORDS, 6, rng);
+  // todayDeck = rngPick(WORDS, 6, rng);
+  todayDeck = rngPick(WORDS.filter(w => HINTS[w]), 6, rng);
   round = 0; stars = 0; starsEl.textContent=stars; bestEl.textContent=getBest();
   ofEl.textContent='/6';
   nextRound();
