@@ -245,10 +245,19 @@ document.getElementById('sayParts').onclick=()=>sayParts();
 document.getElementById('blend').onclick=()=>blendWord();
 document.getElementById('clear').onclick=()=>{ clearSlots(); buzz(10); };
 document.getElementById('hint').onclick=()=>{
-  if(mode!=='Daily'){ say("In free play there’s no target"); return; }
+  if(mode!=='Daily'){ say("Free play has no target"); return; }
   const w = todayDeck[round-1];
-  const seq = w.split('').map(ch=>({text:SOUND[ch]||ch}));
-  chainSpeak(seq);
+  const pic = HINTS[w];
+  if(!pic){ buzz(10); return; }
+  // show overlay with big emoji
+  const o = document.createElement('div');
+  o.className='hintOverlay';
+  o.innerHTML = `<div class="hintPic">${pic}</div>`;
+  o.onclick = ()=> document.body.removeChild(o);
+  document.body.appendChild(o);
+  buzz(20);
+  // Optional: say the first sound only (no reading required)
+  const first = w[0]; say(SOUND[first]||first, {rate:1});
 };
 document.getElementById('check').onclick=()=>{
   const w=currentWord();
