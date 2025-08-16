@@ -8,6 +8,10 @@
   --bg1:#fff2e5; --bg2:#fffaf4; --ink:#2a1f17; --muted:#705a4a;
   --card:#ffffff; --line:#eadfd3; --good:#2ec27e; --bad:#e65f5f; --accent:#ffb703;
 }
+  /* Hint overlay */
+.hintOverlay{position:fixed; inset:0; display:grid; place-items:center;
+  background:rgba(248,247,244,.85); z-index:50}
+.hintPic{font-size:120px; filter:drop-shadow(0 6px 18px rgba(0,0,0,.15))}
 *{box-sizing:border-box}
 body{margin:0;color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
      background: radial-gradient(100% 80% at 0 0,var(--bg1) 0,var(--bg2) 70%);display:flex;min-height:100svh}
