@@ -3,60 +3,63 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#fff1d6">
+  <meta name="theme-color" content="#f8f7f4">
   <title>Kapework — Vibe Lab</title>
 
-  <!-- Playful font -->
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Clean, friendly font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
   <style>
     :root{
-      --bg1:#fff1d6; --bg2:#fff8ec;
-      --ink:#3b2e2a; --muted:#7a5e4b;
-      --card:#ffffff; --line:#eadfd3;
-      --accent:#ffb703; --accent-ink:#1b130f;
-      --max:980px;
+      --bg:#f8f7f4;
+      --ink:#2b221b;
+      --muted:#7a5e4b;
+      --card:#ffffff;
+      --line:#ece8e3;
+      --accent:#b67b50;
+      --accent-ink:#1b130f;
+      --radius:14px;
+      --max:940px;
     }
     *{box-sizing:border-box}
-    html,body{height:100%}
     body{
       margin:0; color:var(--ink);
-      font:16px/1.5 "Fredoka", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: radial-gradient(80% 70% at 20% 0%, var(--bg1) 0, var(--bg2) 60%, var(--bg2) 100%);
+      font:16px/1.55 Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background:var(--bg);
       display:flex; flex-direction:column; align-items:center;
     }
     header,main,footer{width:100%; max-width:var(--max); padding:16px}
     header{padding-top:24px}
     .brand{display:flex; gap:12px; align-items:center}
-    .logo{font-size:34px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.08))}
-    h1{margin:0; font-size:28px; font-weight:900}
+    .logo{font-size:28px}
+    h1{margin:0; font-size:28px; font-weight:800; letter-spacing:.2px}
     .tag{margin:6px 0 0; color:var(--muted)}
-    .kidbar{display:flex; align-items:center; gap:8px; margin:12px 0 4px; flex-wrap:wrap}
-    .kidbar small{color:var(--muted)}
-    .kidbtn{
-      border:1px solid var(--line); background:#fff; padding:8px 12px; border-radius:12px; font-weight:700;
-    }
-    .kidbtn.active{background:var(--accent); color:var(--accent-ink); border-color:#e2a700}
-    .cards{
+    .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0 6px}
+    .pill{border:1px solid var(--line); background:#fff; padding:8px 12px; border-radius:999px; font-weight:600}
+    .pill.primary{background:var(--accent); color:var(--accent-ink); border-color:#a06d47}
+    .grid{
       display:grid; gap:12px; margin-top:12px;
-      grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
     }
     .card{
-      display:flex; gap:12px; align-items:flex-start;
-      background:var(--card); border:1px solid var(--line); border-radius:16px;
+      display:flex; gap:14px; align-items:flex-start;
+      background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
       padding:14px 16px; text-decoration:none; color:inherit;
-      box-shadow:0 10px 24px rgba(0,0,0,.06);
+      box-shadow:0 8px 22px rgba(0,0,0,.05);
       transition: transform .12s ease, box-shadow .12s ease;
+      -webkit-tap-highlight-color: transparent;
     }
     .card:active{transform:scale(.99)}
-    .card:hover{transform:translateY(-2px); box-shadow:0 14px 30px rgba(0,0,0,.08)}
-    .card .emoji{font-size:32px; width:40px; text-align:center}
-    .card h3{margin:0 0 4px; font-size:18px}
-    .card p{margin:0; color:var(--muted); font-weight:500}
-    .row{display:flex; align-items:center; gap:8px; margin-top:8px}
-    .mini{border:1px dashed var(--line); padding:6px 10px; border-radius:10px; font-size:14px; background:#fff}
-    footer{color:var(--muted); text-align:center; padding-bottom:32px}
-    .divider{height:1px; background:linear-gradient(90deg, transparent, #eadfd3, transparent); margin:10px 0}
+    .emoji{
+      width:44px; height:44px; display:grid; place-items:center; font-size:26px;
+      background:#fff; border:1px solid var(--line); border-radius:12px;
+    }
+    .card h3{margin:0 0 4px; font-size:18px; font-weight:800}
+    .card p{margin:0; color:var(--muted)}
+    .actions{display:flex; gap:8px; margin-top:8px}
+    .mini{border:1px dashed var(--line); background:#fff; padding:6px 10px; border-radius:10px; font-size:14px; font-weight:600}
+    footer{color:var(--muted); text-align:center; padding-bottom:28px}
+    .divider{height:1px; background:linear-gradient(90deg,transparent,#eadfd3,transparent); margin:12px 0}
   </style>
 </head>
 <body>
@@ -66,72 +69,78 @@
     <div class="logo">🎮</div>
     <div>
       <h1>Vibe Lab</h1>
-      <div class="tag">Tiny single-file apps. Zero fuss.</div>
+      <div class="tag">Tiny single-file web toys. Zero fuss.</div>
     </div>
   </div>
 
-  <!-- Player switcher (saves who is playing in localStorage) -->
-  <div class="kidbar" id="kidbar">
-    <small>Player:</small>
-    <button class="kidbtn" data-kid="Maxi">Maxi</button>
-    <button class="kidbtn" data-kid="Yciar">Yciar</button>
-    <button class="kidbtn" data-kid="Guest">Guest</button>
-    <small id="whois"></small>
+  <!-- Simple, generic controls -->
+  <div class="toolbar">
+    <button id="random" class="pill primary">Random app</button>
+    <span class="pill" id="profile">Profile: <b id="who">Guest</b></span>
+    <button id="changeProfile" class="pill">Change</button>
   </div>
   <div class="divider"></div>
 </header>
 
 <main>
-  <div id="grid" class="cards" aria-live="polite"></div>
+  <div id="grid" class="grid" aria-live="polite"></div>
 </main>
 
 <footer>
-  © <span id="yr"></span> Kapework · Built for play
+  © <span id="yr"></span> Kapework · A small playground for tiny ideas
 </footer>
 
 <script>
-  // --- Player picker ---
-  const WHO_KEY = 'kw_player';
-  const whoEl = document.getElementById('whois');
-  const kb = document.getElementById('kidbar');
-  function setPlayer(name){
-    localStorage.setItem(WHO_KEY, name);
-    [...kb.querySelectorAll('.kidbtn')].forEach(b=>b.classList.toggle('active', b.dataset.kid===name));
-    whoEl.textContent = `(current: ${name})`;
-  }
-  kb.addEventListener('click', e => {
-    const k = e.target.dataset.kid; if(!k) return;
-    setPlayer(k);
-  });
-  setPlayer(localStorage.getItem(WHO_KEY) || 'Guest');
+  // --- generic profile (no specific names) ---
+  const WHO_KEY='kw_profile';
+  const whoSpan=document.getElementById('who');
+  function setProfile(name){ localStorage.setItem(WHO_KEY,name); whoSpan.textContent=name; }
+  setProfile(localStorage.getItem(WHO_KEY)||'Guest');
+  document.getElementById('changeProfile').onclick=()=>{
+    const v=prompt('Choose a display name (optional):', localStorage.getItem(WHO_KEY)||'Guest');
+    if(v!==null && v.trim()) setProfile(v.trim());
+  };
 
-  // --- Render cards from /manifest.json ---
-  const grid = document.getElementById('grid');
+  // --- load cards from manifest.json ---
+  const grid=document.getElementById('grid');
+  let manifest=[];
   fetch('/manifest.json')
-    .then(r => r.json())
-    .then(list => {
-      // sort newest first by title or leave as-is; keeping as-is here
-      grid.innerHTML = list.map(x => `
-        <a class="card" href="/apps/${x.slug}.html">
-          <div class="emoji">${x.emoji || '🎛️'}</div>
-          <div>
-            <h3>${x.title}</h3>
-            <p>${x.blurb || ''}</p>
-            <div class="row">
-              <span class="mini">Open</span>
-              <a class="mini" href="/apps/${x.slug}.html?mode=daily" onclick="event.stopPropagation()">Daily</a>
-            </div>
-          </div>
-        </a>`).join('');
+    .then(r=>r.json())
+    .then(list=>{
+      manifest=list;
+      render(list);
     })
-    .catch(err => {
-      grid.innerHTML = `<div class="card"><div class="emoji">⚠️</div>
+    .catch(err=>{
+      grid.innerHTML=`<div class="card"><div class="emoji">⚠️</div>
         <div><h3>Couldn’t load apps</h3><p>Please check <code>/manifest.json</code>.</p></div></div>`;
       console.error(err);
     });
 
+  function render(list){
+    grid.innerHTML = list.map(x=>`
+      <a class="card" href="/apps/${x.slug}.html" aria-label="${x.title}">
+        <div class="emoji">${x.emoji||'🎛️'}</div>
+        <div>
+          <h3>${x.title}</h3>
+          <p>${x.blurb||''}</p>
+          <div class="actions">
+            <span class="mini">Open</span>
+            <a class="mini" href="/apps/${x.slug}.html?mode=daily" onclick="event.stopPropagation()">Daily</a>
+          </div>
+        </div>
+      </a>
+    `).join('');
+  }
+
+  // --- random app button ---
+  document.getElementById('random').onclick=()=>{
+    if(!manifest.length) return;
+    const pick = manifest[Math.floor(Math.random()*manifest.length)];
+    location.href = '/apps/'+pick.slug+'.html';
+  };
+
   // footer year
-  document.getElementById('yr').textContent = new Date().getFullYear();
+  document.getElementById('yr').textContent=new Date().getFullYear();
 </script>
 
 </body>
