@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CVC Builder+ — Kapework Vibe Lab</title>
+<style>
+:root{
+  --bg1:#fff2e5; --bg2:#fffaf4; --ink:#2a1f17; --muted:#705a4a;
+  --card:#ffffff; --line:#eadfd3; --good:#2ec27e; --bad:#e65f5f; --accent:#ffb703;
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+     background: radial-gradient(100% 80% at 0 0,var(--bg1) 0,var(--bg2) 70%);display:flex;min-height:100svh}
+.wrap{max-width:860px;margin:auto;padding:16px}
+h1{margin:0 0 8px;font-weight:900;letter-spacing:.2px}
+.muted{color:var(--muted)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:12px;
+       box-shadow:0 8px 22px rgba(0,0,0,.05)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-weight:700}
+.pill.primary{background:var(--accent);border-color:#e2a700}
+.pill.good{background:#e9fbf2;border-color:#b9efd5}
+.pill.bad{background:#ffe9e9;border-color:#f2c0c0}
+.badge{border:1px dashed var(--line);border-radius:10px;padding:6px 10px;font-weight:700}
+.gridSlots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.slot{height:72px;border:2px dashed var(--line);border-radius:14px;display:grid;place-items:center;font-size:34px;background:#fff}
+.slot.active{outline:3px solid #dac6b8}
+.letterRow{display:flex;gap:8px;overflow:auto;padding:4px 2px;margin-top:8px}
+.tile{min-width:52px;height:52px;display:grid;place-items:center;border-radius:12px;color:#1b130f;font-weight:900;
+      box-shadow:0 4px 10px rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.05)}
+.tile:active{transform:scale(.98)}
+/* Fun colors per group */
+.c1{background:#ffd6a5} .v{background:#bde0fe} .c2{background:#caffbf}
+.controls{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;font-weight:800}
+.btn.primary{background:var(--accent);border-color:#e2a700}
+.target{font-weight:900}
+.note{font-size:.95rem;color:#7b6b60}
+small.muted{font-size:.85rem}
+a{color:inherit}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔤 CVC Builder+</h1>
+  <div class="muted">Build, sound-out, and blend short vowel C‑V‑C words. <b>Daily</b> challenge or <b>Free play</b>.</div>
+
+  <div class="panel">
+    <div id="msg" class="muted">Choose a mode to start.</div>
+    <div class="row" style="margin-top:6px">
+      <button id="daily" class="pill primary">Daily</button>
+      <button id="free"  class="pill">Free play</button>
+      <span class="badge">Round <b id="round">0</b><span id="of">/6</span></span>
+      <span class="badge">Solved ⭐ <b id="stars">0</b></span>
+      <span class="badge">Best (Daily) <b id="best">0</b></span>
+      <button id="mute" class="pill">🔈 Voice</button>
+    </div>
+
+    <!-- Target display -->
+    <div class="row" style="margin-top:8px">
+      <div class="pill good">Target: <span id="target" class="target">—</span></div>
+      <button id="hint" class="pill">Hint 🔊</button>
+    </div>
+
+    <!-- Build area -->
+    <div class="gridSlots" style="margin-top:10px">
+      <button id="slotC1" class="slot" aria-label="first sound"></button>
+      <button id="slotV"  class="slot" aria-label="vowel"></button>
+      <button id="slotC2" class="slot" aria-label="last sound"></button>
+    </div>
+
+    <!-- Letter banks -->
+    <div class="row" style="margin-top:6px"><small class="muted">Tap a slot to select, then tap a letter to fill it. Tap letters to hear sounds.</small></div>
+
+    <div class="letterRow" id="rowC1" aria-label="first consonants"></div>
+    <div class="letterRow" id="rowV"  aria-label="vowels"></div>
+    <div class="letterRow" id="rowC2" aria-label="last consonants"></div>
+
+    <div class="controls">
+      <button id="sayParts" class="btn">🔊 Say sounds</button>
+      <button id="blend"    class="btn primary">✨ Blend word</button>
+      <button id="check"    class="btn">✅ Check</button>
+      <button id="clear"    class="btn">🧹 Clear</button>
+      <a class="btn" href="/apps/">← Vibe Lab</a>
+    </div>
+
+    <div class="row"><small class="note">Tip: in <b>Free play</b>, there’s no target—experiment and blend any combination. In <b>Daily</b>, solve today’s 6 words.</small></div>
+  </div>
+</div>
+
+<script>
+// ===== helpers =====
+function buzz(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
+function say(t,opts={}){ if(muted) return Promise.resolve();
+  const u=new SpeechSynthesisUtterance(t); u.rate=opts.rate??1; u.pitch=opts.pitch??1;
+  return new Promise(res=>{ u.onend=res; speechSynthesis.cancel(); speechSynthesis.speak(u); });
+}
+function chainSpeak(list){ // speak items sequentially
+  return list.reduce((p,seg)=>p.then(()=>say(seg.text, seg)), Promise.resolve());
+}
+function lcg(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
+function rngPick(arr, n, rand=Math.random){ const o=[...arr]; const out=[];
+  while(o.length && out.length<n){ out.push(o.splice(Math.floor(rand()*o.length),1)[0]); } return out; }
+function who(){ return localStorage.getItem('kw_profile')||'Guest'; }
+
+// ===== phoneme map for TTS (kid-friendly approximations) =====
+const SOUND={
+  a:"short a", e:"eh", i:"ih", o:"short o", u:"uh",
+  b:"buh", c:"kuh", d:"duh", f:"fff", g:"guh", h:"huh",
+  j:"juh", k:"kuh", l:"lll", m:"mmm", n:"nnn", p:"puh",
+  r:"rrr", s:"sss", t:"tuh", v:"vvv", w:"wuh", y:"yuh", z:"zzz", x:"ks"
+};
+
+// ===== letter banks (broad but CVC-friendly) =====
+const C1 = ["b","c","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","y","z"];
+const V  = ["a","e","i","o","u"];
+const C2 = ["b","d","g","k","l","m","n","p","r","s","t"]; // final consonants commonly in CVC
+
+// ===== curated CVC word list (decodable, short vowels) =====
+const WORDS = [
+  // a
+  "cat","cap","can","cab","cam","bag","rag","ram","rat","man","pan","fan","van","map","tap","lap","sap","nap","bad","mad","sad","dad","had",
+  // e
+  "bed","beg","bet","pen","ten","den","men","hen","leg","peg","set","met","net","let","pet","red",
+  // i
+  "pig","pin","pit","fin","bin","win","lid","kid","kit","big","dig","fig","rib","rim","sip","sit","lit","hip","him",
+  // o
+  "dog","log","bog","cog","pot","cot","hot","dot","got","rob","rod","rot","cop","mop","top","mom",
+  // u
+  "bug","bun","bus","cup","cut","sun","fun","run","rug","mug","tub","sub","gum","mud","hut","pup","cub","hug"
+];
+
+// ===== state refs =====
+const msg  = document.getElementById('msg');
+const roundEl=document.getElementById('round'), ofEl=document.getElementById('of');
+const starsEl=document.getElementById('stars'), bestEl=document.getElementById('best');
+const targetEl=document.getElementById('target');
+const slotC1=document.getElementById('slotC1'), slotV=document.getElementById('slotV'), slotC2=document.getElementById('slotC2');
+const rowC1=document.getElementById('rowC1'), rowV=document.getElementById('rowV'), rowC2=document.getElementById('rowC2');
+
+let activeSlot = slotC1;
+let mode = null;        // "Daily" or "Free"
+let muted = false;
+let rng = Math.random;  // for Daily we seed
+let todayDeck = [];     // 6 words
+let round = 0, stars = 0;
+
+// ===== build UI rows =====
+function makeTile(letter, cls){
+  const b=document.createElement('button');
+  b.className=`tile ${cls}`; b.textContent=letter;
+  b.onclick=()=>{ buzz(10); say(SOUND[letter]||letter,{rate:1}); fill(letter); };
+  return b;
+}
+function buildRows(){
+  rowC1.innerHTML=''; rowV.innerHTML=''; rowC2.innerHTML='';
+  C1.forEach(l=>rowC1.appendChild(makeTile(l,'c1')));
+  V.forEach(l=>rowV.appendChild(makeTile(l,'v')));
+  C2.forEach(l=>rowC2.appendChild(makeTile(l,'c2')));
+}
+buildRows();
+
+// ===== slot selection & filling =====
+[slotC1,slotV,slotC2].forEach(s=>{
+  s.onclick=()=>{ [slotC1,slotV,slotC2].forEach(el=>el.classList.remove('active')); s.classList.add('active'); activeSlot=s; 
+                  const l = s.textContent.trim(); if(l) say(SOUND[l]||l); buzz(8); };
+});
+function fill(letter){ if(!activeSlot) activeSlot=slotC1; activeSlot.textContent=letter; }
+function clearSlots(){ [slotC1,slotV,slotC2].forEach(s=>s.textContent=''); }
+
+// ===== speaking helpers =====
+function sayParts(){
+  const c1=slotC1.textContent.trim(), v=slotV.textContent.trim(), c2=slotC2.textContent.trim();
+  if(!c1&&!v&&!c2){ buzz(15); return; }
+  const seq = [];
+  if(c1) seq.push({text:SOUND[c1]||c1});
+  if(v)  seq.push({text:SOUND[v]||v});
+  if(c2) seq.push({text:SOUND[c2]||c2});
+  return chainSpeak(seq);
+}
+function blendWord(){
+  const w = currentWord();
+  if(!w){ say("Pick three sounds, then blend"); buzz(15); return; }
+  buzz(60);
+  return say(w,{rate:0.95}).then(()=>say(`The word is ${w}`,{rate:0.95}));
+}
+function currentWord(){
+  const c1=slotC1.textContent.trim(), v=slotV.textContent.trim(), c2=slotC2.textContent.trim();
+  if(!(c1&&v&&c2)) return '';
+  return (c1+v+c2);
+}
+
+// ===== Daily deck & scoring =====
+function dailyBestKey(){ return `cvc_best_Daily_${who()}`; }
+function setBest(v){ localStorage.setItem(dailyBestKey(), String(v)); }
+function getBest(){ return Number(localStorage.getItem(dailyBestKey())||0); }
+
+function newDailyDeck(){
+  rng = lcg(dailySeed());
+  todayDeck = rngPick(WORDS, 6, rng);
+  round = 0; stars = 0; starsEl.textContent=stars; bestEl.textContent=getBest();
+  ofEl.textContent='/6';
+  nextRound();
+}
+function nextRound(){
+  round++; roundEl.textContent=round;
+  clearSlots();
+  if(round> (mode==='Daily'?6:Infinity)){ endDaily(); return; }
+  if(mode==='Daily'){
+    targetEl.textContent = todayDeck[round-1];
+    msg.textContent = `Build today’s word ${round}/6, then Blend or Check.`;
+  }else{
+    targetEl.textContent = '—';
+    msg.textContent = `Free play — build any word and blend.`;
+  }
+}
+function endDaily(){
+  const best=Math.max(getBest(), stars);
+  if(best>getBest()) setBest(best);
+  bestEl.textContent=best;
+  msg.innerHTML = `Great job! ⭐ <b>${stars}</b> solved today. Best: <b>${best}</b>.`;
+}
+
+// ===== actions =====
+document.getElementById('sayParts').onclick=()=>sayParts();
+document.getElementById('blend').onclick=()=>blendWord();
+document.getElementById('clear').onclick=()=>{ clearSlots(); buzz(10); };
+document.getElementById('hint').onclick=()=>{
+  if(mode!=='Daily'){ say("In free play there’s no target"); return; }
+  const w = todayDeck[round-1];
+  const seq = w.split('').map(ch=>({text:SOUND[ch]||ch}));
+  chainSpeak(seq);
+};
+document.getElementById('check').onclick=()=>{
+  const w=currentWord();
+  if(!w){ buzz(12); say("Pick three sounds first"); return; }
+  if(mode==='Daily'){
+    const target=todayDeck[round-1];
+    if(w===target){
+      stars++; starsEl.textContent=stars; buzz(80);
+      say(`Yes! ${w}`,{rate:0.95}).then(()=>{ nextRound(); });
+    }else{
+      buzz(40);
+      say(`Not yet. You built ${w}. Try again.`);
+      // tiny visual hint: mismatch highlight
+      [slotC1,slotV,slotC2].forEach((s,i)=>{ s.style.outline = (w[i]===target[i])?'3px solid #b9efd5':'3px solid #f2c0c0';
+        setTimeout(()=>s.style.outline='',600); });
+    }
+  }else{ // Free play: “real word?” coach
+    if(WORDS.includes(w)){
+      buzz(60); say(`That makes ${w}!`,{rate:0.95});
+    }else{
+      buzz(25); say(`That doesn't make a common word. Try a different sound.`);
+    }
+  }
+};
+
+document.getElementById('mute').onclick=()=>{
+  muted=!muted;
+  document.getElementById('mute').textContent = muted? "🔇 Muted" : "🔈 Voice";
+};
+
+// ===== mode buttons =====
+document.getElementById('daily').onclick=()=>{ mode='Daily'; newDailyDeck(); history.replaceState(null,'',location.pathname+'?mode=daily'); };
+document.getElementById('free').onclick =()=>{ mode='Free'; round=0; stars=0; starsEl.textContent=0; bestEl.textContent=getBest(); ofEl.textContent=''; nextRound(); history.replaceState(null,'',location.pathname+'?mode=free'); };
+
+// auto-start
+const qp=new URLSearchParams(location.search);
+if(qp.get('mode')==='free'){ document.getElementById('free').click(); }
+else { document.getElementById('daily').click(); }
+</script>
+</body>
+</html>
