@@ -25,14 +25,14 @@
 <body>
   <div class="wrap">
     <h1>BlinkGrid</h1>
-    <div class="muted">Watch the pattern blink, then recreate it. <b>5 rounds.</b></div>
+    <div class="muted">Watch the pattern blink, then recreate it. <b>Daily or Endless.</b></div>
 
     <div class="panel">
       <div id="msg" class="muted">Choose a mode to start.</div>
       <div class="row">
         <button id="daily" class="primary">Daily</button>
         <button id="endless">Endless</button>
-        <div class="score">Round <span id="round">0</span>/5 · ✓ <span id="hits">0</span></div>
+        <div class="score">Round <span id="round">0</span><span id="of">/5</span> · ✓ <span id="hits">0</span></div>
       </div>
 
       <div id="grid" class="grid" aria-label="3 by 3 memory grid"></div>
@@ -46,39 +46,39 @@
   </div>
 
   <script>
-  // --- tiny seeded RNG for Daily mode ---
-  function lcg(seed){let s=seed>>>0; return ()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+  // --- seeded RNG for Daily ---
+  function lcg(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
   function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
 
-  // --- state ---
-  const gridEl = document.getElementById('grid');
-  const msgEl  = document.getElementById('msg');
-  const roundEl= document.getElementById('round');
-  const hitsEl = document.getElementById('hits');
-  const submit = document.getElementById('submit');
-  const clearB = document.getElementById('clear');
-  let rng = Math.random, mode = null, round = 0, hits = 0;
-  let patternMask = 0, selectMask = 0, busy = false;
+  const ROUNDS_DAILY = 5;
+
+  // refs
+  const gridEl=document.getElementById('grid'), msgEl=document.getElementById('msg');
+  const roundEl=document.getElementById('round'), ofEl=document.getElementById('of'), hitsEl=document.getElementById('hits');
+  const submit=document.getElementById('submit'), clearB=document.getElementById('clear');
+
+  // state
+  let rng=Math.random, mode=null, round=0, hits=0, endless=false;
+  let patternMask=0, selectMask=0, busy=false;
 
   // build 3×3 grid
-  const cells = [];
+  const cells=[];
   for(let i=0;i<9;i++){
     const d=document.createElement('button');
     d.className='cell'; d.setAttribute('aria-label','cell '+(i+1));
-    d.addEventListener('click',()=>{ if(busy) return;
+    d.addEventListener('click',()=>{ if(busy)return;
       selectMask ^= (1<<i);
       d.classList.toggle('selected');
-      submit.disabled = false; clearB.disabled = false;
+      submit.disabled=false; clearB.disabled=false;
       if(navigator.vibrate) navigator.vibrate(8);
     });
     gridEl.appendChild(d); cells.push(d);
   }
 
   function makePattern(bits){
-    // choose 'bits' unique cells -> bitmask 0..511
     let m=0, tries=0;
-    while(bits>0 && tries<40){
-      const i = Math.floor(rng()*9);
+    while(bits>0 && tries<64){
+      const i=Math.floor(rng()*9);
       if(!(m&(1<<i))){ m|=(1<<i); bits--; }
       tries++;
     }
@@ -86,59 +86,63 @@
   }
 
   async function showPattern(mask, ms){
-    busy = true;
+    busy=true;
     cells.forEach((c,i)=> c.classList.toggle('show', !!(mask&(1<<i))));
     await new Promise(r=>setTimeout(r, ms));
     cells.forEach(c=> c.classList.remove('show'));
-    busy = false;
+    busy=false;
   }
 
   function nextRound(){
     round++; roundEl.textContent=round; selectMask=0;
     cells.forEach(c=>c.classList.remove('selected'));
-    submit.disabled = true; clearB.disabled = true;
+    submit.disabled=true; clearB.disabled=true;
 
-    if(round>5){ endGame(); return; }
-    msgEl.textContent = `Memorize the pattern… (${mode} mode)`;
-    const bits = Math.min(2+round, 6);                   // grows slightly harder
-    const showMs = Math.max(450, 1000 - round*100);      // shows faster over time
-    patternMask = makePattern(bits);
+    if(!endless && round>ROUNDS_DAILY){ endGame(); return; }
+
+    msgEl.textContent=`Memorize the pattern… (${mode} mode)`;
+    const bits=Math.min(2+round,6);             // ramps difficulty
+    const showMs=Math.max(450,1000-round*100);  // shorter flashes over time
+    patternMask=makePattern(bits);
     showPattern(patternMask, showMs).then(()=>{
-      msgEl.textContent = 'Recreate it, then Submit.';
-      submit.disabled = false; clearB.disabled = false;
+      msgEl.textContent='Recreate it, then Submit.';
+      submit.disabled=false; clearB.disabled=false;
     });
   }
 
   function endGame(){
-    const bestKey = 'blinkgrid_best_'+mode;
-    const best = Math.max(Number(localStorage.getItem(bestKey)||0), hits);
-    localStorage.setItem(bestKey, best);
-    msgEl.innerHTML = `Done! You matched <b>${hits}</b>/5. Best (${mode}): <b>${best}</b>.`;
-    submit.disabled = true; clearB.disabled = true;
+    const key='blinkgrid_best_'+mode;
+    const best=Math.max(Number(localStorage.getItem(key)||0), hits);
+    localStorage.setItem(key, best);
+    msgEl.innerHTML=`Done! You matched <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
+    submit.disabled=true; clearB.disabled=true;
   }
 
-  submit.onclick = () => {
-    if(busy) return;
-    if(selectMask === patternMask){
+  submit.onclick=()=>{
+    if(busy)return;
+    if(selectMask===patternMask){
       hits++; hitsEl.textContent=hits;
-      msgEl.textContent = 'Nice! Next round…';
+      msgEl.textContent='Nice! Next round…';
       nextRound();
-    } else {
-      msgEl.textContent = 'Not quite—pattern shown again.';
-      showPattern(patternMask, 650);
+    }else{
+      msgEl.textContent='Not quite—pattern shown again.';
+      showPattern(patternMask,650);
     }
   };
-  clearB.onclick = () => { if(busy) return; selectMask=0; cells.forEach(c=>c.classList.remove('selected')); };
+  clearB.onclick=()=>{ if(busy)return; selectMask=0; cells.forEach(c=>c.classList.remove('selected')); };
 
   function start(m){
-    mode = m; rng = (m==='Daily') ? lcg(dailySeed()) : Math.random;
-    round = 0; hits = 0; hitsEl.textContent=hits; nextRound();
-    history.replaceState(null,'', location.pathname + (m==='Daily'?'?mode=daily':'?mode=endless'));
+    mode=m; endless=(m==='Endless');
+    rng=(m==='Daily')?lcg(dailySeed()):Math.random;
+    round=0; hits=0; hitsEl.textContent=hits; roundEl.textContent=0;
+    ofEl.textContent=endless?'':'/'+ROUNDS_DAILY; // hide '/5' in Endless
+    nextRound();
+    history.replaceState(null,'',location.pathname+(m==='Daily'?'?mode=daily':'?mode=endless'));
   }
-  document.getElementById('daily').onclick   = ()=> start('Daily');
-  document.getElementById('endless').onclick = ()=> start('Endless');
+  document.getElementById('daily').onclick  = ()=>start('Daily');
+  document.getElementById('endless').onclick= ()=>start('Endless');
 
-  // auto-start based on URL param
+  // auto-start from URL param
   if(new URLSearchParams(location.search).get('mode')==='daily') start('Daily');
   </script>
 </body>
