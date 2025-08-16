@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>TapSum</title>
   <style>
+    /* --- Screen fit: paste near the top of <style> --- */
+html,body{
+  height:100svh;            /* iOS-safe full height */
+  margin:0;
+  overflow:hidden;          /* prevent accidental scroll */
+  background:#f8f7f4;       /* neutral background */
+  color:#2b221b;
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+.wrap{
+  height:100%;
+  display:grid;             /* center content */
+  place-items:center;
+  padding:8px;
+}
     :root{
       --bg:#0b0f14;
       --panel:#121923;
