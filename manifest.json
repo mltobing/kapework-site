@@ -1,5 +1,6 @@
 [
   {"slug":"tapsum","title":"TapSum","emoji":"🔢","blurb":"Tap numbers to hit the target. Daily seed + endless."},
   {"slug":"blinkgrid","title":"BlinkGrid","emoji":"🧠","blurb":"Watch the pattern blink, then recreate it. 5 rounds."},
-{"slug":"blinkgrid4","title":"BlinkGrid 4×4","emoji":"🧩","blurb":"Bigger 4×4 memory—watch, blink, recreate. Daily + endless."}
+{"slug":"blinkgrid4","title":"BlinkGrid 4×4","emoji":"🧩","blurb":"Bigger 4×4 memory—watch, blink, recreate. Daily + endless."},
+{"slug":"cvcbuilder","title":"CVC Builder+","emoji":"🔤","blurb":"Build, sound-out, and blend C‑V‑C words. Daily + Free play."}
 ]
