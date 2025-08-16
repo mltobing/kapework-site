@@ -24,7 +24,7 @@ a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
 <body>
 <div class="wrap">
   <h1>BlinkGrid 4×4</h1>
-  <div class="muted">Advanced mode: bigger grid. Watch the pattern blink, then recreate it.</div>
+  <div class="muted">Advanced grid. Auto-submit on completion.</div>
 
   <div class="panel">
     <div id="msg" class="muted">Choose a mode to start.</div>
@@ -37,8 +37,7 @@ a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
     <div id="grid" class="grid" aria-label="4 by 4 memory grid"></div>
 
     <div class="row">
-      <button id="submit" class="primary" disabled>Submit</button>
-      <button id="clear" disabled>Clear</button>
+      <button id="reset">Reset selection</button>
       <a href="/apps/">← Vibe Lab</a>
     </div>
   </div>
@@ -48,30 +47,52 @@ a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
 // helpers
 function lcg(seed){let s=seed>>>0; return ()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
 function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
+const ROUNDS_DAILY=5, CELLS=16;
 
-const ROUNDS_DAILY = 5;
-const CELLS = 16; // 4×4
-
-// state
+// refs & state
 const gridEl=document.getElementById('grid'), msgEl=document.getElementById('msg');
 const roundEl=document.getElementById('round'), ofEl=document.getElementById('of'), hitsEl=document.getElementById('hits');
-const submit=document.getElementById('submit'), clearB=document.getElementById('clear');
+const resetB=document.getElementById('reset');
 
 let rng=Math.random, mode=null, round=0, hits=0, endless=false;
-let patternMask=0, selectMask=0, busy=false;
+let patternMask=0, selectMask=0, neededBits=0, busy=false;
 
-// build 4×4 grid
+// build grid
 const cells=[];
 for(let i=0;i<CELLS;i++){
   const d=document.createElement('button');
   d.className='cell'; d.setAttribute('aria-label','cell '+(i+1));
-  d.addEventListener('click',()=>{ if(busy) return;
-    selectMask ^= (1<<i);
-    d.classList.toggle('selected');
-    submit.disabled=false; clearB.disabled=false;
-    if(navigator.vibrate) navigator.vibrate(8);
-  });
+  d.addEventListener('click',()=>onTap(i));
   gridEl.appendChild(d); cells.push(d);
+}
+function bitCount(m){let c=0; while(m){m&=m-1; c++;} return c;}
+
+function onTap(i){
+  if(busy) return;
+  const bit=(1<<i);
+  if(selectMask & bit){ selectMask &= ~bit; cells[i].classList.remove('selected'); }
+  else { selectMask |= bit; cells[i].classList.add('selected'); if(navigator.vibrate) navigator.vibrate(8); }
+
+  const cnt=bitCount(selectMask);
+  if(cnt===neededBits){
+    busy=true;
+    setTimeout(()=>{
+      if(selectMask===patternMask){
+        hits++; hitsEl.textContent=hits;
+        msgEl.textContent='Nice! Next round…';
+        nextRound();
+      }else{
+        if(navigator.vibrate) navigator.vibrate([40,40,40]);
+        msgEl.textContent='Wrong pattern — game over.';
+        endGame();
+      }
+      busy=false;
+    },80);
+  } else if(cnt>neededBits){
+    if(navigator.vibrate) navigator.vibrate([30,30]);
+    msgEl.textContent='Too many tiles — game over.';
+    endGame();
+  }
 }
 
 function makePattern(bits){
@@ -83,7 +104,6 @@ function makePattern(bits){
   }
   return m;
 }
-
 async function showPattern(mask, ms){
   busy=true;
   cells.forEach((c,i)=> c.classList.toggle('show', !!(mask&(1<<i))));
@@ -91,21 +111,20 @@ async function showPattern(mask, ms){
   cells.forEach(c=> c.classList.remove('show'));
   busy=false;
 }
+function clearSelection(){ selectMask=0; cells.forEach(c=>c.classList.remove('selected')); }
+resetB.onclick=()=>{ if(!busy) clearSelection(); };
 
 function nextRound(){
-  round++; roundEl.textContent=round; selectMask=0;
-  cells.forEach(c=>c.classList.remove('selected'));
-  submit.disabled=true; clearB.disabled=true;
+  round++; roundEl.textContent=round; clearSelection();
 
   if(!endless && round>ROUNDS_DAILY){ endGame(); return; }
 
-  msgEl.textContent = `Memorize the pattern… (${mode} mode)`;
-  const bits   = Math.min(3 + Math.floor(round*0.8), 10); // start 3; ramp to ~10
-  const showMs = Math.max(500, 1100 - round*80);          // slightly longer flashes than 3×3
-  patternMask = makePattern(bits);
+  msgEl.textContent=`Memorize the pattern… (${mode} mode)`;
+  neededBits = Math.min(3 + Math.floor(round*0.8), 10); // start 3; ramp to ~10
+  const showMs = Math.max(500, 1100 - round*80);
+  patternMask = makePattern(neededBits);
   showPattern(patternMask, showMs).then(()=>{
-    msgEl.textContent='Recreate it, then Submit.';
-    submit.disabled=false; clearB.disabled=false;
+    msgEl.textContent=`Select ${neededBits} tile${neededBits>1?'s':''}.`;
   });
 }
 
@@ -113,22 +132,8 @@ function endGame(){
   const key='blinkgrid4_best_'+mode;
   const best=Math.max(Number(localStorage.getItem(key)||0), hits);
   localStorage.setItem(key, best);
-  msgEl.innerHTML = `Done! You matched <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
-  submit.disabled=true; clearB.disabled=true;
+  msgEl.innerHTML=`Done! Correct rounds: <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
 }
-
-submit.onclick=()=>{
-  if(busy)return;
-  if(selectMask===patternMask){
-    hits++; hitsEl.textContent=hits;
-    msgEl.textContent='Nice! Next round…';
-    nextRound();
-  }else{
-    msgEl.textContent='Not quite—pattern shown again.';
-    showPattern(patternMask, 750);
-  }
-};
-clearB.onclick=()=>{ if(busy)return; selectMask=0; cells.forEach(c=>c.classList.remove('selected')); };
 
 function start(m){
   mode=m; endless=(m==='Endless');
