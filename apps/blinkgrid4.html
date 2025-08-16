@@ -4,7 +4,22 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BlinkGrid 4×4 — Kapework Vibe Lab</title>
 <style>
-:root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
+/* --- Screen fit: paste near the top of <style> --- */
+html,body{
+  height:100svh;            /* iOS-safe full height */
+  margin:0;
+  overflow:hidden;          /* prevent accidental scroll */
+  background:#f8f7f4;       /* neutral background */
+  color:#2b221b;
+  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+.wrap{
+  height:100%;
+  display:grid;             /* center content */
+  place-items:center;
+  padding:8px;
+}
+  :root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;display:flex;min-height:100svh}
 .wrap{max-width:520px;margin:auto;padding:20px}
 h1{margin:0 0 8px;font-weight:800}
