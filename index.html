@@ -1,18 +1,138 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kapework Vibe Lab</title><style>
-  body{font:16px/1.4 system-ui;margin:0;background:#faf7f2;color:#2d221b}
-  .wrap{max-width:820px;margin:40px auto;padding:0 16px}
-  h1{font-weight:800;margin:0 0 12px} .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-  .card{background:#fff;border:1px solid #e7ded4;border-radius:14px;padding:14px;text-decoration:none;color:inherit}
-  .card h3{margin:6px 0 4px} .muted{color:#7b6b60}
-</style></head><body><div class="wrap">
-  <h1>Vibe Lab</h1><p class="muted">Tiny single-file apps. Zero fuss.</p>
-  <div id="grid" class="grid"></div>
-</div><script>
-  fetch('manifest.json').then(r=>r.json()).then(list=>{
-    const g=document.getElementById('grid');
-    g.innerHTML=list.map(x=>`<a class="card" href="./apps/${x.slug}.html"><div style="font-size:32px">${x.emoji||'🎛️'}</div>
-      <h3>${x.title}</h3><div class="muted">${x.blurb||''}</div></a>`).join('');
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#fff1d6">
+  <title>Kapework — Vibe Lab</title>
+
+  <!-- Playful font -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg1:#fff1d6; --bg2:#fff8ec;
+      --ink:#3b2e2a; --muted:#7a5e4b;
+      --card:#ffffff; --line:#eadfd3;
+      --accent:#ffb703; --accent-ink:#1b130f;
+      --max:980px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; color:var(--ink);
+      font:16px/1.5 "Fredoka", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(80% 70% at 20% 0%, var(--bg1) 0, var(--bg2) 60%, var(--bg2) 100%);
+      display:flex; flex-direction:column; align-items:center;
+    }
+    header,main,footer{width:100%; max-width:var(--max); padding:16px}
+    header{padding-top:24px}
+    .brand{display:flex; gap:12px; align-items:center}
+    .logo{font-size:34px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.08))}
+    h1{margin:0; font-size:28px; font-weight:900}
+    .tag{margin:6px 0 0; color:var(--muted)}
+    .kidbar{display:flex; align-items:center; gap:8px; margin:12px 0 4px; flex-wrap:wrap}
+    .kidbar small{color:var(--muted)}
+    .kidbtn{
+      border:1px solid var(--line); background:#fff; padding:8px 12px; border-radius:12px; font-weight:700;
+    }
+    .kidbtn.active{background:var(--accent); color:var(--accent-ink); border-color:#e2a700}
+    .cards{
+      display:grid; gap:12px; margin-top:12px;
+      grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+    }
+    .card{
+      display:flex; gap:12px; align-items:flex-start;
+      background:var(--card); border:1px solid var(--line); border-radius:16px;
+      padding:14px 16px; text-decoration:none; color:inherit;
+      box-shadow:0 10px 24px rgba(0,0,0,.06);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+    .card:active{transform:scale(.99)}
+    .card:hover{transform:translateY(-2px); box-shadow:0 14px 30px rgba(0,0,0,.08)}
+    .card .emoji{font-size:32px; width:40px; text-align:center}
+    .card h3{margin:0 0 4px; font-size:18px}
+    .card p{margin:0; color:var(--muted); font-weight:500}
+    .row{display:flex; align-items:center; gap:8px; margin-top:8px}
+    .mini{border:1px dashed var(--line); padding:6px 10px; border-radius:10px; font-size:14px; background:#fff}
+    footer{color:var(--muted); text-align:center; padding-bottom:32px}
+    .divider{height:1px; background:linear-gradient(90deg, transparent, #eadfd3, transparent); margin:10px 0}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">🎮</div>
+    <div>
+      <h1>Vibe Lab</h1>
+      <div class="tag">Tiny single-file apps. Zero fuss.</div>
+    </div>
+  </div>
+
+  <!-- Player switcher (saves who is playing in localStorage) -->
+  <div class="kidbar" id="kidbar">
+    <small>Player:</small>
+    <button class="kidbtn" data-kid="Maxi">Maxi</button>
+    <button class="kidbtn" data-kid="Yciar">Yciar</button>
+    <button class="kidbtn" data-kid="Guest">Guest</button>
+    <small id="whois"></small>
+  </div>
+  <div class="divider"></div>
+</header>
+
+<main>
+  <div id="grid" class="cards" aria-live="polite"></div>
+</main>
+
+<footer>
+  © <span id="yr"></span> Kapework · Built for play
+</footer>
+
+<script>
+  // --- Player picker ---
+  const WHO_KEY = 'kw_player';
+  const whoEl = document.getElementById('whois');
+  const kb = document.getElementById('kidbar');
+  function setPlayer(name){
+    localStorage.setItem(WHO_KEY, name);
+    [...kb.querySelectorAll('.kidbtn')].forEach(b=>b.classList.toggle('active', b.dataset.kid===name));
+    whoEl.textContent = `(current: ${name})`;
+  }
+  kb.addEventListener('click', e => {
+    const k = e.target.dataset.kid; if(!k) return;
+    setPlayer(k);
   });
-</script></body></html>
+  setPlayer(localStorage.getItem(WHO_KEY) || 'Guest');
+
+  // --- Render cards from /manifest.json ---
+  const grid = document.getElementById('grid');
+  fetch('/manifest.json')
+    .then(r => r.json())
+    .then(list => {
+      // sort newest first by title or leave as-is; keeping as-is here
+      grid.innerHTML = list.map(x => `
+        <a class="card" href="/apps/${x.slug}.html">
+          <div class="emoji">${x.emoji || '🎛️'}</div>
+          <div>
+            <h3>${x.title}</h3>
+            <p>${x.blurb || ''}</p>
+            <div class="row">
+              <span class="mini">Open</span>
+              <a class="mini" href="/apps/${x.slug}.html?mode=daily" onclick="event.stopPropagation()">Daily</a>
+            </div>
+          </div>
+        </a>`).join('');
+    })
+    .catch(err => {
+      grid.innerHTML = `<div class="card"><div class="emoji">⚠️</div>
+        <div><h3>Couldn’t load apps</h3><p>Please check <code>/manifest.json</code>.</p></div></div>`;
+      console.error(err);
+    });
+
+  // footer year
+  document.getElementById('yr').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
