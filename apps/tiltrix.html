@@ -1,221 +1,406 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Tiltrix — Kapework Vibe Lab</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tiltrix</title>
 <style>
-  html,body{height:100svh;margin:0;overflow:hidden;background:#f8f7f4;color:#2b221b;
-            font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  .wrap{height:100%;display:grid;place-items:center}
-  .hud{position:fixed;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;
-       font-weight:800;opacity:.8;pointer-events:none}
-  canvas{touch-action:none;image-rendering:pixelated}
-  .start{position:fixed;inset:0;display:grid;place-items:center;background:rgba(248,247,244,.95)}
-  .card{background:#fff;border:1px solid #ece8e3;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,.06);
-        padding:16px;text-align:center;max-width:420px}
-  .btn{margin-top:10px;padding:10px 14px;border-radius:12px;border:1px solid #e0dcd6;background:#fff;font-weight:800}
-  .btn.primary{background:#b67b50;color:#fff;border-color:#a06d47}
-  a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0b3a6}
+  :root { --bd:#e5e7eb; --muted:#6b7280; --ink:#111827; --bg:#ffffff; }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:520px;margin:0 auto;padding:12px 12px 72px;position:relative}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{font-size:20px;margin:0}
+  .meta{font-size:12px;color:var(--muted)}
+  .board{display:flex;justify-content:center;margin-top:12px}
+  canvas{border:1px solid var(--bd);border-radius:14px;background:#0b1220;display:block;touch-action:none}
+  .hud{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .btn{padding:6px 10px;border:1px solid var(--bd);border-radius:12px;background:#fff;cursor:pointer}
+  .hint{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.3}
+  /* Floating tilt buttons created by script share this look */
+  .floating{position:fixed;bottom:12px;right:12px;z-index:9999;padding:10px 12px;border-radius:12px;border:1px solid var(--bd);background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.1);font:14px system-ui}
+  .floating.secondary{right:120px}
+  @media (min-width:420px){
+    canvas{width:300px;height:600px}
+  }
 </style>
+</head>
 <body>
-<div class="wrap"><canvas id="cv" width="320" height="640" aria-label="Tiltrix game board"></canvas></div>
-<div class="hud"><div id="score">Lines: 0</div><div><a href="/apps/">Vibe Lab</a></div></div>
-
-<!-- Start / permission overlay -->
-<div id="gate" class="start">
-  <div class="card">
-    <h2 style="margin:0 0 6px">Tiltrix</h2>
-    <div style="opacity:.8">Tilt left/right to move. Tap to rotate. Swipe down to drop.</div>
-    <button id="tilt" class="btn primary">Enable tilt & start</button>
-    <button id="nosensor" class="btn">Start without tilt</button>
-    <div style="opacity:.6;margin-top:8px;font-size:.9rem">
-      Tip: add <code>?mode=daily</code> for today’s seeded sequence.
+  <div class="wrap">
+    <header>
+      <h1>Tiltrix</h1>
+      <div class="pill"><span>Score:</span><strong id="score">0</strong></div>
+    </header>
+    <div class="meta">Tilt left/right to move · Tilt forward to drop · Tilt back to rotate ⟲ · Tap left half = rotate ⟲</div>
+    <div class="board"><canvas id="c" width="240" height="480" aria-label="tilt tetris board"></canvas></div>
+    <div class="hud">
+      <button id="restart" class="btn">Restart</button>
+      <div class="pill"><span>Lines:</span><strong id="lines">0</strong></div>
     </div>
+    <p class="hint">Tip: Tap <strong>Enable Tilt</strong> and hold the phone naturally, then press <strong>Calibrate</strong> if needed. Kids mode: play with taps only.</p>
   </div>
-</div>
 
-<script>
-/* ----------- utils & seeded RNG ----------- */
-function lcg(seed){let s=seed>>>0;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
-function daySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
-const seeded = new URLSearchParams(location.search).get('mode')==='daily' ? lcg(daySeed()) : Math.random;
+  <!-- === GAME LOGIC ===================================================== -->
+  <script>
+  (function(){
+    const COLS=10, ROWS=20, SIZE=24;
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const linesEl  = document.getElementById('lines');
+    const restartBtn = document.getElementById('restart');
 
-/* ----------- board & pieces ----------- */
-const COLS=10, ROWS=20;
-const COLORS=['#ddd','#5cc8ff','#ffd166','#06d6a0','#ef476f','#8d8bfe','#ffa3a3','#7bdff2']; // bright
-const SHAPES=[ // I,O,T,S,Z,J,L (4x4 matrices)
- [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
- [[2,2],[2,2]],
- [[0,3,0],[3,3,3],[0,0,0]],
- [[0,4,4],[4,4,0],[0,0,0]],
- [[5,5,0],[0,5,5],[0,0,0]],
- [[6,0,0],[6,6,6],[0,0,0]],
- [[0,0,7],[7,7,7],[0,0,0]]
-];
+    const COLORS = {
+      I:'#6ee7b7', O:'#fde68a', T:'#c4b5fd', S:'#86efac', Z:'#fca5a5', J:'#93c5fd', L:'#fdba74'
+    };
 
-function emptyBoard(){return Array.from({length:ROWS},()=>Array(COLS).fill(0));}
-let board = emptyBoard();
+    // Tetromino definitions (4x4 matrices)
+    const SHAPES = {
+      I: [
+        [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+        [[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]],
+        [[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]],
+        [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]],
+      ],
+      O: [
+        [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+      ],
+      T: [
+        [[0,1,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0]],
+        [[0,0,0,0],[1,1,1,0],[0,1,0,0],[0,0,0,0]],
+        [[0,1,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0]],
+      ],
+      S: [
+        [[0,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,0,0],[0,1,1,0],[0,0,1,0],[0,0,0,0]],
+        [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]],
+        [[1,0,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0]],
+      ],
+      Z: [
+        [[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,0,1,0],[0,1,1,0],[0,1,0,0],[0,0,0,0]],
+        [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]],
+        [[0,1,0,0],[1,1,0,0],[1,0,0,0],[0,0,0,0]],
+      ],
+      J: [
+        [[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,1,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]],
+        [[0,0,0,0],[1,1,1,0],[0,0,1,0],[0,0,0,0]],
+        [[0,1,0,0],[0,1,0,0],[1,1,0,0],[0,0,0,0]],
+      ],
+      L: [
+        [[0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+        [[0,1,0,0],[0,1,0,0],[0,1,1,0],[0,0,0,0]],
+        [[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0]],
+        [[1,1,0,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]],
+      ]
+    };
+    const BAG = ['I','O','T','S','Z','J','L'];
 
-/* 7-bag generator */
-function bag(rand=seeded){
-  const ids=[0,1,2,3,4,5,6]; const out=[];
-  while(ids.length){ out.push(ids.splice(Math.floor(rand()*ids.length),1)[0]); }
-  return out;
-}
-let queue=[]; function nextId(){ if(!queue.length) queue=bag(); return queue.shift(); }
+    // Game state
+    let board, piece, nextBag, score, lines, gameOver=false;
+    let dropInterval = 600;   // ms (normal)
+    let lastDrop = performance.now();
 
-/* piece object */
-function spawn(){
-  const id=nextId(); const raw=SHAPES[id];
-  const shape = raw.map(r=>r.slice()); // deep copy
-  // position
-  const size = shape.length;
-  return {id,shape,x: Math.floor((COLS-size)/2), y: -1};
-}
-
-/* collisions */
-function collide(b, shape, offx, offy){
-  for(let y=0;y<shape.length;y++){
-    for(let x=0;x<shape[y].length;x++){
-      const v=shape[y][x]; if(!v) continue;
-      const nx=offx+x, ny=offy+y;
-      if(ny<0) continue; // above board allowed
-      if(nx<0||nx>=COLS||ny>=ROWS) return true;
-      if(b[ny][nx]) return true;
+    function newBoard(){
+      board = Array.from({length:ROWS}, ()=>Array(COLS).fill(null));
     }
-  } return false;
-}
-
-/* rotation with simple kicks */
-function rot(shape, dir){
-  const N=shape.length, out=Array.from({length:N},()=>Array(N).fill(0));
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++)
-    out[y][x] = dir>0 ? (shape[N-1-x][y]||0) : (shape[x][N-1-y]||0);
-  return out;
-}
-function tryRotate(p,dir){
-  const r=rot(p.shape,dir);
-  if(!collide(board,r,p.x,p.y)){ p.shape=r; return true; }
-  for(const k of [-1,1,-2,2]) if(!collide(board,r,p.x+k,p.y)){ p.x+=k; p.shape=r; return true; }
-  return false;
-}
-
-/* merge, clear */
-function merge(b,p){
-  const s=p.shape;
-  for(let y=0;y<s.length;y++)
-    for(let x=0;x<s[y].length;x++){
-      const v=s[y][x]; if(!v) continue;
-      const ny=p.y+y, nx=p.x+x; if(ny>=0) b[ny][nx]=v;
+    function randBag(){
+      const a = BAG.slice();
+      for (let i=a.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+      return a;
     }
-}
-function clearLines(){
-  let cleared=0;
-  for(let y=ROWS-1;y>=0;y--){
-    if(board[y].every(v=>v)){
-      board.splice(y,1);
-      board.unshift(Array(COLS).fill(0));
-      cleared++; y++;
+    function spawn(){
+      if (!nextBag.length) nextBag = randBag();
+      const t = nextBag.pop();
+      piece = {
+        t,
+        r:0,
+        x:3,
+        y:0,
+        m:SHAPES[t][0],
+        c:COLORS[t]
+      };
+      if (collide(piece, board)) { gameOver=true; }
     }
-  } return cleared;
-}
+    function rotate(p,dir){
+      const r = (p.r + (dir>0?1:3)) % 4;
+      const m = SHAPES[p.t][r];
+      const test = { ...p, r, m };
+      // Wall kicks: simple left/right nudge
+      if (!collide(test, board)) { Object.assign(p, test); return; }
+      test.x = p.x + 1;
+      if (!collide(test, board)) { Object.assign(p, test); return; }
+      test.x = p.x - 2;
+      if (!collide(test, board)) { Object.assign(p, test); return; }
+    }
+    function collide(p,b){
+      for (let y=0;y<4;y++){
+        for(let x=0;x<4;x++){
+          if (!p.m[y][x]) continue;
+          const nx = p.x + x, ny = p.y + y;
+          if (nx<0 || nx>=COLS || ny>=ROWS) return true;
+          if (ny>=0 && b[ny][nx]) return true;
+        }
+      }
+      return false;
+    }
+    function merge(p,b){
+      for (let y=0;y<4;y++){
+        for(let x=0;x<4;x++){
+          if (p.m[y][x] && p.y+y>=0) b[p.y+y][p.x+x] = p.c;
+        }
+      }
+    }
+    function clearLines(){
+      let cleared=0;
+      for (let y=ROWS-1; y>=0; y--){
+        if (board[y].every(c=>!!c)){
+          board.splice(y,1);
+          board.unshift(Array(COLS).fill(null));
+          cleared++; y++;
+        }
+      }
+      if (cleared){
+        lines += cleared;
+        score += [0,100,300,500,800][cleared] || 0;
+      }
+    }
 
-/* ----------- rendering ----------- */
-const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-function fit(){
-  // compute cell to fill screen height with minimal margins
-  const W=innerWidth, H=innerHeight;
-  const cell = Math.floor(Math.min(W/COLS, H/ROWS));
-  cv.width = cell*COLS; cv.height = cell*ROWS;
-  ctx.imageSmoothingEnabled=false;
-}
-addEventListener('resize', fit); fit();
+    function move(dx){
+      const test = { ...piece, x:piece.x+dx };
+      if (!collide(test,board)) piece.x += dx;
+    }
+    function setFallSpeed(mode){
+      dropInterval = (mode==="fast") ? 50 : 600;
+    }
+    function hardDrop(){
+      if (gameOver) return;
+      while (!collide({ ...piece, y:piece.y+1 }, board)) piece.y++;
+      tickLock();
+    }
+    function tick(){
+      const now = performance.now();
+      if (now - lastDrop > dropInterval){
+        lastDrop = now;
+        const test = { ...piece, y:piece.y+1 };
+        if (!collide(test,board)) { piece.y++; }
+        else { tickLock(); }
+      }
+      draw();
+      if (!gameOver) requestAnimationFrame(tick);
+      else drawGameOver();
+    }
+    function tickLock(){
+      merge(piece, board);
+      clearLines();
+      spawn();
+    }
 
-function drawCell(x,y,c){ ctx.fillStyle=COLORS[c]; ctx.fillRect(x,y,1,1);
-  ctx.strokeStyle='rgba(0,0,0,.06)'; ctx.strokeRect(x+.02,y+.02,.96,.96); }
-function draw(){
-  ctx.save(); const s = cv.width/COLS; ctx.scale(s,s); ctx.clearRect(0,0,COLS,ROWS);
-  // board
-  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){ const v=board[y][x]; if(v) drawCell(x,y,v); }
-  // piece
-  const s2=piece.shape;
-  for(let y=0;y<s2.length;y++) for(let x=0;x<s2[y].length;x++){
-    const v=s2[y][x]; if(!v) continue;
-    const ny=piece.y+y, nx=piece.x+x; if(ny>=0) drawCell(nx,ny,v);
-  }
-  ctx.restore();
-}
+    function drawCell(x,y,color){
+      const px = x*SIZE, py = y*SIZE;
+      // cell background
+      ctx.fillStyle = '#0b1220';
+      ctx.fillRect(px,py,SIZE,SIZE);
+      // block
+      if (color){
+        ctx.fillStyle = color;
+        ctx.fillRect(px+1,py+1,SIZE-2,SIZE-2);
+        ctx.fillStyle = 'rgba(255,255,255,.15)';
+        ctx.fillRect(px+1,py+1,SIZE-2,4);
+      }
+      // grid line
+      ctx.strokeStyle = 'rgba(255,255,255,.06)';
+      ctx.strokeRect(px+0.5,py+0.5,SIZE-1,SIZE-1);
+    }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // board
+      for (let y=0;y<ROWS;y++){
+        for(let x=0;x<COLS;x++){
+          drawCell(x,y, board[y][x]);
+        }
+      }
+      // piece
+      for (let y=0;y<4;y++){
+        for(let x=0;x<4;x++){
+          if (piece.m[y][x]){
+            const gx = piece.x + x, gy = piece.y + y;
+            if (gy>=0) drawCell(gx,gy,piece.c);
+          }
+        }
+      }
+      scoreEl.textContent = score;
+      linesEl.textContent = lines;
+    }
+    function drawGameOver(){
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 20px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Game Over', canvas.width/2, canvas.height/2 - 8);
+      ctx.font = '14px system-ui';
+      ctx.fillText('Tap Restart', canvas.width/2, canvas.height/2 + 16);
+    }
 
-/* ----------- input: tilt + gestures ----------- */
-let useTilt=false, gamma=0;
-let lastDir=0, nextMoveAt=0, DAS=150, ARR=60;
+    function start(){
+      newBoard(); nextBag = randBag(); score=0; lines=0; gameOver=false;
+      spawn();
+      lastDrop = performance.now();
+      requestAnimationFrame(tick);
+    }
+    restartBtn.addEventListener('click', start);
+    canvas.addEventListener('click', ()=>{ if (gameOver) start(); });
 
-function enableTilt(){
-  function ok(){ useTilt=true; document.getElementById('gate').style.display='none'; }
-  const DME=window.DeviceMotionEvent, DOE=window.DeviceOrientationEvent;
-  if(DOE && typeof DOE.requestPermission==='function'){
-    DOE.requestPermission().then(s=>{ if(s==='granted') { addTilt(); ok(); } else { ok(); }});
-  }else if(DOE){ addTilt(); ok(); }
-  else { ok(); }
-}
-function addTilt(){
-  addEventListener('deviceorientation', e=>{ if(typeof e.gamma==='number') gamma=e.gamma; });
-}
-document.getElementById('tilt').onclick=enableTilt;
-document.getElementById('nosensor').onclick=()=>{ document.getElementById('gate').style.display='none'; };
+    // Touch fallback: tap right half rotate CW; left half CCW
+    canvas.addEventListener('pointerdown', (e)=>{
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      if (x < rect.width/2) rotate(piece,-1); else rotate(piece,1);
+    });
 
-let touchStart=null;
-cv.addEventListener('touchstart',e=>{ const t=e.changedTouches[0]; touchStart={x:t.clientX,y:t.clientY,t:Date.now()}; },{passive:true});
-cv.addEventListener('touchend',e=>{
-  const t=e.changedTouches[0]; const dx=t.clientX-touchStart.x, dy=t.clientY-touchStart.y, dt=Date.now()-touchStart.t;
-  const adx=Math.abs(dx), ady=Math.abs(dy);
-  if(ady>40 && dt<250){ hardDrop(); return; }
-  if(adx<10 && ady<10 && dt<220){ rotate(); return; }
-},{passive:true});
+    // Expose controls for tilt script
+    window.__tiltrixControls = {
+      move: (dx)=>move(dx),
+      setFallSpeed: (mode)=>setFallSpeed(mode),
+      hardDrop: ()=>hardDrop(),
+      rotate: (dir)=>rotate(piece,dir) // dir: +1 CW, -1 CCW
+    };
 
-/* fallback swipe left/right if no tilt */
-cv.addEventListener('touchmove',e=>{
-  if(useTilt) return;
-  const t=e.changedTouches[0]; const dx=t.clientX-touchStart.x;
-  if(Math.abs(dx)>22){ move(dx>0?1:-1); touchStart.x=t.clientX; }
-},{passive:true});
+    start();
+  })();
+  </script>
 
-/* ----------- game loop ----------- */
-let piece=spawn();
-let lines=0; const scoreEl=document.getElementById('score');
-let dropEvery=900, last=0, acc=0;
+  <!-- === TILT CONTROLS =================================================== -->
+  <script>
+  /*  Mapping:
+        - gamma (left/right)  → move L/R with auto-repeat
+        - beta  (forward/back)→ soft/hard drop + rotate CW (latched)
+      Backup touch: tap left half rotate CCW (already in game).
+  */
+  (function(){
+    const G = window.__tiltrixControls;
+    if (!G) return;
 
-function move(dir){ if(!collide(board,piece.shape,piece.x+dir,piece.y)){ piece.x+=dir; vibrate(8); } }
-function rotate(){ if(tryRotate(piece,1)) vibrate(10); }
-function softDrop(){ if(!collide(board,piece.shape,piece.x,piece.y+1)){ piece.y++; return true; } return false; }
-function hardDrop(){ let moved=false; while(softDrop()) moved=true; tick(true); }
-function vibrate(ms){ if(navigator.vibrate) navigator.vibrate(ms); }
+    // Hook bridge
+    const HOOKS = {
+      moveLeft:  () => G.move(-1),
+      moveRight: () => G.move(+1),
+      startSoftDrop: () => G.setFallSpeed("fast"),
+      stopSoftDrop:  () => G.setFallSpeed("normal"),
+      hardDrop:  () => G.hardDrop(),
+      rotateCW:  () => G.rotate(+1),
+      rotateCCW: () => G.rotate(-1)
+    };
 
-function tick(lockNow=false){
-  if(!lockNow && !collide(board,piece.shape,piece.x,piece.y+1)){ piece.y++; return; }
-  // lock
-  merge(board,piece); vibrate(30);
-  const c=clearLines(); if(c){ lines+=c; scoreEl.textContent='Lines: '+lines; vibrate(60); dropEvery=Math.max(300,dropEvery-40*c); }
-  piece=spawn();
-  if(collide(board,piece.shape,piece.x,piece.y)){ // game over
-    board=emptyBoard(); lines=0; dropEvery=900; scoreEl.textContent='Lines: 0';
-  }
-}
+    function makeButton(text, onClick, rightPx) {
+      const b = document.createElement("button");
+      b.textContent = text;
+      b.className = "floating" + (rightPx?" secondary":"");
+      if (rightPx) b.style.right = rightPx;
+      b.addEventListener("click", onClick);
+      document.body.appendChild(b);
+      return b;
+    }
 
-function update(t){
-  const dt=t-last; last=t; acc+=dt;
+    // Tunables
+    const LR_TILT = 8;   // deg: start moving
+    const LR_DAS  = 130; // ms: delay before auto-repeat
+    const LR_RPT  = 65;  // ms: repeat rate
+    const FB_SOFT = 8;   // deg beta: soft drop
+    const FB_HARD = 22;  // deg beta: hard drop
+    const ROT_T   = -10; // deg beta: back tilt for CW rotate
+    const HYS     = 3;   // deg: hysteresis
+    const SMOOTH  = 0.15;
 
-  // handle tilt as repeated moves (DAS/ARR)
-  if(useTilt){
-    const thr=6; const dir = gamma>thr ? 1 : (gamma<-thr ? -1 : 0);
-    if(dir){
-      if(dir!==lastDir){ move(dir); nextMoveAt=t+DAS; lastDir=dir; }
-      else if(t>=nextMoveAt){ move(dir); nextMoveAt=t+ARR; }
-    }else{ lastDir=0; nextMoveAt=0; }
-  }
+    let baseBeta=0, baseGamma=0, fBeta=0, fGamma=0;
+    let lrState=0, lrTimer=null, lrRpt=null;
+    let softDropping=false, hardDroppedLatch=false, rotateLatched=false;
+    let sensorBound=false;
 
-  if(acc>=dropEvery){ acc%=dropEvery; tick(false); }
-  draw();
-  requestAnimationFrame(update);
-}
-requestAnimationFrame(update);
-</script>
+    function stopLR(){ if (lrTimer){clearTimeout(lrTimer);lrTimer=null} if(lrRpt){clearInterval(lrRpt);lrRpt=null} }
+    function startLR(dir){
+      stopLR();
+      (dir<0?HOOKS.moveLeft:HOOKS.moveRight)();
+      lrTimer=setTimeout(()=>{ lrRpt=setInterval(()=> (dir<0?HOOKS.moveLeft:HOOKS.moveRight)(), LR_RPT); }, LR_DAS);
+    }
+    function setSoftDrop(on){
+      if (on && !softDropping){ HOOKS.startSoftDrop(); softDropping=true; }
+      if (!on && softDropping){ HOOKS.stopSoftDrop();  softDropping=false; }
+    }
+    function calibrate(beta,gamma){
+      baseBeta=beta; baseGamma=gamma;
+      stopLR(); lrState=0; setSoftDrop(false);
+      hardDroppedLatch=false; rotateLatched=false;
+    }
+
+    function bindSensor(){
+      if (sensorBound) return;
+      window.addEventListener("deviceorientation",(e)=>{
+        const beta = e.beta ?? 0;
+        const gamma = e.gamma ?? 0;
+        const dB = beta - baseBeta;
+        const dG = gamma - baseGamma;
+        fBeta  = fBeta  + (dB - fBeta)  * SMOOTH;
+        fGamma = fGamma + (dG - fGamma) * SMOOTH;
+
+        // L/R
+        const wantLR = (fGamma > LR_TILT) ? 1 : (fGamma < -LR_TILT ? -1 : 0);
+        if (wantLR !== lrState){
+          lrState = wantLR; stopLR(); if (lrState!==0) startLR(lrState);
+        }
+
+        // Forward: drop
+        const forward = fBeta;
+        if (forward > FB_HARD && !hardDroppedLatch){
+          HOOKS.hardDrop(); hardDroppedLatch=true;
+        } else if (forward < FB_HARD - HYS){
+          hardDroppedLatch=false;
+        }
+        setSoftDrop(forward > FB_SOFT && forward <= FB_HARD - HYS);
+
+        // Backward: rotate CW (latched)
+        if (fBeta < ROT_T && !rotateLatched){ HOOKS.rotateCW(); rotateLatched=true; }
+        else if (fBeta > ROT_T + HYS){ rotateLatched=false; }
+      }, { passive:true });
+      sensorBound=true;
+    }
+
+    async function requestMotion(){
+      try{
+        if (typeof DeviceMotionEvent !== "undefined" &&
+            typeof DeviceMotionEvent.requestPermission === "function") {
+          const res = await DeviceMotionEvent.requestPermission();
+          if (res !== "granted") throw new Error("Permission denied");
+        }
+        const once = (e)=>{ calibrate(e.beta||0, e.gamma||0); window.removeEventListener("deviceorientation", once); };
+        window.addEventListener("deviceorientation", once, { passive:true });
+        bindSensor();
+        permBtn.remove(); calibBtn.style.display="block";
+      }catch(err){
+        alert("Tilt access not granted. You can keep playing with taps.");
+        console.warn(err);
+      }
+    }
+
+    const permBtn  = makeButton("Enable Tilt", requestMotion);
+    const calibBtn = makeButton("Calibrate", ()=>{
+      const once = (e)=>{ calibrate(e.beta||0, e.gamma||0); window.removeEventListener("deviceorientation", once); };
+      window.addEventListener("deviceorientation", once, { passive:true });
+    }, "120px");
+    calibBtn.style.display="none";
+
+    document.addEventListener("visibilitychange", ()=>{
+      if (document.hidden){ stopLR(); setSoftDrop(false); }
+    });
+
+  })();
+  </script>
+</body>
+</html>
