@@ -11,14 +11,21 @@
   header{display:flex;gap:12px;align-items:center;justify-content:space-between}
   .sorter{display:flex;gap:8px;align-items:center}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px}
-  .card{position:relative;border:1px solid var(--bd);border-radius:16px;padding:14px 14px 42px;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;background:#fff}
+
+  /* Card is a link so navigation is instant; heart stops it with preventDefault */
+  a.card{
+    position:relative; display:block; text-decoration:none; color:inherit;
+    border:1px solid var(--bd); border-radius:16px; padding:14px 14px 42px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05); background:#fff; cursor:pointer;
+  }
   .title{display:flex;gap:10px;align-items:center}
   .emoji{font-size:1.3rem}
   .name{font-weight:700}
   .badge{position:absolute;bottom:10px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff}
   .playbadge{left:10px}
-  .like{right:10px}
-  .like.liked{background:#f9fafb}
+  button.like{right:10px;position:absolute;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff;cursor:pointer}
+  button.like.liked{background:#f9fafb}
+
   .feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:10px}
   textarea,button,select{font:inherit}
   textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px}
@@ -60,6 +67,10 @@
     const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
     const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
     let sb = null;
+
+    // REST endpoints (used with keepalive for reliable writes on navigation)
+    const REST_PLAYS = `${SUPABASE_URL}/rest/v1/plays`;
+    const REST_LIKES = `${SUPABASE_URL}/rest/v1/likes`;
 
     // DOM
     const grid = document.getElementById("grid");
@@ -126,72 +137,79 @@
         const likeNum = likeCounts.get(g.slug) ?? 0;
         const playNum = playCounts.get(g.slug) ?? 0;
 
-        const card = document.createElement("div");
+        // Whole card is a link for instant navigation
+        const card = document.createElement("a");
         card.className = "card";
-        card.setAttribute("role","button");
-        card.setAttribute("tabindex","0");
+        card.href = g.url;
+        card.target = "_blank";
+        card.setAttribute("aria-label", `Play ${g.name}`);
+
         card.innerHTML = `
           <div class="title">
             <span class="emoji">${g.cover_emoji || "🎮"}</span>
             <div class="name">${g.name}</div>
           </div>
           <span class="badge playbadge" data-slug="${g.slug}">▶︎ ${playNum}</span>
-          <button class="badge like ${liked?"liked":""}" data-slug="${g.slug}" aria-pressed="${liked}">
+          <button type="button" class="like ${liked?"liked":""}" data-slug="${g.slug}" aria-pressed="${liked}">
             ${liked ? "❤️" : "♡"} ${likeNum}
           </button>
         `;
 
-        // Open game on card click (do navigation FIRST for iOS popup rules)
+        // Before navigation, record a play using keepalive fetch (survives unload)
         card.addEventListener("click",(e)=>{
-          if (e.target.closest("button.like")) return; // ignore heart clicks
-
-          const slug = g.slug;
-          const url  = g.url;
-
-          // 1) Navigate immediately (try new tab, fall back to same tab)
-          let opened = false;
-          try { const w = window.open(url, "_blank"); opened = !!w; } catch(_) {}
-          if (!opened) window.location.href = url;
-
-          // 2) Update local UI counts (so the list feels instant)
-          playCounts.set(slug, (playCounts.get(slug)||0) + 1);
+          // If the heart was clicked, the button handler will preventDefault()
+          // For real card clicks, let the link navigate and fire this non-blocking request.
+          localStorage.setItem(LAST_KEY, g.slug);
           const badge = card.querySelector(".playbadge");
-          if (badge) badge.textContent = `▶︎ ${playCounts.get(slug)}`;
-          if (sortSel.value === "plays") render();
+          playCounts.set(g.slug, (playCounts.get(g.slug)||0)+1);
+          if (badge) badge.textContent = `▶︎ ${playCounts.get(g.slug)}`;
+          if (sortSel.value === "plays") setTimeout(render, 0);
 
-          // 3) Tag feedback + write play server-side (non-blocking)
-          localStorage.setItem(LAST_KEY, slug);
-          refreshAttachLabel();
-          if (sb) { sb.from("plays").insert({ slug, device_id: deviceId }).catch(()=>{}); }
+          // Keepalive REST call (headers allowed; continues after unload)
+          fetch(REST_PLAYS, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({ slug: g.slug, device_id: deviceId }),
+            keepalive: true
+          }).catch(()=>{});
         });
 
-        // Keyboard accessibility
-        card.addEventListener("keydown",(e)=>{
-          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); }
-        });
-
-        grid.appendChild(card);
-      });
-
-      // Heart buttons
-      grid.querySelectorAll("button.like").forEach(btn=>{
-        btn.addEventListener("click", async (e)=>{
-          e.stopPropagation();
+        // Heart button: stop the link, like globally, update UI, re-sort if needed
+        const likeBtn = card.querySelector("button.like");
+        likeBtn.addEventListener("click", async (e)=>{
+          e.preventDefault(); e.stopPropagation();
           const slug = e.currentTarget.dataset.slug;
           if (likedByMe[slug]) return;
+
           likedByMe[slug] = true;
           localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
           likeCounts.set(slug, (likeCounts.get(slug)||0) + 1);
+
           e.currentTarget.classList.add("liked");
           e.currentTarget.setAttribute("aria-pressed","true");
           e.currentTarget.textContent = `❤️ ${likeCounts.get(slug)}`;
           if (sortSel.value === "likes") render();
 
-          if (sb){
-            try { await sb.from("likes").insert({ slug, device_id: deviceId }); }
-            catch(err){ console.warn("Like insert failed:", err?.message||err); }
-          }
+          // Write like via REST keepalive too (robust), but we can use SDK here as page stays
+          fetch(REST_LIKES, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": SUPABASE_ANON,
+              "Authorization": `Bearer ${SUPABASE_ANON}`,
+              "Prefer": "return=minimal"
+            },
+            body: JSON.stringify({ slug, device_id: deviceId }),
+            keepalive: true
+          }).catch(()=>{});
         });
+
+        grid.appendChild(card);
       });
     }
 
@@ -216,6 +234,10 @@
 
     sortSel.addEventListener("change", render);
     fbSend.addEventListener("click", sendFeedback);
+    document.addEventListener("visibilitychange", async ()=>{
+      // When returning to this tab, refresh counts from the server
+      if (!document.hidden){ await loadCounts(); render(); refreshAttachLabel(); }
+    });
 
     window.addEventListener("load", async ()=>{
       try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) {}
