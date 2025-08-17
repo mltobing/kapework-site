@@ -1,7 +1,47 @@
 [
-  {"slug":"tapsum","title":"TapSum","emoji":"🔢","blurb":"Tap numbers to hit the target. Daily seed + endless."},
-  {"slug":"blinkgrid","title":"BlinkGrid","emoji":"🧠","blurb":"Watch the pattern blink, then recreate it. 5 rounds."},
-{"slug":"blinkgrid4","title":"BlinkGrid 4×4","emoji":"🧩","blurb":"Bigger 4×4 memory—watch, blink, recreate. Daily + endless."},
-{"slug":"cvcbuilder","title":"CVC Builder+","emoji":"🔤","blurb":"Build, sound-out, and blend C‑V‑C words. Daily + Free play."},
-  {"slug":"tiltrix","title":"Tiltrix","emoji":"🧱","blurb":"Tilt to move, tap to rotate, swipe down to drop. Daily + endless."}
+  {
+    "slug": "blinkgrid",
+    "name": "BlinkGrid",
+    "url": "apps/blinkgrid.html",
+    "released_at": "2025-08-15",
+    "tags": ["memory","family"],
+    "blurb": "Watch the blink, tap what changed.",
+    "cover_emoji": "✨"
+  },
+  {
+    "slug": "blinkgrid4",
+    "name": "BlinkGrid 4x4",
+    "url": "apps/blinkgrid4.html",
+    "released_at": "2025-08-16",
+    "tags": ["memory","kids"],
+    "blurb": "Smaller grid, perfect for quick play.",
+    "cover_emoji": "⚡️"
+  },
+  {
+    "slug": "cvcbuilder",
+    "name": "CVC Builder",
+    "url": "apps/cvcbuilder.html",
+    "released_at": "2025-08-12",
+    "tags": ["phonics","kids"],
+    "blurb": "Sound-first hints to build C-V-C words.",
+    "cover_emoji": "🔤"
+  },
+  {
+    "slug": "tapsum",
+    "name": "TapSum",
+    "url": "apps/tapsum.html",
+    "released_at": "2025-08-13",
+    "tags": ["math","logic"],
+    "blurb": "Tap numbers to hit the target sum.",
+    "cover_emoji": "➕"
+  },
+  {
+    "slug": "tiltrix",
+    "name": "Tiltrix",
+    "url": "apps/tiltrix.html",
+    "released_at": "2025-08-10",
+    "tags": ["puzzle","spatial"],
+    "blurb": "Tilt pieces into place.",
+    "cover_emoji": "🧩"
+  }
 ]
