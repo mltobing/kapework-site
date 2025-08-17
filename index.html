@@ -6,6 +6,7 @@
 <title>Kapework Arcade</title>
 <style>
   :root { --bd:#e5e7eb; --muted:#6b7280; }
+  *{box-sizing:border-box}
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:960px;margin:0 auto;padding:16px}
   header{display:flex;gap:12px;align-items:center;justify-content:space-between}
   .sorter{display:flex;gap:8px;align-items:center}
@@ -18,19 +19,18 @@
   button.like{border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff;cursor:pointer}
   button.like.liked{background:#f9fafb}
   .feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:10px}
-  textarea,input,select,button{font:inherit}
+  textarea,button,select{font:inherit}
   textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px}
   .ok{color:#065f46}
   .err{color:#7f1d1d}
 </style>
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
     <h1>Kapework Arcade</h1>
     <div class="sorter">
       <label for="sort">Sort:</label>
-      <select id="sort">
+      <select id="sort" aria-label="Sort games">
         <option value="newest">Newest</option>
         <option value="name">Name (A–Z)</option>
         <option value="likes">Most Liked</option>
@@ -42,7 +42,7 @@
 
   <section class="feedback">
     <h2>Quick feedback</h2>
-    <div class="meta" id="fb-attach">Attached to: <span id="fb-target">General</span></div>
+    <div class="meta">Attached to: <span id="fb-target">General</span></div>
     <textarea id="fb-message" rows="3" placeholder="Tell me anything you liked or what to improve. (We’ll tag it to the last game you played.)"></textarea>
     <div class="row" style="justify-content:flex-end;gap:8px">
       <button id="fb-send">Send</button>
@@ -50,169 +50,166 @@
     <p id="fb-status" class="meta"></p>
   </section>
 
-<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  // === YOUR SUPABASE PROJECT ===
-  const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+  <!-- Load Supabase FIRST (no defer) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  // Elements
-  const grid = document.getElementById("grid");
-  const sortSel = document.getElementById("sort");
-  const fbMsg = document.getElementById("fb-message");
-  const fbSend = document.getElementById("fb-send");
-  const fbStatus = document.getElementById("fb-status");
-  const fbTarget = document.getElementById("fb-target");
+  <!-- App script -->
+  <script>
+    // === Supabase project (anon/public) ===
+    const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
 
-  // Helpers
-  function showError(msg){
-    const p = document.createElement("p");
-    p.className = "meta err";
-    p.textContent = msg;
-    grid.appendChild(p);
-  }
+    // DOM refs
+    const grid = document.getElementById("grid");
+    const sortSel = document.getElementById("sort");
+    const fbMsg = document.getElementById("fb-message");
+    const fbSend = document.getElementById("fb-send");
+    const fbStatus = document.getElementById("fb-status");
+    const fbTarget = document.getElementById("fb-target");
 
-  // Stable anonymous device id for likes (if/when you enable server likes)
-  const DID_KEY = "kapework_did_v1";
-  let deviceId = localStorage.getItem(DID_KEY);
-  if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
+    // Local state / keys
+    const DID_KEY   = "kapework_did_v1";
+    const LIKED_KEY = "kapework_liked_by_me_v1";
+    const LAST_KEY  = "kapework_last_played_slug";
 
-  // Local liked set (for UI polish only)
-  const LIKED_KEY = "kapework_liked_by_me_v1";
-  let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
-
-  // Last played (to tag feedback)
-  const LAST_KEY = "kapework_last_played_slug";
-
-  // Supabase (guarded so page never crashes if library isn’t ready)
-  let sb = null;
-  function initSupabase(){
-    try {
-      if (window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-    } catch(e) { /* ignore */ }
-  }
-  initSupabase();
-
-  // Data
-  let games = [];
-  const bySlug = new Map();
-  let likeCounts = new Map(); // slug -> int
-
-  async function loadManifest(){
-    try{
-      const res = await fetch("manifest.json?v=" + Date.now());
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (!Array.isArray(data)) throw new Error("JSON is not an array");
-      games = data;
-      games.forEach(g => bySlug.set(g.slug, g));
-      if (games.length === 0) showError("No games found in manifest.json.");
-    } catch (e) {
-      showError("Could not load manifest.json: " + (e.message || e));
-      games = [];
+    // Stable anonymous device id
+    let deviceId = localStorage.getItem(DID_KEY);
+    if (!deviceId) {
+      deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2));
+      localStorage.setItem(DID_KEY, deviceId);
     }
-  }
 
-  async function loadLikeCounts(){
-    if (!sb) return; // optional
-    try{
-      const { data, error } = await sb.from("game_like_counts").select();
-      if (error) throw error;
-      likeCounts = new Map(data.map(r => [r.slug, r.likes]));
-    } catch (e) {
-      // Non-fatal; just show zeros
-      likeCounts = new Map();
+    // Local liked set (for fast UI)
+    let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
+
+    // Supabase client
+    let sb = null;
+
+    // Data
+    let games = [];
+    const bySlug = new Map();
+    let likeCounts = new Map(); // slug -> int
+
+    // Helpers
+    function showError(msg){
+      const p = document.createElement("p");
+      p.className = "meta err";
+      p.textContent = msg;
+      grid.appendChild(p);
     }
-  }
 
-  function sortGames(list, mode){
-    if (mode === "name") return [...list].sort((a,b)=>a.name.localeCompare(b.name));
-    if (mode === "likes") return [...list].sort((a,b)=>(likeCounts.get(b.slug)||0)-(likeCounts.get(a.slug)||0));
-    return [...list].sort((a,b)=>new Date(b.released_at) - new Date(a.released_at)); // newest
-  }
+    async function loadManifest(){
+      try{
+        const res = await fetch("manifest.json?v=" + Date.now()); // cache-bust
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("JSON not array");
+        games = data;
+        games.forEach(g => bySlug.set(g.slug, g));
+        if (!games.length) showError("No games found in manifest.json.");
+      } catch(e){
+        showError("Could not load manifest.json: " + (e.message||e));
+        games = [];
+      }
+    }
 
-  function render(){
-    grid.innerHTML = "";
-    const sorted = sortGames(games, sortSel.value);
-    sorted.forEach(g=>{
-      const liked = !!likedByMe[g.slug];
-      const count = likeCounts.get(g.slug) ?? 0;
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = `
-        <div class="title"><span style="font-size:1.25rem">${g.cover_emoji||"🎮"}</span> ${g.name}</div>
-        <div class="meta">${new Date(g.released_at).toLocaleDateString()} · ${(g.tags||[]).join(" · ")}</div>
-        <p>${g.blurb||""}</p>
-        <div class="row">
-          <a class="play" href="${g.url}" target="_blank" rel="noopener" data-slug="${g.slug}">Play ▶️</a>
-          <button class="like ${liked?"liked":""}" data-slug="${g.slug}">${liked?"❤️": "♡"} ${count}</button>
-        </div>
-      `;
-      grid.appendChild(card);
-    });
+    async function loadLikeCounts(){
+      if (!sb) return; // non-fatal
+      try{
+        const { data, error } = await sb.from("game_like_counts").select();
+        if (error) throw error;
+        likeCounts = new Map(data.map(r => [r.slug, r.likes]));
+      } catch(_){
+        likeCounts = new Map(); // fallback to zeros
+      }
+    }
 
-    // Like buttons (local + optional server insert if sb is ready)
-    grid.querySelectorAll("button.like").forEach(btn=>{
-      btn.addEventListener("click", async (e)=>{
-        const slug = e.currentTarget.dataset.slug;
-        if (likedByMe[slug]) return;
-        likedByMe[slug] = true;
-        localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
-        likeCounts.set(slug, (likeCounts.get(slug)||0) + 1);
+    function sortGames(list, mode){
+      if (mode === "name")  return [...list].sort((a,b)=>a.name.localeCompare(b.name));
+      if (mode === "likes") return [...list].sort((a,b)=>(likeCounts.get(b.slug)||0)-(likeCounts.get(a.slug)||0));
+      return [...list].sort((a,b)=>new Date(b.released_at)-new Date(a.released_at)); // newest
+    }
 
-        // Optional server insert
-        if (sb) {
-          try { await sb.from("likes").insert({ slug, device_id: deviceId }); } catch(_) {}
-        }
-
-        e.currentTarget.classList.add("liked");
-        e.currentTarget.textContent = `❤️ ${likeCounts.get(slug)}`;
-        if (sortSel.value === "likes") render();
+    function render(){
+      grid.innerHTML = "";
+      const sorted = sortGames(games, sortSel.value);
+      sorted.forEach(g=>{
+        const liked = !!likedByMe[g.slug];
+        const count = likeCounts.get(g.slug) ?? 0;
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="title"><span style="font-size:1.25rem">${g.cover_emoji||"🎮"}</span> ${g.name}</div>
+          <div class="meta">${new Date(g.released_at).toLocaleDateString()} · ${(g.tags||[]).join(" · ")}</div>
+          <p>${g.blurb||""}</p>
+          <div class="row">
+            <a class="play" href="${g.url}" target="_blank" rel="noopener" data-slug="${g.slug}">Play ▶️</a>
+            <button class="like ${liked?"liked":""}" data-slug="${g.slug}">${liked?"❤️":"♡"} ${count}</button>
+          </div>`;
+        grid.appendChild(card);
       });
-    });
 
-    // Track last played for feedback tagging
-    grid.querySelectorAll("a.play").forEach(a=>{
-      a.addEventListener("click",(e)=>{
-        const slug = e.currentTarget.dataset.slug;
-        localStorage.setItem(LAST_KEY, slug);
-        refreshAttachLabel();
+      // Like buttons (update UI immediately; write to server if available)
+      grid.querySelectorAll("button.like").forEach(btn=>{
+        btn.addEventListener("click", async (e)=>{
+          const slug = e.currentTarget.dataset.slug;
+          if (likedByMe[slug]) return;
+          likedByMe[slug] = true;
+          localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
+
+          likeCounts.set(slug, (likeCounts.get(slug)||0) + 1);
+          e.currentTarget.classList.add("liked");
+          e.currentTarget.textContent = `❤️ ${likeCounts.get(slug)}`;
+          if (sortSel.value === "likes") render();
+
+          if (sb){
+            try { await sb.from("likes").insert({ slug, device_id: deviceId }); }
+            catch(err){ console.warn("Like insert failed:", err?.message||err); }
+          }
+        });
       });
+
+      // Track last played for feedback tagging
+      grid.querySelectorAll("a.play").forEach(a=>{
+        a.addEventListener("click",(e)=>{
+          const slug = e.currentTarget.dataset.slug;
+          localStorage.setItem(LAST_KEY, slug);
+          refreshAttachLabel();
+        });
+      });
+    }
+
+    function refreshAttachLabel(){
+      const last = localStorage.getItem(LAST_KEY);
+      fbTarget.textContent = (last && bySlug.has(last)) ? `${bySlug.get(last).name} (last played)` : "General";
+    }
+
+    async function sendFeedback(){
+      const message = fbMsg.value.trim();
+      if (!message) { fbStatus.textContent = "Please write a quick note."; fbStatus.className = "meta err"; return; }
+      const last = localStorage.getItem(LAST_KEY);
+      const slug = (last && bySlug.has(last)) ? last : "general";
+      if (!sb) { fbStatus.textContent = "Feedback service not ready. Reload and try again."; fbStatus.className = "meta err"; return; }
+
+      fbSend.disabled = true; fbStatus.textContent = "Sending…"; fbStatus.className = "meta";
+      const { error } = await sb.from("feedback").insert({ slug, message });
+      if (error) { fbStatus.textContent = "Could not send, please try again."; fbStatus.className = "meta err"; }
+      else { fbStatus.textContent = "Thank you! Saved."; fbStatus.className = "meta ok"; fbMsg.value = ""; }
+      fbSend.disabled = false;
+    }
+
+    sortSel.addEventListener("change", render);
+    fbSend.addEventListener("click", sendFeedback);
+
+    // Boot after page + library are ready
+    window.addEventListener("load", async ()=>{
+      try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); }
+      catch(e){ console.warn("Supabase not available:", e); }
+      await loadManifest();
+      await loadLikeCounts();
+      render();
+      refreshAttachLabel();
     });
-  }
-
-  function refreshAttachLabel(){
-    const last = localStorage.getItem(LAST_KEY);
-    fbTarget.textContent = (last && bySlug.has(last)) ? `${bySlug.get(last).name} (last played)` : "General";
-  }
-
-  async function sendFeedback(){
-    const message = fbMsg.value.trim();
-    if (!message) { fbStatus.textContent = "Please write a quick note."; fbStatus.className = "meta err"; return; }
-    const last = localStorage.getItem(LAST_KEY);
-    const slug = (last && bySlug.has(last)) ? last : "general";
-
-    if (!sb) { fbStatus.textContent = "Feedback service not ready. Try again in a moment."; fbStatus.className = "meta err"; initSupabase(); return; }
-
-    fbSend.disabled = true;
-    fbStatus.textContent = "Sending…"; fbStatus.className = "meta";
-    const { error } = await sb.from("feedback").insert({ slug, message });
-    if (error) { fbStatus.textContent = "Could not send, please try again."; fbStatus.className = "meta err"; }
-    else { fbStatus.textContent = "Thank you! Saved."; fbStatus.className = "meta ok"; fbMsg.value = ""; }
-    fbSend.disabled = false;
-  }
-
-  sortSel.addEventListener("change", render);
-  document.getElementById("fb-send").addEventListener("click", sendFeedback);
-
-  (async function init(){
-    await loadManifest();
-    await loadLikeCounts();
-    render();
-    refreshAttachLabel();
-  })();
-</script>
-    
-    
+  </script>
 </body>
 </html>
