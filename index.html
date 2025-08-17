@@ -17,10 +17,13 @@
   a.play{text-decoration:none}
   button.like{border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff;cursor:pointer}
   button.like.liked{background:#f9fafb}
-  form#feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:8px}
-  input,select,textarea,button{font:inherit}
-  input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px}
+  .feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:10px}
+  textarea,input,select,button{font:inherit}
+  textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px}
+  .ok{color:#065f46}
+  .err{color:#7f1d1d}
 </style>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <header>
@@ -30,109 +33,159 @@
       <select id="sort">
         <option value="newest">Newest</option>
         <option value="name">Name (A–Z)</option>
-        <option value="liked">Liked (on this device)</option>
+        <option value="likes">Most Liked</option>
       </select>
     </div>
   </header>
 
   <div id="grid" class="grid" aria-live="polite"></div>
 
-  <form id="feedback">
-    <h2>Feedback</h2>
-    <label>Game
-      <select id="fb-game"></select>
-    </label>
-    <label>Your thoughts
-      <textarea id="fb-message" rows="3" placeholder="What did you like? What should improve?"></textarea>
-    </label>
-    <button type="submit">Send feedback</button>
+  <section class="feedback">
+    <h2>Quick feedback</h2>
+    <div class="meta" id="fb-attach">Attached to: <span id="fb-target">General</span></div>
+    <textarea id="fb-message" rows="3" placeholder="Tell me anything you liked or what to improve. (We’ll tag it to the last game you played.)"></textarea>
+    <div class="row" style="justify-content:flex-end;gap:8px">
+      <button id="fb-send">Send</button>
+    </div>
     <p id="fb-status" class="meta"></p>
-  </form>
+  </section>
 
 <script>
-  // 👇 SET THIS to your email for feedback:
-  const FEEDBACK_EMAIL = "you@example.com";
+  // === Supabase (your project) ===
+  const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // Stable anonymous device id for 1-like-per-game
+  const DID_KEY = "kapework_did_v1";
+  let deviceId = localStorage.getItem(DID_KEY);
+  if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
+
+  // Track "liked by me" locally for UX (server enforces uniqueness)
+  const LIKED_KEY = "kapework_liked_by_me_v1"; // { slug: true }
+  let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
+
+  // Track last played slug for feedback tagging
+  const LAST_KEY = "kapework_last_played_slug";
 
   const grid = document.getElementById("grid");
   const sortSel = document.getElementById("sort");
-  const fbGame = document.getElementById("fb-game");
-  const fbForm = document.getElementById("feedback");
+  const fbMsg = document.getElementById("fb-message");
+  const fbSend = document.getElementById("fb-send");
   const fbStatus = document.getElementById("fb-status");
+  const fbTarget = document.getElementById("fb-target");
 
-  const LIKES_KEY = "kapework_likes_v1"; // { slug: true }
-  let liked = JSON.parse(localStorage.getItem(LIKES_KEY) || "{}");
   let games = [];
+  const bySlug = new Map();
+  let likeCounts = new Map(); // slug -> int
 
   async function loadManifest(){
     const res = await fetch("manifest.json");
     games = await res.json();
-    render();
+    games.forEach(g => bySlug.set(g.slug, g));
+  }
+
+  async function loadLikeCounts(){
+    try{
+      const { data, error } = await sb.from("game_like_counts").select();
+      if (error) throw error;
+      likeCounts = new Map(data.map(r => [r.slug, r.likes]));
+    } catch (e) {
+      console.warn("Could not load like counts yet:", e?.message || e);
+      likeCounts = new Map();
+    }
   }
 
   function sortGames(list, mode){
     if (mode === "name") return [...list].sort((a,b)=>a.name.localeCompare(b.name));
-    if (mode === "liked") return [...list].sort((a,b)=>{
-      const A = liked[a.slug] ? 1 : 0, B = liked[b.slug] ? 1 : 0;
-      if (B !== A) return B - A; // liked first
-      return new Date(b.released_at) - new Date(a.released_at); // then newest
-    });
-    // default newest
+    if (mode === "likes") return [...list].sort((a,b)=>(likeCounts.get(b.slug)||0)-(likeCounts.get(a.slug)||0));
     return [...list].sort((a,b)=>new Date(b.released_at) - new Date(a.released_at));
   }
 
   function render(){
     grid.innerHTML = "";
-    fbGame.innerHTML = "";
     const sorted = sortGames(games, sortSel.value);
-
     sorted.forEach(g=>{
+      const liked = !!likedByMe[g.slug];
+      const count = likeCounts.get(g.slug) ?? 0;
       const card = document.createElement("div");
       card.className = "card";
-      const isLiked = !!liked[g.slug];
       card.innerHTML = `
         <div class="title"><span style="font-size:1.25rem">${g.cover_emoji||"🎮"}</span> ${g.name}</div>
         <div class="meta">${new Date(g.released_at).toLocaleDateString()} · ${(g.tags||[]).join(" · ")}</div>
         <p>${g.blurb||""}</p>
         <div class="row">
-          <a class="play" href="${g.url}" target="_blank" rel="noopener">Play ▶️</a>
-          <button class="like ${isLiked?"liked":""}" data-slug="${g.slug}">${isLiked?"❤️ Liked":"♡ Like"}</button>
+          <a class="play" href="${g.url}" target="_blank" rel="noopener" data-slug="${g.slug}">Play ▶️</a>
+          <button class="like ${liked?"liked":""}" data-slug="${g.slug}">${liked?"❤️": "♡"} ${count}</button>
         </div>
       `;
       grid.appendChild(card);
-
-      const opt = document.createElement("option");
-      opt.value = g.slug; opt.textContent = g.name;
-      fbGame.appendChild(opt);
     });
 
+    // Like buttons
     grid.querySelectorAll("button.like").forEach(btn=>{
-      btn.addEventListener("click",(e)=>{
+      btn.addEventListener("click", async (e)=>{
         const slug = e.currentTarget.dataset.slug;
-        liked[slug] = true;
-        localStorage.setItem(LIKES_KEY, JSON.stringify(liked));
+        if (likedByMe[slug]) return; // already liked on this device
+        e.currentTarget.disabled = true;
+
+        // try server insert; ignore duplicate error (unique constraint)
+        const { error } = await sb.from("likes").insert({ slug, device_id: deviceId });
+        if (error && !String(error.message||"").toLowerCase().includes("duplicate")) {
+          console.error(error);
+          e.currentTarget.disabled = false;
+          return;
+        }
+        likedByMe[slug] = true;
+        localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
+        likeCounts.set(slug, (likeCounts.get(slug)||0) + 1);
+
         e.currentTarget.classList.add("liked");
-        e.currentTarget.textContent = "❤️ Liked";
-        render(); // re-sort if "Liked" selected
+        e.currentTarget.textContent = `❤️ ${likeCounts.get(slug)}`;
+        e.currentTarget.disabled = false;
+
+        if (sortSel.value === "likes") render(); // keep ordering correct
+      });
+    });
+
+    // Track last played
+    grid.querySelectorAll("a.play").forEach(a=>{
+      a.addEventListener("click",(e)=>{
+        const slug = e.currentTarget.dataset.slug;
+        localStorage.setItem(LAST_KEY, slug);
+        refreshAttachLabel();
       });
     });
   }
 
+  function refreshAttachLabel(){
+    const last = localStorage.getItem(LAST_KEY);
+    fbTarget.textContent = (last && bySlug.has(last)) ? `${bySlug.get(last).name} (last played)` : "General";
+  }
+
+  async function sendFeedback(){
+    const message = fbMsg.value.trim();
+    if (!message) { fbStatus.textContent = "Please write a quick note."; fbStatus.className = "meta err"; return; }
+    const last = localStorage.getItem(LAST_KEY);
+    const slug = (last && bySlug.has(last)) ? last : "general";
+
+    fbSend.disabled = true;
+    fbStatus.textContent = "Sending…"; fbStatus.className="meta";
+    const { error } = await sb.from("feedback").insert({ slug, message });
+    if (error) { fbStatus.textContent = "Could not send, please try again."; fbStatus.className="meta err"; }
+    else { fbStatus.textContent = "Thank you! Saved."; fbStatus.className="meta ok"; fbMsg.value=""; }
+    fbSend.disabled = false;
+  }
+
   sortSel.addEventListener("change", render);
+  document.getElementById("fb-send").addEventListener("click", sendFeedback);
 
-  fbForm.addEventListener("submit",(e)=>{
-    e.preventDefault();
-    const slug = fbGame.value;
-    const game = games.find(g=>g.slug===slug);
-    const msg = document.getElementById("fb-message").value.trim();
-    if (!msg) { fbStatus.textContent = "Please write a quick note."; return; }
-    const subject = encodeURIComponent(`Kapework feedback: ${game?.name||slug}`);
-    const body = encodeURIComponent(msg);
-    window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
-    fbStatus.textContent = "Your email app should open—thank you!";
-    fbForm.reset();
-  });
-
-  loadManifest();
+  (async function init(){
+    await loadManifest();
+    await loadLikeCounts();
+    render();
+    refreshAttachLabel();
+  })();
 </script>
 </body>
 </html>
