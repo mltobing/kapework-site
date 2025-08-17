@@ -310,14 +310,16 @@
     }
 
     // Tunables
-    const LR_TILT = 8;   // deg: start moving
-    const LR_DAS  = 130; // ms: delay before auto-repeat
-    const LR_RPT  = 65;  // ms: repeat rate
-    const FB_SOFT = 8;   // deg beta: soft drop
-    const FB_HARD = 22;  // deg beta: hard drop
-    const ROT_T   = -10; // deg beta: back tilt for CW rotate
-    const HYS     = 3;   // deg: hysteresis
-    const SMOOTH  = 0.15;
+     
+    const STEADY = true; // flip to false for the original snappier feel
+  const LR_TILT = STEADY ? 12 : 8;
+const LR_DAS  = STEADY ? 180 : 130;
+const LR_RPT  = STEADY ? 85  : 65;
+const FB_SOFT = STEADY ? 10  : 8;
+const FB_HARD = STEADY ? 26  : 22;
+const ROT_T   = STEADY ? -12 : -10;
+const HYS     = STEADY ? 5   : 3;
+const SMOOTH  = STEADY ? 0.25: 0.15;
 
     let baseBeta=0, baseGamma=0, fBeta=0, fGamma=0;
     let lrState=0, lrTimer=null, lrRpt=null;
