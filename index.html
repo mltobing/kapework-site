@@ -141,30 +141,28 @@
           </button>
         `;
 
-        // Open game on card click (whole card)
+        // Open game on card click (do navigation FIRST for iOS popup rules)
         card.addEventListener("click",(e)=>{
           if (e.target.closest("button.like")) return; // ignore heart clicks
+
           const slug = g.slug;
           const url  = g.url;
 
-          // tag feedback
+          // 1) Navigate immediately (try new tab, fall back to same tab)
+          let opened = false;
+          try { const w = window.open(url, "_blank"); opened = !!w; } catch(_) {}
+          if (!opened) window.location.href = url;
+
+          // 2) Update local UI counts (so the list feels instant)
+          playCounts.set(slug, (playCounts.get(slug)||0) + 1);
+          const badge = card.querySelector(".playbadge");
+          if (badge) badge.textContent = `▶︎ ${playCounts.get(slug)}`;
+          if (sortSel.value === "plays") render();
+
+          // 3) Tag feedback + write play server-side (non-blocking)
           localStorage.setItem(LAST_KEY, slug);
           refreshAttachLabel();
-
-          // bump UI play counter immediately
-          playCounts.set(slug, (playCounts.get(slug)||0) + 1);
-          if (sortSel.value === "plays") {
-            render(); // resort if needed
-          } else {
-            const badge = card.querySelector(".playbadge");
-            if (badge) badge.textContent = `▶︎ ${playCounts.get(slug)}`;
-          }
-
-          // record on server (ignore errors; unique/hour may block repeats)
           if (sb) { sb.from("plays").insert({ slug, device_id: deviceId }).catch(()=>{}); }
-
-          // open game
-          window.open(url, "_blank");
         });
 
         // Keyboard accessibility
