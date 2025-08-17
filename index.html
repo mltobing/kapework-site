@@ -15,8 +15,9 @@
   .title{display:flex;gap:10px;align-items:center}
   .emoji{font-size:1.3rem}
   .name{font-weight:700}
-  .meta{font-size:12px;color:var(--muted)}
-  .like{position:absolute;right:10px;bottom:10px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff;cursor:pointer}
+  .badge{position:absolute;bottom:10px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff}
+  .playbadge{left:10px}
+  .like{right:10px}
   .like.liked{background:#f9fafb}
   .feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:10px}
   textarea,button,select{font:inherit}
@@ -34,7 +35,7 @@
         <option value="newest">Newest</option>
         <option value="name">Name (A–Z)</option>
         <option value="likes">Most Liked</option>
-        <option value="plays">Most Played</option><!-- uses view if present -->
+        <option value="plays">Most Played</option>
       </select>
     </div>
   </header>
@@ -82,7 +83,7 @@
     let games = [];
     const bySlug = new Map();
     let likeCounts = new Map(); // slug->int
-    let playCounts = new Map(); // slug->int (optional)
+    let playCounts = new Map(); // slug->int
 
     function showError(msg){
       const p=document.createElement("p"); p.className="meta err"; p.textContent=msg; grid.appendChild(p);
@@ -100,15 +101,13 @@
 
     async function loadCounts(){
       if (!sb) return;
-      // Likes
       try{
-        const { data, error } = await sb.from("game_like_counts").select();
-        if (!error && data) likeCounts = new Map(data.map(r=>[r.slug, r.likes]));
+        const { data } = await sb.from("game_like_counts").select();
+        if (data) likeCounts = new Map(data.map(r=>[r.slug, r.likes]));
       }catch(_){}
-      // Plays (optional)
       try{
-        const { data, error } = await sb.from("game_play_counts").select();
-        if (!error && data) playCounts = new Map(data.map(r=>[r.slug, r.plays]));
+        const { data } = await sb.from("game_play_counts").select();
+        if (data) playCounts = new Map(data.map(r=>[r.slug, r.plays]));
       }catch(_){}
     }
 
@@ -125,6 +124,7 @@
       sorted.forEach(g=>{
         const liked = !!likedByMe[g.slug];
         const likeNum = likeCounts.get(g.slug) ?? 0;
+        const playNum = playCounts.get(g.slug) ?? 0;
 
         const card = document.createElement("div");
         card.className = "card";
@@ -135,23 +135,38 @@
             <span class="emoji">${g.cover_emoji || "🎮"}</span>
             <div class="name">${g.name}</div>
           </div>
-          <button class="like ${liked?"liked":""}" data-slug="${g.slug}" aria-pressed="${liked}">
+          <span class="badge playbadge" data-slug="${g.slug}">▶︎ ${playNum}</span>
+          <button class="badge like ${liked?"liked":""}" data-slug="${g.slug}" aria-pressed="${liked}">
             ${liked ? "❤️" : "♡"} ${likeNum}
           </button>
         `;
 
         // Open game on card click (whole card)
         card.addEventListener("click",(e)=>{
-          if (e.target.closest("button.like")) return; // ignore clicks on heart
-          // save last played for feedback
-          localStorage.setItem(LAST_KEY, g.slug);
+          if (e.target.closest("button.like")) return; // ignore heart clicks
+          const slug = g.slug;
+          const url  = g.url;
+
+          // tag feedback
+          localStorage.setItem(LAST_KEY, slug);
           refreshAttachLabel();
 
-          // record play (fire-and-forget; page stays because we open new tab)
-          if (sb) { try { sb.from("plays").insert({ slug:g.slug, device_id: deviceId }); } catch(_){} }
+          // bump UI play counter immediately
+          playCounts.set(slug, (playCounts.get(slug)||0) + 1);
+          if (sortSel.value === "plays") {
+            render(); // resort if needed
+          } else {
+            const badge = card.querySelector(".playbadge");
+            if (badge) badge.textContent = `▶︎ ${playCounts.get(slug)}`;
+          }
+
+          // record on server (ignore errors; unique/hour may block repeats)
+          if (sb) { sb.from("plays").insert({ slug, device_id: deviceId }).catch(()=>{}); }
+
           // open game
-          window.open(g.url, "_blank");
+          window.open(url, "_blank");
         });
+
         // Keyboard accessibility
         card.addEventListener("keydown",(e)=>{
           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); }
@@ -163,7 +178,7 @@
       // Heart buttons
       grid.querySelectorAll("button.like").forEach(btn=>{
         btn.addEventListener("click", async (e)=>{
-          e.stopPropagation(); // don't trigger card click
+          e.stopPropagation();
           const slug = e.currentTarget.dataset.slug;
           if (likedByMe[slug]) return;
           likedByMe[slug] = true;
