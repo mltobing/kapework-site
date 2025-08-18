@@ -5,17 +5,26 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TapSum</title>
 <style>
-  :root { --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08); --accent:#7dd3fc; --ok:#34d399; --err:#fb7185; }
-  *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto}
-  .wrap{max-width:520px;margin:0 auto;padding:16px 16px 24px}
-  header{display:flex;justify-content:space-between;align-items:center}
+  :root {
+    --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08);
+    --accent:#7dd3fc; --ok:#34d399; --err:#fb7185;
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto}
+  .wrap{max-width:560px;margin:0 auto;padding:16px 16px 24px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   h1{margin:0;font-size:20px}
+  .stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;background:#0e1729}
+  .pill strong{font-weight:800}
+  .btn{padding:6px 10px;border-radius:10px;border:1px solid var(--bd);background:#0e1729;color:var(--ink);cursor:pointer}
   .panel{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:12px}
   .target{display:flex;flex-direction:column;align-items:center;gap:6px;margin:10px 0 6px}
   .label{font-size:12px;color:var(--muted)}
   .target .num{font-size:48px;font-weight:800;letter-spacing:.5px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 8px}
-  .cell{height:100px;border-radius:16px;border:1px solid var(--bd);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;cursor:pointer;user-select:none;transition:transform .06s ease, background .06s}
+  .cell{height:100px;border-radius:16px;border:1px solid var(--bd);background:rgba(255,255,255,.02);
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;cursor:pointer;user-select:none;transition:transform .06s ease, background .06s}
   .cell:active{transform:scale(.98)}
   .cell.sel{outline:2px solid var(--accent);background:rgba(125,211,252,.12)}
   .sumrow{display:flex;justify-content:center;gap:10px;margin:6px 0 2px;color:var(--muted)}
@@ -25,12 +34,20 @@
   button:hover{background:#0f1a2f}
   .toast{height:22px;text-align:center;font-size:14px;color:var(--muted);margin-top:8px}
   .toast.ok{color:var(--ok)} .toast.err{color:var(--err)}
-  @media (min-width:520px){ .cell{height:120px} }
+  @media (min-width:560px){ .cell{height:120px} }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header><h1>TapSum</h1></header>
+  <header>
+    <h1>TapSum</h1>
+    <div class="stats">
+      <span class="pill">Streak <strong id="streak">0</strong></span>
+      <span class="pill">Best <strong id="best">0</strong></span>
+      <span class="pill">Global <strong id="global">0</strong></span>
+      <button id="ambience" class="btn" title="Ambient sound (calming pad)">🎧</button>
+    </div>
+  </header>
 
   <div class="panel">
     <div class="target">
@@ -58,56 +75,91 @@
   </p>
 </div>
 
+<!-- Supabase (for global best storage) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
+  const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+  const SLUG = "tapsum";
+  let sb = null;
+
+  // --- DOM
   const gridEl = document.getElementById('grid');
   const targetEl = document.getElementById('target');
   const sumEl = document.getElementById('sum');
   const restartBtn = document.getElementById('restart');
   const newBtn = document.getElementById('new');
   const toast = document.getElementById('toast');
+  const streakEl = document.getElementById('streak');
+  const bestEl = document.getElementById('best');
+  const globalEl = document.getElementById('global');
+  const ambienceBtn = document.getElementById('ambience');
 
-  // --- Game state ---
-  let cells = [];          // [{el,val,selected,usedIdx}] length 9
+  // --- Device/local state
+  const DID_KEY = "kapework_did_v1";
+  const BEST_KEY = "tapsum_best_streak_v1";
+  let deviceId = localStorage.getItem(DID_KEY);
+  if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
+  let bestLocal = parseInt(localStorage.getItem(BEST_KEY)||"0",10);
+  bestEl.textContent = bestLocal;
+
+  // --- Game state
+  let cells = [];          // [{el,val,selected}]
   let picks = [];          // indices of selected cells
   let target = 0;
   let won = false;
+  let streak = 0;
+  let interacted = false;  // to decide if Restart/New should reset streak
 
-  // Utility
+  // --- Ambient sound (very soft pad; requires user tap)
+  let ctx = null, gain=null, o1=null, o2=null, lfo=null;
+  function toggleAmbience(){
+    if (!ctx){
+      ctx = new (window.AudioContext||window.webkitAudioContext)();
+      gain = ctx.createGain(); gain.gain.value = 0.03; gain.connect(ctx.destination);
+      o1 = ctx.createOscillator(); o1.type="sine"; o1.frequency.value=220; o1.detune.value=-6; o1.connect(gain); o1.start();
+      o2 = ctx.createOscillator(); o2.type="sine"; o2.frequency.value=220; o2.detune.value=+6; o2.connect(gain); o2.start();
+      lfo = ctx.createOscillator(); lfo.type="sine"; lfo.frequency.value=0.08;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = 12; // gentle pitch drift
+      lfo.connect(lfoGain); lfoGain.connect(o1.detune); lfoGain.connect(o2.detune); lfo.start();
+      ambienceBtn.textContent = "🎧 On";
+    } else if (ctx.state === "running") {
+      ctx.suspend(); ambienceBtn.textContent = "🎧";
+    } else {
+      ctx.resume(); ambienceBtn.textContent = "🎧 On";
+    }
+  }
+  ambienceBtn.addEventListener('click', toggleAmbience);
+
+  // --- Helpers
   const rand = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  function updateStreak(v){ streak = v; streakEl.textContent = v; }
 
   function genRound(){
-    won = false;
+    won = false; interacted = false;
     toast.textContent = "";
-    picks = [];
-    sumEl.textContent = "0";
+    picks = []; sumEl.textContent = "0";
 
-    // Create a guaranteed-solvable target by picking 2-4 random numbers up front
-    const must = [];
-    const count = rand(2,4);
-    for (let i=0;i<count;i++) must.push(rand(1,9));
+    // Build guaranteed-solvable target: pick 2-4 base numbers
+    const must = Array.from({length:rand(2,4)}, ()=>rand(1,9));
     target = must.reduce((a,b)=>a+b,0);
     targetEl.textContent = String(target);
 
-    // Fill 9 cells, place the "must" set somewhere, rest random 1-9
-    const vals = [];
-    for (let i=0;i<9;i++) vals.push(rand(1,9));
-    // overwrite random positions with the must picks
+    // Fill grid, inject must
+    const vals = Array.from({length:9}, ()=>rand(1,9));
     const slots = [...Array(9).keys()].sort(()=>Math.random()-0.5).slice(0,must.length);
     slots.forEach((pos,i)=>{ vals[pos]=must[i]; });
 
-    // build DOM
+    // DOM rebuild
     gridEl.innerHTML = "";
     cells = vals.map((v,idx)=>{
       const el = document.createElement('div');
-      el.className = 'cell';
-      el.textContent = v;
-      el.setAttribute('role','button');
-      el.setAttribute('tabindex','0');
-      el.setAttribute('aria-label', `Pick ${v}`);
-      el.addEventListener('click', ()=>toggle(idx));
+      el.className = 'cell'; el.textContent = v;
+      el.setAttribute('role','button'); el.setAttribute('tabindex','0');
+      el.addEventListener('click', ()=>{ interacted=true; toggle(idx); });
       el.addEventListener('keydown', e=>{
-        if (e.key==='Enter' || e.key===' ') { e.preventDefault(); toggle(idx); }
+        if (e.key==='Enter' || e.key===' ') { e.preventDefault(); interacted=true; toggle(idx); }
       });
       gridEl.appendChild(el);
       return { el, val:v, selected:false };
@@ -120,6 +172,30 @@
     return s;
   }
 
+  async function onWin(){
+    won = true;
+    updateStreak(streak+1);
+    toast.textContent = "Nice! Starting a new round…";
+    toast.className = "toast ok";
+
+    // Personal best (local + cloud)
+    if (streak > bestLocal){
+      bestLocal = streak;
+      localStorage.setItem(BEST_KEY, String(bestLocal));
+      bestEl.textContent = bestLocal;
+      // Upsert to Supabase
+      try{
+        if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        await sb.from("scores").upsert(
+          { slug: SLUG, device_id: deviceId, best_streak: bestLocal },
+          { onConflict: "slug,device_id" }
+        );
+        refreshGlobal();
+      }catch(e){ /* ignore */ }
+    }
+    setTimeout(genRound, 900);
+  }
+
   function toggle(i){
     if (won) return;
     const c = cells[i];
@@ -127,58 +203,39 @@
     if (c.selected){ picks.push(i); c.el.classList.add('sel'); }
     else { picks = picks.filter(x=>x!==i); c.el.classList.remove('sel'); }
     const s = updateSum();
-    if (s === target){
-      won = true;
-      toast.textContent = "Nice! Starting a new round…";
-      toast.className = "toast ok";
-      setTimeout(genRound, 1000);
-    } else if (s > target){
-      toast.textContent = "Too high – undo or restart.";
-      toast.className = "toast err";
-    } else {
-      toast.textContent = "";
-      toast.className = "toast";
-    }
+    if (s === target){ onWin(); }
+    else if (s > target){ toast.textContent = "Too high – undo or restart."; toast.className = "toast err"; }
+    else { toast.textContent = ""; toast.className = "toast"; }
   }
 
-  // Keyboard: digits pick a tile with that value (cycles through duplicates)
-  const lastHitByVal = {}; // value -> last index hit
+  // Digit selection with cycling
+  const lastHitByVal = {};
   function pickByDigit(d){
+    interacted = true;
     const val = d;
     const start = (lastHitByVal[val] ?? -1) + 1;
-    // search for next unused cell with this value
     const order = [...Array(9).keys()];
     const perm = order.slice(start).concat(order.slice(0,start));
-    for (const i of perm){
-      if (cells[i].val === val) {
-        lastHitByVal[val] = i;
-        toggle(i);
-        return;
-      }
-    }
-    // no match—blink toast
-    toast.textContent = `No ${val} available.`;
-    toast.className = "toast err";
-    setTimeout(()=>{ toast.textContent = ""; toast.className="toast"; }, 500);
+    for (const i of perm){ if (cells[i].val === val){ lastHitByVal[val]=i; toggle(i); return; } }
+    toast.textContent = `No ${val} available.`; toast.className = "toast err";
+    setTimeout(()=>{ toast.textContent=""; toast.className="toast"; }, 400);
   }
 
-  // Controls
   restartBtn.addEventListener('click', ()=>{
-    if (won) { genRound(); return; }
+    if (!won && interacted) updateStreak(0); // break streak if you give up mid-round
     picks.forEach(i=>cells[i].el.classList.remove('sel'));
-    cells.forEach(c=>c.selected=false);
-    picks = [];
-    toast.textContent = "";
-    toast.className = "toast";
-    updateSum();
+    cells.forEach(c=>c.selected=false); picks=[]; toast.textContent=""; toast.className="toast"; updateSum();
   });
-
-  newBtn.addEventListener('click', genRound);
+  newBtn.addEventListener('click', ()=>{
+    if (!won && interacted) updateStreak(0); // starting fresh mid-round breaks streak
+    genRound();
+  });
 
   window.addEventListener('keydown', (e)=>{
     if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
     if (e.key>='1' && e.key<='9'){ pickByDigit(parseInt(e.key,10)); return; }
     if (e.key==='Backspace' || e.key==='Delete'){
+      interacted = true;
       const i = picks.pop();
       if (i!=null){ cells[i].selected=false; cells[i].el.classList.remove('sel'); updateSum(); }
       e.preventDefault(); return;
@@ -187,6 +244,17 @@
     if (e.key==='Enter'){ if (won) newBtn.click(); else restartBtn.click(); }
   });
 
+  async function refreshGlobal(){
+    try{
+      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      const { data } = await sb.from("global_best_scores").select().eq("slug", SLUG).maybeSingle();
+      globalEl.textContent = data?.global_best ?? 0;
+    }catch(e){ /* ignore */ }
+  }
+
+  // init
+  refreshGlobal();
+  updateStreak(0);
   genRound();
 })();
 </script>
