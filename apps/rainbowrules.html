@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rainbow Rules</title>
+<style>
+  :root { --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08);
+          --ok:#34d399; --err:#fb7185; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto}
+  .wrap{max-width:560px;margin:0 auto;padding:16px 16px 24px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  h1{margin:0;font-size:20px}
+  .stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;background:#0e1729}
+  .pill strong{font-weight:800}
+  .panel{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:12px}
+  .banner{height:24px;text-align:center;font-size:14px;color:var(--muted)}
+  .banner.show{color:#e8eefc}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+  .cell{height:76px;border-radius:14px;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;
+        font-weight:800;font-size:22px;color:#0b1220; cursor:pointer; user-select:none; transition:transform .05s ease, filter .1s}
+  .cell:active{transform:scale(.98)}
+  .cell.off{filter:grayscale(0.3) brightness(0.65)}
+  .cell.dead{opacity:.18; pointer-events:none}
+  .foot{display:flex;gap:10px;justify-content:center;margin-top:8px}
+  button{padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:#0e1729;color:#e8eefc;cursor:pointer;font:inherit}
+  button:hover{background:#0f1a2f}
+  .toast{height:22px;text-align:center;font-size:14px;color:var(--muted);margin-top:6px}
+  .toast.ok{color:var(--ok)} .toast.err{color:var(--err)}
+  @media (min-width:560px){ .cell{height:96px;font-size:24px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Rainbow Rules</h1>
+    <div class="stats">
+      <span class="pill">Level <strong id="level">1</strong></span>
+      <span class="pill">Best <strong id="best">0</strong></span>
+      <span class="pill">Global <strong id="global">0</strong></span>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div id="banner" class="banner">Memorize the new rule…</div>
+    <div id="grid" class="grid" role="group" aria-label="tile grid"></div>
+    <div class="foot">
+      <button id="restart">Restart</button>
+      <button id="next">New</button>
+    </div>
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </div>
+
+  <p class="pill" style="margin-top:12px; display:inline-flex">Tip: each level adds a new rule. Apply rules 1→N in order.</p>
+</div>
+
+<!-- Supabase for global best -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  // --- Supabase project (reuse yours) ---
+  const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+  const SLUG = "rainbowrules";
+  let sb = null;
+
+  // --- DOM
+  const gridEl = document.getElementById('grid');
+  const levelEl = document.getElementById('level');
+  const bestEl = document.getElementById('best');
+  const globalEl = document.getElementById('global');
+  const banner = document.getElementById('banner');
+  const restartBtn = document.getElementById('restart');
+  const nextBtn = document.getElementById('next');
+  const toast = document.getElementById('toast');
+
+  // --- Device/local
+  const DID_KEY = "kapework_did_v1";
+  const BEST_KEY = "rainbowrules_best_v1";
+  let deviceId = localStorage.getItem(DID_KEY);
+  if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
+  let bestLocal = parseInt(localStorage.getItem(BEST_KEY)||"0",10);
+  bestEl.textContent = bestLocal;
+
+  // --- Palette (with labels for color-blind support)
+  const COLORS = [
+    {name:"RED",    css:"#ef4444", label:"R"},
+    {name:"ORANGE", css:"#f97316", label:"O"},
+    {name:"YELLOW", css:"#f59e0b", label:"Y"},
+    {name:"GREEN",  css:"#22c55e", label:"G"},
+    {name:"BLUE",   css:"#3b82f6", label:"B"},
+    {name:"INDIGO", css:"#6366f1", label:"I"},
+    {name:"VIOLET", css:"#a855f7", label:"V"}
+  ];
+
+  // --- Rule generators
+  const RULES = {
+    color: (c)=>({
+      kind:"color", desc:`Tap ${c.name}`, nextTargets(state){
+        return state.aliveIndices().filter(i=>state.tiles[i].color===c.name);
+      }}),
+    odd: ()=>({ kind:"odd", desc:"Tap ODD numbers", nextTargets(state){
+      return state.aliveIndices().filter(i=>state.tiles[i].num%2===1);
+    }}),
+    even: ()=>({ kind:"even", desc:"Tap EVEN numbers", nextTargets(state){
+      return state.aliveIndices().filter(i=>state.tiles[i].num%2===0);
+    }}),
+    top: ()=>({ kind:"top", desc:"Tap TOP row", nextTargets(state){
+      return state.aliveIndices().filter(i=>Math.floor(i/4)===0);
+    }}),
+    bottom: ()=>({ kind:"bottom", desc:"Tap BOTTOM row", nextTargets(state){
+      return state.aliveIndices().filter(i=>Math.floor(i/4)===3);
+    }}),
+    leftcol: ()=>({ kind:"leftcol", desc:"Tap LEFT column", nextTargets(state){
+      return state.aliveIndices().filter(i=>i%4===0);
+    }}),
+    rightcol: ()=>({ kind:"rightcol", desc:"Tap RIGHT column", nextTargets(state){
+      return state.aliveIndices().filter(i=>i%4===3);
+    }}),
+    corners: ()=>({ kind:"corners", desc:"Tap CORNERS", nextTargets(state){
+      return state.aliveIndices().filter(i=>[0,3,12,15].includes(i));
+    }}),
+    ascending: ()=>({ kind:"ascending", desc:"Tap numbers ASCENDING", nextTargets(state){
+      // Return the single smallest-number tile among alive ones; called repeatedly
+      const alive = state.aliveIndices();
+      if (!alive.length) return [];
+      const min = alive.reduce((a,b)=> state.tiles[a].num<=state.tiles[b].num ? a : b );
+      return [min];
+    }})
+  };
+
+  // --- Game state
+  const state = {
+    level:1,
+    rules:[],         // array of rule objects
+    tiles:[],         // {el, num, color, alive}
+    currentRuleIdx:0,
+    presenting:false,
+    aliveIndices(){ return this.tiles.map((t,i)=>t.alive?i:-1).filter(i=>i>=0); }
+  };
+
+  function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+  function choice(arr){ return arr[rand(0,arr.length-1)]; }
+
+  function buildGrid(){
+    gridEl.innerHTML = "";
+    state.tiles = Array.from({length:16}, (_,i)=>{
+      const c = choice(COLORS);
+      const num = rand(1,9);
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.style.background = c.css;
+      el.textContent = num; // number is needed for some rules
+      el.dataset.idx = i;
+      gridEl.appendChild(el);
+      return { el, num, color:c.name, alive:true };
+    });
+  }
+
+  function addNewRule(){
+    // Pick a rule; ensure grid has at least one match for it at start (if not, retry)
+    const candidates = [
+      RULES.color(choice(COLORS)),
+      RULES.odd(), RULES.even(),
+      RULES.top(), RULES.bottom(), RULES.leftcol(), RULES.rightcol(),
+      RULES.corners(),
+      RULES.ascending()
+    ];
+    let r = choice(candidates);
+    // Simple retry loop to avoid empty rules at start
+    let tries = 0;
+    while (r.nextTargets(state).length===0 && tries<10){ r = choice(candidates); tries++; }
+    state.rules.push(r);
+    flashBanner(`Rule ${state.rules.length}: ${r.desc}`);
+  }
+
+  function flashBanner(text){
+    banner.textContent = text;
+    banner.classList.add('show');
+    state.presenting = true;
+    setTimeout(()=>{ banner.textContent = ""; banner.classList.remove('show'); state.presenting=false; }, 1200);
+  }
+
+  function startLevel(resetRules=false){
+    toast.textContent = "";
+    buildGrid();
+    if (resetRules){ state.rules=[]; state.level=1; }
+    levelEl.textContent = state.level;
+    if (state.rules.length<state.level) addNewRule();
+    state.currentRuleIdx = 0;
+    // Brief visual hint: dim non-targets for the first rule for 800ms (training wheels)
+    const targets = state.rules[0].nextTargets(state);
+    state.tiles.forEach((t,i)=>{ if (!targets.includes(i)) t.el.classList.add('off'); });
+    setTimeout(()=> state.tiles.forEach(t=>t.el.classList.remove('off')), 800);
+  }
+
+  function advanceRuleOrLevel(){
+    state.currentRuleIdx++;
+    // Skip rules that no longer have matches (because earlier taps removed them)
+    while (state.currentRuleIdx < state.rules.length &&
+           state.rules[state.currentRuleIdx].nextTargets(state).length===0){
+      state.currentRuleIdx++;
+    }
+    if (state.currentRuleIdx >= state.rules.length){
+      // Level complete
+      toast.textContent = "Level up!";
+      toast.className = "toast ok";
+      state.level++;
+      levelEl.textContent = state.level;
+      updateBest();
+      setTimeout(()=>{ startLevel(); }, 800);
+    }else{
+      // Optionally pulse banner briefly for the next rule index (no text)
+      flashBanner(`Rule ${state.currentRuleIdx+1}`);
+    }
+  }
+
+  function killTile(i){
+    const t = state.tiles[i];
+    t.alive = false;
+    t.el.classList.add('dead');
+  }
+
+  function handleTap(i){
+    if (state.presenting) return;
+    const r = state.rules[state.currentRuleIdx];
+    let targets = r.nextTargets(state);
+    if (targets.length===0){ advanceRuleOrLevel(); return; }
+    if (r.kind === "ascending"){
+      const next = targets[0];
+      if (i===next){ killTile(i); advanceIfExhausted(); }
+      else fail();
+      return;
+    }
+    // Set-type rules: any in targets is OK
+    if (targets.includes(i)){ killTile(i); advanceIfExhausted(); }
+    else fail();
+
+    function advanceIfExhausted(){
+      // If no more targets for this rule, move to next rule
+      const remaining = r.nextTargets(state);
+      if (remaining.length===0) advanceRuleOrLevel();
+    }
+  }
+
+  function fail(){
+    toast.textContent = "Oops! Wrong tile.";
+    toast.className = "toast err";
+    // Reset to level 1 rules but keep best
+    state.level = 1;
+    setTimeout(()=>{ startLevel(true); toast.textContent=""; toast.className="toast"; }, 700);
+  }
+
+  // Click / keyboard
+  gridEl.addEventListener('click', (e)=>{
+    const cell = e.target.closest('.cell'); if (!cell) return;
+    handleTap(parseInt(cell.dataset.idx,10));
+  });
+  window.addEventListener('keydown', (e)=>{
+    if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
+    // Keyboard mapping: 1-4 top row, QWER next, ASDF next, ZXCV bottom
+    const map = {
+      '1':0,'2':1,'3':2,'4':3,
+      'q':4,'w':5,'e':6,'r':7,
+      'a':8,'s':9,'d':10,'f':11,
+      'z':12,'x':13,'c':14,'v':15
+    };
+    const key = e.key.toLowerCase();
+    if (key in map){ e.preventDefault(); handleTap(map[key]); return; }
+    if (key==='enter'){ startLevel(); }
+  });
+
+  restartBtn.addEventListener('click', ()=> startLevel(true));
+  nextBtn.addEventListener('click', ()=> startLevel());
+
+  // Best / Global
+  function updateBest(){
+    if (state.level-1 > bestLocal){
+      bestLocal = state.level-1;
+      localStorage.setItem(BEST_KEY, String(bestLocal));
+      bestEl.textContent = bestLocal;
+      upsertBest(bestLocal);
+    }
+  }
+  async function upsertBest(val){
+    try{
+      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      await sb.from("scores").upsert(
+        { slug: SLUG, device_id: deviceId, best_streak: val },
+        { onConflict: "slug,device_id" }
+      );
+      refreshGlobal();
+    }catch(e){}
+  }
+  async function refreshGlobal(){
+    try{
+      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      const { data } = await sb.from("global_best_scores").select().eq("slug", SLUG).maybeSingle();
+      globalEl.textContent = data?.global_best ?? 0;
+    }catch(e){}
+  }
+
+  // Boot
+  refreshGlobal();
+  startLevel(true);
+})();
+</script>
+</body>
+</html>
