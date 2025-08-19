@@ -43,5 +43,14 @@
     "tags": ["puzzle","spatial"],
     "blurb": "Tilt pieces into place.",
     "cover_emoji": "🧩"
-  }
+  },
+  {
+  "slug": "rainbowrules",
+  "name": "Rainbow Rules",
+  "url": "apps/rainbowrules.html",
+  "released_at": "2025-08-19",
+  "tags": ["memory","rainbow"],
+  "blurb": "Memorize. Apply all rules in order.",
+  "cover_emoji": "🌈"
+}
 ]
