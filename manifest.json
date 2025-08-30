@@ -52,5 +52,7 @@
   "tags": ["memory","rainbow"],
   "blurb": "Memorize. Apply all rules in order.",
   "cover_emoji": "🌈"
-}
+},
+{"slug":"longshot","name":"Longshot","url":"apps/longshot/","released_at":"2025-08-30","tags":["word","daily"],"blurb":"3 shots to find your best word.","cover_emoji":"🧩"}
+
 ]
