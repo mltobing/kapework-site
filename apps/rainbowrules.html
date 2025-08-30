@@ -23,7 +23,6 @@
         font-weight:800;font-size:22px;color:#0b1220; cursor:pointer; user-select:none; transition:transform .05s ease, filter .1s}
   .cell:active{transform:scale(.98)}
   .cell.off{filter:grayscale(0.3) brightness(0.65)}
-  .cell.dead{opacity:.18; pointer-events:none}
   .foot{display:flex;gap:10px;justify-content:center;margin-top:8px}
   button{padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:#0e1729;color:#e8eefc;cursor:pointer;font:inherit}
   button:hover{background:#0f1a2f}
@@ -53,7 +52,7 @@
     <div id="toast" class="toast" aria-live="polite"></div>
   </div>
 
-  <p class="pill" style="margin-top:12px; display:inline-flex">Tip: each level adds a new rule. Apply rules 1→N in order.</p>
+  <p class="pill" style="margin-top:12px; display:inline-flex">Tip: rules apply from newest ➜ oldest.</p>
 </div>
 
 <!-- Supabase for global best -->
@@ -67,82 +66,109 @@
   let sb = null;
 
   // --- DOM
-  const gridEl = document.getElementById('grid');
-  const levelEl = document.getElementById('level');
-  const bestEl = document.getElementById('best');
+  const gridEl   = document.getElementById('grid');
+  const levelEl  = document.getElementById('level');
+  const bestEl   = document.getElementById('best');
   const globalEl = document.getElementById('global');
-  const banner = document.getElementById('banner');
+  const banner   = document.getElementById('banner');
   const restartBtn = document.getElementById('restart');
-  const nextBtn = document.getElementById('next');
-  const toast = document.getElementById('toast');
+  const nextBtn    = document.getElementById('next');
+  const toast    = document.getElementById('toast');
 
   // --- Device/local
-  const DID_KEY = "kapework_did_v1";
+  const DID_KEY  = "kapework_did_v1";
   const BEST_KEY = "rainbowrules_best_v1";
   let deviceId = localStorage.getItem(DID_KEY);
   if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
   let bestLocal = parseInt(localStorage.getItem(BEST_KEY)||"0",10);
   bestEl.textContent = bestLocal;
 
-  // --- Palette (with labels for color-blind support)
+  // --- Palette
   const COLORS = [
-    {name:"RED",    css:"#ef4444", label:"R"},
-    {name:"ORANGE", css:"#f97316", label:"O"},
-    {name:"YELLOW", css:"#f59e0b", label:"Y"},
-    {name:"GREEN",  css:"#22c55e", label:"G"},
-    {name:"BLUE",   css:"#3b82f6", label:"B"},
-    {name:"INDIGO", css:"#6366f1", label:"I"},
-    {name:"VIOLET", css:"#a855f7", label:"V"}
+    {name:"RED",    css:"#ef4444"},
+    {name:"ORANGE", css:"#f97316"},
+    {name:"YELLOW", css:"#f59e0b"},
+    {name:"GREEN",  css:"#22c55e"},
+    {name:"BLUE",   css:"#3b82f6"},
+    {name:"INDIGO", css:"#6366f1"},
+    {name:"VIOLET", css:"#a855f7"}
   ];
 
-  // --- Rule generators
+  const COLS = 4; // grid columns remain 4; rows shrink as tiles are removed
+
+  // --- Helpers
+  function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+  function choice(arr){ return arr[rand(0,arr.length-1)]; }
+
+  // --- Dynamic board-aware predicates
+  function makePredicates(state){
+    const len = state.tiles.length;
+    const lastRow = Math.floor((len-1)/COLS);
+    const topRow = 0;
+
+    return {
+      isTop:     (i)=> Math.floor(i/COLS) === topRow,
+      isBottom:  (i)=> Math.floor(i/COLS) === lastRow,
+      isLeft:    (i)=> i % COLS === 0,
+      isRight:   (i)=> i % COLS === (COLS-1),
+      isCorner:  (i)=> {
+        const tl = 0;
+        const tr = Math.min(COLS-1, len-1);
+        const bl = Math.max(0, len - ((len % COLS) || COLS));
+        const br = len-1;
+        return i===tl || i===tr || i===bl || i===br;
+      }
+    };
+  }
+
+  // --- Rule generators (use dynamic predicates every call)
   const RULES = {
     color: (c)=>({
       kind:"color", desc:`Tap ${c.name}`, nextTargets(state){
-        return state.aliveIndices().filter(i=>state.tiles[i].color===c.name);
+        return state.tiles.map((t,i)=> ({t,i})).filter(x=>x.t.alive && x.t.color===c.name).map(x=>x.i);
       }}),
-    odd: ()=>({ kind:"odd", desc:"Tap ODD numbers", nextTargets(state){
-      return state.aliveIndices().filter(i=>state.tiles[i].num%2===1);
+    odd:   ()=>({ kind:"odd",   desc:"Tap ODD numbers", nextTargets(state){
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && x.t.num%2===1).map(x=>x.i);
     }}),
-    even: ()=>({ kind:"even", desc:"Tap EVEN numbers", nextTargets(state){
-      return state.aliveIndices().filter(i=>state.tiles[i].num%2===0);
+    even:  ()=>({ kind:"even",  desc:"Tap EVEN numbers", nextTargets(state){
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && x.t.num%2===0).map(x=>x.i);
     }}),
-    top: ()=>({ kind:"top", desc:"Tap TOP row", nextTargets(state){
-      return state.aliveIndices().filter(i=>Math.floor(i/4)===0);
+    top:   ()=>({ kind:"top",   desc:"Tap TOP row", nextTargets(state){
+      const P = makePredicates(state);
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && P.isTop(x.i)).map(x=>x.i);
     }}),
-    bottom: ()=>({ kind:"bottom", desc:"Tap BOTTOM row", nextTargets(state){
-      return state.aliveIndices().filter(i=>Math.floor(i/4)===3);
+    bottom:()=>({ kind:"bottom",desc:"Tap BOTTOM row", nextTargets(state){
+      const P = makePredicates(state);
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && P.isBottom(x.i)).map(x=>x.i);
     }}),
-    leftcol: ()=>({ kind:"leftcol", desc:"Tap LEFT column", nextTargets(state){
-      return state.aliveIndices().filter(i=>i%4===0);
+    leftcol:()=>({ kind:"leftcol",desc:"Tap LEFT column", nextTargets(state){
+      const P = makePredicates(state);
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && P.isLeft(x.i)).map(x=>x.i);
     }}),
-    rightcol: ()=>({ kind:"rightcol", desc:"Tap RIGHT column", nextTargets(state){
-      return state.aliveIndices().filter(i=>i%4===3);
+    rightcol:()=>({ kind:"rightcol",desc:"Tap RIGHT column", nextTargets(state){
+      const P = makePredicates(state);
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && P.isRight(x.i)).map(x=>x.i);
     }}),
-    corners: ()=>({ kind:"corners", desc:"Tap CORNERS", nextTargets(state){
-      return state.aliveIndices().filter(i=>[0,3,12,15].includes(i));
+    corners:()=>({ kind:"corners",desc:"Tap CORNERS", nextTargets(state){
+      const P = makePredicates(state);
+      return state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive && P.isCorner(x.i)).map(x=>x.i);
     }}),
-    ascending: ()=>({ kind:"ascending", desc:"Tap numbers ASCENDING", nextTargets(state){
-      // Return the single smallest-number tile among alive ones; called repeatedly
-      const alive = state.aliveIndices();
+    ascending:()=>({ kind:"ascending", desc:"Tap numbers ASCENDING", nextTargets(state){
+      const alive = state.tiles.map((t,i)=>({t,i})).filter(x=>x.t.alive);
       if (!alive.length) return [];
-      const min = alive.reduce((a,b)=> state.tiles[a].num<=state.tiles[b].num ? a : b );
-      return [min];
+      const min = alive.reduce((a,b)=> a.t.num<=b.t.num ? a : b );
+      return [min.i];
     }})
   };
 
   // --- Game state
   const state = {
     level:1,
-    rules:[],         // array of rule objects
-    tiles:[],         // {el, num, color, alive}
-    currentRuleIdx:0,
-    presenting:false,
-    aliveIndices(){ return this.tiles.map((t,i)=>t.alive?i:-1).filter(i=>i>=0); }
+    rules:[],         // [{kind, desc, nextTargets(state)}]
+    tiles:[],         // {el,num,color,alive}
+    currentRuleIdx:0, // we apply rules from newest -> oldest
+    presenting:false
   };
-
-  function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
-  function choice(arr){ return arr[rand(0,arr.length-1)]; }
 
   function buildGrid(){
     gridEl.innerHTML = "";
@@ -152,15 +178,19 @@
       const el = document.createElement('div');
       el.className = 'cell';
       el.style.background = c.css;
-      el.textContent = num; // number is needed for some rules
+      el.textContent = num;
       el.dataset.idx = i;
       gridEl.appendChild(el);
       return { el, num, color:c.name, alive:true };
     });
+    reindexTiles();
+  }
+
+  function reindexTiles(){
+    state.tiles.forEach((t,idx)=>{ t.el.dataset.idx = idx; });
   }
 
   function addNewRule(){
-    // Pick a rule; ensure grid has at least one match for it at start (if not, retry)
     const candidates = [
       RULES.color(choice(COLORS)),
       RULES.odd(), RULES.even(),
@@ -169,7 +199,6 @@
       RULES.ascending()
     ];
     let r = choice(candidates);
-    // Simple retry loop to avoid empty rules at start
     let tries = 0;
     while (r.nextTargets(state).length===0 && tries<10){ r = choice(candidates); tries++; }
     state.rules.push(r);
@@ -183,28 +212,31 @@
     setTimeout(()=>{ banner.textContent = ""; banner.classList.remove('show'); state.presenting=false; }, 1200);
   }
 
-  function startLevel(resetRules=false){
+  function startLevel(resetAll=false){
     toast.textContent = "";
+    if (resetAll){ state.rules=[]; state.level=1; }
     buildGrid();
-    if (resetRules){ state.rules=[]; state.level=1; }
     levelEl.textContent = state.level;
-    if (state.rules.length<state.level) addNewRule();
-    state.currentRuleIdx = 0;
-    // Brief visual hint: dim non-targets for the first rule for 800ms (training wheels)
-    const targets = state.rules[0].nextTargets(state);
+    // Ensure we have exactly 'level' rules, adding the new one now
+    while (state.rules.length < state.level) addNewRule();
+    // newest first
+    state.currentRuleIdx = state.rules.length - 1;
+
+    // brief hint for the newest rule
+    const targets = state.rules[state.currentRuleIdx].nextTargets(state);
     state.tiles.forEach((t,i)=>{ if (!targets.includes(i)) t.el.classList.add('off'); });
     setTimeout(()=> state.tiles.forEach(t=>t.el.classList.remove('off')), 800);
   }
 
-  function advanceRuleOrLevel(){
-    state.currentRuleIdx++;
-    // Skip rules that no longer have matches (because earlier taps removed them)
-    while (state.currentRuleIdx < state.rules.length &&
+  function advanceBackwardThroughRules(){
+    // move to the previous rule that still has targets
+    state.currentRuleIdx--;
+    while (state.currentRuleIdx >= 0 &&
            state.rules[state.currentRuleIdx].nextTargets(state).length===0){
-      state.currentRuleIdx++;
+      state.currentRuleIdx--;
     }
-    if (state.currentRuleIdx >= state.rules.length){
-      // Level complete
+    if (state.currentRuleIdx < 0){
+      // Level complete -> increase level, maybe update best, start next level
       toast.textContent = "Level up!";
       toast.className = "toast ok";
       state.level++;
@@ -212,43 +244,55 @@
       updateBest();
       setTimeout(()=>{ startLevel(); }, 800);
     }else{
-      // Optionally pulse banner briefly for the next rule index (no text)
       flashBanner(`Rule ${state.currentRuleIdx+1}`);
     }
   }
 
-  function killTile(i){
+  function removeTile(i){
     const t = state.tiles[i];
     t.alive = false;
-    t.el.classList.add('dead');
+    // Remove from DOM and array, then reindex
+    t.el.remove();
+    state.tiles.splice(i,1);
+    reindexTiles();
   }
 
   function handleTap(i){
     if (state.presenting) return;
+    // Guard index (in case user taps while a removal is happening)
+    if (i<0 || i>=state.tiles.length) return;
+
     const r = state.rules[state.currentRuleIdx];
-    let targets = r.nextTargets(state);
-    if (targets.length===0){ advanceRuleOrLevel(); return; }
-    if (r.kind === "ascending"){
+    const targets = r.nextTargets(state);
+
+    // If no targets for this rule (because board shrank), step backward
+    if (targets.length===0){ advanceBackwardThroughRules(); return; }
+
+    const isAscending = (r.kind === "ascending");
+    if (isAscending){
       const next = targets[0];
-      if (i===next){ killTile(i); advanceIfExhausted(); }
+      if (i===next){ removeTile(i); afterRemovalCheck(r); }
       else fail();
       return;
     }
-    // Set-type rules: any in targets is OK
-    if (targets.includes(i)){ killTile(i); advanceIfExhausted(); }
-    else fail();
 
-    function advanceIfExhausted(){
-      // If no more targets for this rule, move to next rule
-      const remaining = r.nextTargets(state);
-      if (remaining.length===0) advanceRuleOrLevel();
+    // Set-based rules: any target is OK
+    if (targets.includes(i)){
+      removeTile(i);
+      afterRemovalCheck(r);
+    } else {
+      fail();
+    }
+
+    function afterRemovalCheck(rule){
+      // If this rule has no remaining matches on the shrunken board, go to the previous rule
+      if (rule.nextTargets(state).length===0) advanceBackwardThroughRules();
     }
   }
 
   function fail(){
     toast.textContent = "Oops! Wrong tile.";
     toast.className = "toast err";
-    // Reset to level 1 rules but keep best
     state.level = 1;
     setTimeout(()=>{ startLevel(true); toast.textContent=""; toast.className="toast"; }, 700);
   }
@@ -258,24 +302,30 @@
     const cell = e.target.closest('.cell'); if (!cell) return;
     handleTap(parseInt(cell.dataset.idx,10));
   });
+
   window.addEventListener('keydown', (e)=>{
     if (e.target && ['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-    // Keyboard mapping: 1-4 top row, QWER next, ASDF next, ZXCV bottom
+    // Keyboard mapping: 1-4 top row, QWER next, ASDF next, ZXCV bottom (current layout)
     const map = {
       '1':0,'2':1,'3':2,'4':3,
       'q':4,'w':5,'e':6,'r':7,
       'a':8,'s':9,'d':10,'f':11,
       'z':12,'x':13,'c':14,'v':15
     };
-    const key = e.key.toLowerCase();
-    if (key in map){ e.preventDefault(); handleTap(map[key]); return; }
-    if (key==='enter'){ startLevel(); }
+    const k = e.key.toLowerCase();
+    if (k in map){
+      const idx = map[k];
+      // idx may be out of range when the board shrinks
+      if (idx < state.tiles.length) { e.preventDefault(); handleTap(idx); }
+      return;
+    }
+    if (k==='enter'){ startLevel(); }
   });
 
   restartBtn.addEventListener('click', ()=> startLevel(true));
   nextBtn.addEventListener('click', ()=> startLevel());
 
-  // Best / Global
+  // --- Best / Global (same as before)
   function updateBest(){
     if (state.level-1 > bestLocal){
       bestLocal = state.level-1;
