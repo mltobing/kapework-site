@@ -7,29 +7,31 @@
 <style>
   :root { --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08);
           --accent:#7dd3fc; --ok:#34d399; --err:#fb7185; }
-  *{box-sizing:border-box} html,body{height:100%} body{margin:0;background:var(--bg);color:var(--ink);
-  font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto}
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto}
   .wrap{max-width:560px;margin:0 auto;padding:16px 16px 28px}
   header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   h1{margin:0;font-size:20px}
-  .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);
-        border-radius:999px;background:#0e1729}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;background:#0e1729}
   .panel{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:12px}
-  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 10px}
   .cell{height:76px;border-radius:14px;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;
-        font-weight:800;font-size:26px;cursor:pointer;user-select:none;transition:transform .05s ease, background .1s}
+        font-weight:800;font-size:26px;cursor:pointer;user-select:none;transition:transform .05s ease, background .1s, box-shadow .2s}
   .cell:active{transform:scale(.98)}
   .cell.sel{outline:2px solid var(--accent);background:rgba(125,211,252,.12)}
-  .row{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:8px}
+  .cell.hot{box-shadow:0 0 0 2px rgba(125,211,252,.35), 0 0 22px rgba(125,211,252,.25) inset}
+  .row{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:6px;flex-wrap:wrap}
   .btn{padding:10px 14px;border-radius:12px;border:1px solid var(--bd);background:#0e1729;color:#e8eefc;cursor:pointer}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
-  .status{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin-top:6px}
+  .status{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px;margin-top:6px;gap:8px;flex-wrap:wrap}
   .shots{letter-spacing:2px}
   .ok{color:var(--ok)} .err{color:var(--err)}
-  .toast{height:20px;text-align:center;font-size:14px;margin-top:8px}
+  .toast{min-height:20px;text-align:center;font-size:14px;margin-top:8px}
   .muted{color:var(--muted)}
+  .closer{display:flex;justify-content:center;gap:8px;align-items:center;margin-top:6px}
+  .bar{height:10px;border-radius:999px;border:1px solid var(--bd);background:rgba(255,255,255,.04);width:220px;overflow:hidden}
+  .fill{height:100%;background:linear-gradient(90deg,#34d399,#7dd3fc);width:0%}
   @media(min-width:560px){ .cell{height:96px;font-size:28px} }
-  /* tiny shake when you try an invalid non-adjacent step */
   @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-2px)} 50%{transform:translateX(2px)} 75%{transform:translateX(-2px)} 100%{transform:translateX(0)} }
   .shake{animation:shake .15s}
 </style>
@@ -37,7 +39,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Longshot</h1>
+    <h1>Longshot <span class="muted" id="puzzleNum"></span></h1>
     <span class="pill">Streak <strong id="streak">0</strong></span>
   </header>
 
@@ -46,17 +48,25 @@
 
     <div class="row">
       <button id="submit" class="btn" disabled>Submit</button>
+      <button id="share" class="btn" style="display:none">Share</button>
     </div>
 
     <div class="status">
       <div id="today" class="muted"></div>
       <div><span class="muted">Shots:</span> <span id="shots" class="shots">● ○ ○</span></div>
+      <div id="bestline" class="muted"></div>
+    </div>
+
+    <div class="closer" id="closer" style="display:none">
+      <div class="bar"><div id="fill" class="fill"></div></div>
+      <div id="pct" class="muted">0%</div>
+      <div id="medal" style="min-width:1.5rem;text-align:center"></div>
     </div>
 
     <div id="toast" class="toast muted" aria-live="polite"></div>
   </div>
 
-  <p class="muted" style="margin-top:10px">Tap letters to trace a word (8-direction adjacency, no tile reuse). Submit up to 3 times per UTC day.</p>
+  <p class="muted" style="margin-top:10px">Tap letters (8‑way adjacency, no reuse). 3 shots per UTC day. Tap last letter again to undo.</p>
 </div>
 
 <script>
@@ -66,12 +76,13 @@
     return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86400000);
   }
   const DAY = dayIndexUTC();
+  document.getElementById('puzzleNum').textContent = `#${DAY}`;
 
   // ===== Seeded RNG (mulberry32) =====
   function mulberry32(a){ return function(){ let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const rng = mulberry32((DAY ^ 0x9E3779B9) >>> 0);
 
-  // ===== Weighted letter bag (English-ish) =====
+  // ===== Weighted letter bag =====
   const bag = [
     ...'E'.repeat(12), ...'A'.repeat(9), ...'R'.repeat(8), ...'I'.repeat(8),
     ...'O'.repeat(8),  ...'T'.repeat(7), ...'L'.repeat(6), ...'N'.repeat(6),
@@ -84,88 +95,176 @@
   const pick = ()=> bag[Math.floor(rng()*bag.length)];
 
   // ===== Local persistence =====
-  const NS = "longshot_v1";
+  const NS = "longshot_v2"; // bump namespace for new fields
   const KEY = (k)=>`${NS}_${k}`;
-  function loadState(){
-    try{ return JSON.parse(localStorage.getItem(KEY("state"))||"{}"); }catch{ return {}; }
-  }
+  const todayEl  = document.getElementById('today');
+  todayEl.textContent = new Date().toUTCString().slice(0,16) + " UTC";
+  function loadState(){ try{ return JSON.parse(localStorage.getItem(KEY("state"))||"{}"); }catch{return{}} }
   function saveState(s){ localStorage.setItem(KEY("state"), JSON.stringify(s)); }
 
   // ===== DOM refs =====
   const gridEl   = document.getElementById('grid');
   const submitEl = document.getElementById('submit');
+  const shareEl  = document.getElementById('share');
   const shotsEl  = document.getElementById('shots');
   const toastEl  = document.getElementById('toast');
-  const todayEl  = document.getElementById('today');
+  const closerEl = document.getElementById('closer');
+  const fillEl   = document.getElementById('fill');
+  const pctEl    = document.getElementById('pct');
+  const medalEl  = document.getElementById('medal');
+  const bestline = document.getElementById('bestline');
   const streakEl = document.getElementById('streak');
 
-  // ===== Dictionary (optional) =====
-  let dictReady = false;
-  let dict = null; // Set<string>
-  (async function(){
+  function setToast(msg, cls="muted"){ toastEl.textContent = msg; toastEl.className = `toast ${cls}`; }
+  function setShots(n){
+    const dots = ["●","○","○"]; if (n>=2) dots[1]="●"; if (n>=3) dots[2]="●";
+    shotsEl.textContent = dots.join(" ");
+  }
+
+  // ===== Dictionary & trie =====
+  // Minimal internal list so the game "just works" (please replace with /data/words_common.json)
+  const MINI_WORDS = [
+    "cat","dog","bird","tree","stone","river","water","time","light","night","day","green","blue",
+    "train","trail","trails","lines","liner","line","note","tone","tones","notes","rain","rains",
+    "taken","taker","stake","stain","stare","stare","stair","stare","rates","rate","rates","late",
+    "later","alert","alter","trend","tread","reads","read","bore","bored","board","broad","roads",
+    "roads","road","load","loads","sail","sails","sailor","iron","irons","tire","tires","rise","rises",
+    "store","stores","stone","stole","steal","steals","stale","stair","stair","chair","chain","chain",
+    "cage","cages","game","games","aim","aims","mail","mails","steam","teams","team","meant","meats",
+    "meat","time","times","timer","timer","rate","rates","rated","tired","tide","tides"
+  ];
+  let dictSet = null, trie = null, dictLabel = "mini";
+
+  function insertTrie(root, w){
+    let node = root;
+    for (const ch of w){
+      const c = ch.charCodeAt(0) - 97;
+      if (c<0 || c>25) return; // skip non a-z
+      if (!node[c]) node[c] = Object.create(null);
+      node = node[c];
+    }
+    node.$ = 1; // end marker
+  }
+  function buildTrie(words){
+    const root = Object.create(null);
+    for (const w of words){ if (w.length>=3) insertTrie(root, w); }
+    return root;
+  }
+
+  async function loadDictionary(){
+    // Try external file first
     try{
       const res = await fetch("/data/words_common.json", { cache:"force-cache" });
       if (res.ok){
         const arr = await res.json();
-        dict = new Set(arr);
-        dictReady = true;
+        dictSet = new Set(arr);
+        trie = buildTrie(arr.map(w=>w.toLowerCase()));
+        dictLabel = "common";
+        return;
       }
-    }catch(_){ /* optional */ }
-  })();
+    }catch(_){}
+    // Fallback to mini
+    dictSet = new Set(MINI_WORDS);
+    trie = buildTrie(MINI_WORDS);
+    dictLabel = "mini";
+  }
 
-  // ===== Game/session state =====
-  let grid = [];               // array of 16 letters
-  let selected = [];           // indices path
-  let attempts = [];           // [{word,len,valid,ts}]
+  // ===== Board & solver =====
+  let grid = [];                 // ['A','B',...]
+  let selected = [];             // indices path during a guess
+  let attempts = [];             // [{word,len,valid,ts}]
   let completed = false;
   let lastPlayedDay = null;
   let streak = 0;
 
-  function setToast(msg, cls="muted"){ toastEl.textContent = msg; toastEl.className = `toast ${cls}`; }
-  function setShots(n){
-    const dots = ["●","○","○"];
-    if (n>=2) dots[1]="●";
-    if (n>=3) dots[2]="●";
-    shotsEl.textContent = dots.join(" ");
-  }
-
-  // ===== Build / load today's board =====
-  function newBoard(){
-    grid = Array.from({length:16}, pick);
-  }
-
-  function initFromStorage(){
-    const s = loadState();
-    // New day → reset daily progress but keep streak logic
-    if (!s.day || s.day !== DAY){
-      // streak will update upon first submit of the day
-      newBoard();
-      attempts = [];
-      completed = false;
-      lastPlayedDay = s.lastPlayedDay ?? null;
-      streak = s.streak ?? 0;
-      persist();
-    } else {
-      grid = s.grid || Array.from({length:16}, pick);
-      attempts = s.attempts || [];
-      completed = !!s.completed;
-      streak = s.streak || 0;
-      lastPlayedDay = s.lastPlayedDay ?? null;
+  // Solver (max length + one example path)
+  function neighbors(i){
+    const x=i%4, y=(i/4)|0, out=[];
+    for (let dy=-1; dy<=1; dy++){
+      for (let dx=-1; dx<=1; dx++){
+        if (dx===0 && dy===0) continue;
+        const nx=x+dx, ny=y+dy;
+        if (nx>=0 && nx<4 && ny>=0 && ny<4) out.push(ny*4+nx);
+      }
     }
-    streakEl.textContent = streak;
-    todayEl.textContent = new Date().toUTCString().slice(0,16) + " UTC";
-    setShots(attempts.length);
-    if (completed) {
-      setToast("All shots used. Come back tomorrow.", "ok");
-      submitEl.disabled = true;
+    return out;
+  }
+
+  function maxOnBoard(grid, trie){
+    let bestLen = 0;
+    const examples = new Set();
+    let bestPath = [];
+
+    const neigh = Array.from({length:16}, (_,i)=>neighbors(i));
+
+    function dfs(idx, node, visitedMask, wordArr, path){
+      // step letter
+      const ch = grid[idx].toLowerCase();
+      const code = ch.charCodeAt(0)-97;
+      const next = node[code];
+      if (!next) return;
+
+      const newMask = visitedMask | (1<<idx);
+      const newPath = path; newPath.push(idx);
+      wordArr.push(ch);
+
+      if (next.$){
+        if (wordArr.length > bestLen){
+          bestLen = wordArr.length;
+          examples.clear();
+          examples.add(wordArr.join(""));
+          bestPath = newPath.slice();
+        } else if (wordArr.length === bestLen){
+          if (examples.size < 5) examples.add(wordArr.join(""));
+        }
+      }
+
+      const nn = neigh[idx];
+      for (let k=0;k<nn.length;k++){
+        const j = nn[k];
+        if (newMask & (1<<j)) continue;
+        dfs(j, next, newMask, wordArr, newPath);
+      }
+
+      wordArr.pop(); newPath.pop();
     }
+
+    for (let i=0;i<16;i++){
+      dfs(i, trie, 0, [], []);
+    }
+    return { maxLen: bestLen, examples: Array.from(examples), path: bestPath };
   }
 
-  function persist(){
-    saveState({ day:DAY, grid, attempts, completed, streak, lastPlayedDay });
+  // Generate a quality-gated board
+  function makeBoard(){
+    let attempts=0, chosen=null, stats=null;
+    while(attempts<250){
+      const g = Array.from({length:16}, pick);
+      const s = maxOnBoard(g, trie);
+      if (s.maxLen>=8 && s.maxLen<=14){
+        chosen=g; stats=s; break;
+      }
+      attempts++;
+    }
+    if (!chosen){ // fallback if dictionary small
+      chosen = Array.from({length:16}, pick);
+      stats = maxOnBoard(chosen, trie);
+    }
+    return { grid: chosen, stats };
   }
 
-  // ===== Render grid =====
+  // ===== UI wiring =====
+  const bestlineUpdate = (best,max)=>{
+    if (!max || max<=0){ bestline.textContent = ""; closerEl.style.display="none"; return; }
+    const pct = Math.round((best/max)*100);
+    const medal = pct>=90 ? "🥇" : (pct>=75 ? "🥈" : (pct>=60 ? "🥉" : ""));
+    bestline.textContent = `Best ${best} / ${max} (${pct}%) ${medal}`;
+    closerEl.style.display = "flex";
+    fillEl.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    pctEl.textContent = `${pct}%`;
+    medalEl.textContent = medal;
+  };
+
   function renderGrid(){
     gridEl.innerHTML = "";
     grid.forEach((ch, idx)=>{
@@ -177,14 +276,7 @@
     });
   }
 
-  // ===== Adjacency =====
-  function isNeighbor(a,b){
-    const ax=a%4, ay=(a/4)|0, bx=b%4, by=(b/4)|0;
-    return Math.max(Math.abs(ax-bx), Math.abs(ay-by)) === 1; // 8-way
-  }
-
   function updateSelectionUI(){
-    // clear all
     gridEl.querySelectorAll('.cell').forEach(c=>c.classList.remove('sel'));
     selected.forEach(i=>{
       const c = gridEl.querySelector(`.cell[data-idx="${i}"]`);
@@ -193,46 +285,74 @@
     submitEl.disabled = selected.length < 3 || completed;
   }
 
-  // Click handling
-  gridEl.addEventListener('click', (e)=>{
-    const cell = e.target.closest('.cell'); if (!cell) return;
-    if (completed) return;
+  function isNeighbor(a,b){
+    const ax=a%4, ay=(a/4)|0, bx=b%4, by=(b/4)|0;
+    return Math.max(Math.abs(ax-bx), Math.abs(ay-by)) === 1;
+  }
 
+  function shake(el){ el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'), 150); }
+
+  // ===== Persistence + day rollover =====
+  let maxLen = 0;
+  let examples = [];
+  let bestPath = [];
+
+  function persist(){ saveState({ day:DAY, grid, attempts, completed, streak, lastPlayedDay, maxLen, examples, dictLabel }) }
+
+  function initNewDay(){
+    const { grid:g, stats } = makeBoard();
+    grid = g; maxLen = stats.maxLen; examples = stats.examples; bestPath = stats.path;
+    attempts = []; completed=false;
+  }
+
+  function initFromStorage(){
+    const s = loadState();
+    if (!s.day || s.day !== DAY || !s.grid){
+      initNewDay();
+      lastPlayedDay = s.lastPlayedDay ?? null;
+      streak = s.streak ?? 0;
+      persist();
+    } else {
+      grid = s.grid; attempts = s.attempts || []; completed = !!s.completed;
+      streak = s.streak || 0; lastPlayedDay = s.lastPlayedDay ?? null;
+      maxLen = s.maxLen || 0; examples = s.examples || [];
+      // If we upgraded to v2 and have no stats, compute once:
+      if (!maxLen){ const stats = maxOnBoard(grid, trie); maxLen = stats.maxLen; examples = stats.examples; bestPath = stats.path; persist(); }
+    }
+    document.getElementById('streak').textContent = streak;
+    setShots(attempts.length);
+    // closeness so far
+    const best = Math.max(0, ...attempts.filter(a=>a.valid).map(a=>a.len));
+    bestlineUpdate(best, maxLen);
+    if (completed){ submitEl.disabled = true; shareEl.style.display = "inline-block"; setToast("All shots used. Come back tomorrow.", "ok"); }
+  }
+
+  // ===== Hotspot (last-shot nudge) =====
+  function showHotspotIfNeeded(){
+    gridEl.querySelectorAll('.cell').forEach(c=>c.classList.remove('hot'));
+    if (attempts.length === 2 && bestPath && bestPath.length){
+      const pickIdx = bestPath[Math.floor(rng()*bestPath.length)];
+      const el = gridEl.querySelector(`.cell[data-idx="${pickIdx}"]`);
+      if (el) el.classList.add('hot');
+    }
+  }
+
+  // ===== Click handlers =====
+  gridEl.addEventListener('click', (e)=>{
+    const cell = e.target.closest('.cell'); if (!cell || completed) return;
     const idx = parseInt(cell.dataset.idx,10);
     const last = selected[selected.length-1];
 
-    // Toggling last = undo
-    if (selected.length && idx === last){
-      selected.pop();
-      updateSelectionUI();
-      return;
-    }
-
-    // Prevent reusing earlier tiles
-    if (selected.includes(idx)){ // ignore (not last)
-      shake(cell); return;
-    }
-
-    // First pick ok; subsequent must be neighbor
-    if (selected.length === 0 || isNeighbor(last, idx)){
-      selected.push(idx);
-      updateSelectionUI();
-    } else {
-      shake(cell);
-    }
+    if (selected.length && idx === last){ selected.pop(); updateSelectionUI(); return; }
+    if (selected.includes(idx)){ shake(cell); return; }
+    if (selected.length === 0 || isNeighbor(last, idx)){ selected.push(idx); updateSelectionUI(); }
+    else { shake(cell); }
   });
 
-  function shake(el){
-    el.classList.add('shake');
-    setTimeout(()=>el.classList.remove('shake'), 150);
-  }
-
-  // ===== Submit =====
   submitEl.addEventListener('click', ()=>{
     if (completed || selected.length < 3) return;
-
     const word = selected.map(i=>grid[i]).join('').toLowerCase();
-    const valid = dictReady ? dict.has(word) : true; // if no dictionary, accept any 3+ path
+    const valid = dictSet.has(word);
     const entry = { word, len: word.length, valid, ts: Date.now() };
     attempts.push(entry);
 
@@ -240,34 +360,65 @@
     if (attempts.length === 1){
       if (lastPlayedDay == null || lastPlayedDay < DAY-1) streak = 1;
       else if (lastPlayedDay === DAY-1) streak = (streak||0) + 1;
-      // if lastPlayedDay === DAY, do nothing (retries within same day)
       lastPlayedDay = DAY;
       streakEl.textContent = streak;
     }
 
-    // feedback
-    if (!valid) setToast(`✗ “${entry.word.toUpperCase()}” not in list`, "err");
-    else        setToast(`✓ “${entry.word.toUpperCase()}” submitted (len ${entry.len})`, "ok");
+    setToast(valid ? `✓ “${word.toUpperCase()}” (${entry.len})` : `✗ “${word.toUpperCase()}” not in list`, valid?"ok":"err");
 
-    // clear current path
-    selected = [];
-    updateSelectionUI();
+    selected = []; updateSelectionUI();
 
-    // mark completion
+    // update closeness
+    const best = Math.max(0, ...attempts.filter(a=>a.valid).map(a=>a.len));
+    bestlineUpdate(best, maxLen);
+
     if (attempts.length >= 3){
-      completed = true;
-      submitEl.disabled = true;
-      setToast("All shots used. Come back tomorrow.", "ok");
+      completed = true; submitEl.disabled = true;
+      const ex = examples && examples.length ? ` Example: ${examples[0].toUpperCase()}` : "";
+      setToast(`All shots used. Today’s max is ${maxLen}.${ex}`, "ok");
+      shareEl.style.display = "inline-block";
     }
-
     setShots(attempts.length);
     persist();
+    showHotspotIfNeeded();
   });
 
-  // ===== Boot =====
-  initFromStorage();
-  renderGrid();
-  updateSelectionUI();
+  // Share
+  shareEl.addEventListener('click', async ()=>{
+    const best = Math.max(0, ...attempts.filter(a=>a.valid).map(a=>a.len));
+    const pct = maxLen ? Math.round((best/maxLen)*100) : 0;
+    const medal = pct>=90 ? "🥇" : (pct>=75 ? "🥈" : (pct>=60 ? "🥉" : ""));
+    const left = 3 - attempts.length;
+    const text = `Longshot #${DAY} — ${best}/${maxLen} (${pct}%) ${medal}${left?` · ${left} left`:''}`;
+    try{
+      if (navigator.share){ await navigator.share({ text }); }
+      else {
+        await navigator.clipboard.writeText(text);
+        setToast("Result copied to clipboard.", "ok");
+      }
+    }catch(_){}
+  });
+
+  // ===== Boot (wait for dictionary so the quality gate is meaningful) =====
+  (async function start(){
+    setToast("Loading word list…", "muted");
+    await loadDictionary();
+    setToast(dictLabel==="mini" ? "Using starter word list (add /data/words_common.json for better puzzles)." : "");
+    const s = loadState();
+    // if day changed or no stored grid, build a fresh gated board
+    if (!s.day || s.day !== DAY || !s.grid){
+      initNewDay(); persist();
+    } else {
+      // We loaded trie now; if old save had no max, recompute
+      if (!s.maxLen){ const stats = maxOnBoard(s.grid, trie); maxLen=stats.maxLen; examples=stats.examples; bestPath=stats.path; }
+      else { maxLen=s.maxLen; examples=s.examples||[]; }
+      grid = s.grid; attempts = s.attempts||[]; completed=!!s.completed; streak=s.streak||0; lastPlayedDay=s.lastPlayedDay??null;
+    }
+    renderGrid();
+    updateSelectionUI();
+    initFromStorage();
+    showHotspotIfNeeded();
+  })();
 })();
 </script>
 </body>
