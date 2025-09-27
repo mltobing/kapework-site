@@ -53,6 +53,14 @@
   "blurb": "Memorize. Apply all rules in order.",
   "cover_emoji": "🌈"
 },
-{"slug":"longshot","name":"Longshot","url":"apps/longshot/","released_at":"2025-08-30","tags":["word","daily"],"blurb":"3 shots to find your best word.","cover_emoji":"🧩"}
-
+{"slug":"longshot","name":"Longshot","url":"apps/longshot/","released_at":"2025-08-30","tags":["word","daily"],"blurb":"3 shots to find your best word.","cover_emoji":"🧩"},
+{
+  "slug": "make24",
+  "name": "Make 24",
+  "url": "apps/make24/",
+  "released_at": "2025-09-27",
+  "tags": ["math","logic","24"],
+  "blurb": "Use each number once. Tap two cards, then an operator, to make 24.",
+  "cover_emoji": "➗"
+}
 ]
