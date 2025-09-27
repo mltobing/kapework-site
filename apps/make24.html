@@ -2,126 +2,96 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Make 24 — Daily</title>
 <style>
-  /* ========= Light, NYT-style palette ========= */
   :root{
-    --bg:#fafafa;
-    --ink:#111827;          /* near-black text */
-    --muted:#6b7280;        /* slate */
-    --bd:#e5e7eb;           /* light gray border */
-    --panel:#ffffff;        /* cards/panels */
-    --shadow:0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.03);
-    --accent:#f6c90e;       /* bee yellow accent */
-    --accent-ink:#111827;
-    --ok:#16a34a;           /* green */
-    --err:#dc2626;          /* red */
+    --bg:#f8fafc;          /* page */
+    --ink:#0f172a;         /* text */
+    --muted:#64748b;       /* slate */
+    --bd:#e5e7eb;          /* borders */
+    --panel:#ffffff;       /* cards/panel */
+    --shadow:0 1px 3px rgba(15,23,42,.06), 0 10px 24px rgba(15,23,42,.04);
+    --accent:#f6c90e;      /* honey */
+    --pick:#22d3ee;        /* cyan selection */
+    --ok:#16a34a;          /* green */
+    --err:#dc2626;         /* red */
   }
-
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--ink);
-    font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
-  }
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
 
-  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 40px}
-
-  /* ===== Top bar ===== */
-  header{
-    display:flex;align-items:center;justify-content:space-between;gap:12px;
-    margin-bottom:14px;
-  }
-  h1{margin:0;font-size:22px;letter-spacing:.2px}
-  .linklike{color:#1f2937;text-decoration:none;border-bottom:1px solid #d1d5db}
-  .pill{
-    display:inline-flex;gap:8px;align-items:center;
-    padding:6px 12px;border:1px solid var(--bd);border-radius:999px;
-    background:var(--panel);box-shadow:var(--shadow);font-weight:600
-  }
+  .wrap{max-width:680px;margin:0 auto;padding:18px 14px 40px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  h1{margin:0;font-size:22px}
+  .badge{display:inline-flex;gap:8px;align-items:center;padding:6px 12px;border:1px solid var(--bd);
+         border-radius:999px;background:var(--panel);box-shadow:var(--shadow);font-weight:600}
   .muted{color:var(--muted)}
-  .accent{background:var(--accent);color:var(--accent-ink);border-color:#f3c302}
+  .accent{background:var(--accent);border-color:#f4c200}
 
-  /* ===== Panel (board) ===== */
-  .panel{
-    position:relative;background:var(--panel);border:1px solid var(--bd);
-    border-radius:16px;padding:18px;box-shadow:var(--shadow);overflow:hidden
-  }
-
-  /* Subtle X backdrop (hairline) */
-  .panel::before,.panel::after{
-    content:"";position:absolute;inset:16px;border-top:1px solid #f3f4f6;
-    transform-origin:center;pointer-events:none;
-  }
+  .panel{position:relative;background:var(--panel);border:1px solid var(--bd);border-radius:16px;
+         padding:14px 14px 66px;box-shadow:var(--shadow);overflow:hidden}
+  .panel::before,.panel::after{content:"";position:absolute;inset:16px;border-top:1px solid #f3f4f6;transform-origin:center;pointer-events:none}
   .panel::before{transform:rotate(45deg)}
   .panel::after{transform:rotate(-45deg)}
 
-  /* ===== Diamond layout ===== */
-  .diamond{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:12px;height:420px;margin:6px 0 12px}
+  /* Diamond uses viewport height to avoid clipping on phones */
+  .diamond{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:10px;
+           height:min(56vh,460px); margin:6px 0 10px}
   .slot{display:flex;align-items:center;justify-content:center}
   .top{grid-column:2;grid-row:1}
   .left{grid-column:1;grid-row:2}
   .right{grid-column:3;grid-row:2}
   .bottom{grid-column:2;grid-row:3}
 
+  /* Cards scale with diamond height */
   .card{
-    width:150px;height:110px;border-radius:14px;border:1px solid var(--bd);
-    background:var(--panel);box-shadow:var(--shadow);
+    width:min(36vw,160px); height:min(22vh,120px);
+    border-radius:14px;border:1px solid var(--bd);background:var(--panel);box-shadow:var(--shadow);
     display:flex;align-items:center;justify-content:center;
-    font-weight:800;font-size:40px;cursor:pointer;user-select:none;
-    transition:transform .06s, box-shadow .12s, border-color .12s, background .12s
+    font-weight:800;font-size:clamp(28px,6.3vw,40px); cursor:pointer; user-select:none;
+    transition:transform .06s, box-shadow .12s, outline-color .12s, background .12s;
   }
   .card:active{transform:scale(.985)}
-  .card.sel{outline:3px solid var(--accent);outline-offset:2px}
-  .faded{opacity:.3}
+  .card.sel{outline:3px solid var(--pick); outline-offset:2px; background:#ecfeff}
+  .faded{opacity:.35}
 
-  /* ===== Operator row ===== */
-  .ops{display:flex;gap:10px;justify-content:center;margin:6px 0 10px}
+  /* Operator strip sticks to panel bottom */
+  .ops{
+    position:absolute; left:0; right:0; bottom:12px;
+    display:flex; gap:10px; justify-content:center; padding:0 10px;
+  }
   .op{
-    padding:10px 16px;border-radius:12px;border:1px solid var(--bd);
-    background:var(--panel);box-shadow:var(--shadow);
-    cursor:pointer;font:600 18px/1 inherit;min-width:56px;text-align:center
+    padding:10px 16px; min-width:56px; font:600 18px/1 inherit;
+    border-radius:12px; border:1px solid var(--bd); background:var(--panel); box-shadow:var(--shadow); cursor:pointer;
   }
   .op:disabled{opacity:.4;cursor:not-allowed}
 
-  /* ===== Buttons ===== */
-  .row{display:flex;gap:10px;justify-content:center;margin-top:6px;flex-wrap:wrap}
-  .btn{
-    padding:10px 16px;border-radius:12px;border:1px solid var(--bd);
-    background:var(--panel);box-shadow:var(--shadow);cursor:pointer;font-weight:600
-  }
+  .row{display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+  .btn{padding:10px 16px;border-radius:12px;border:1px solid var(--bd);background:var(--panel);box-shadow:var(--shadow);cursor:pointer;font-weight:600}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
 
-  /* ===== Status & feedback ===== */
-  .status{
-    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
-    color:var(--muted);font-size:13px;margin-top:10px
-  }
+  .status{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:10px}
   .shots{letter-spacing:2px}
-  .ok{color:var(--ok)} .err{color:var(--err)}
-  .toast{
-    min-height:24px;text-align:center;font-size:15px;margin-top:12px;
-    background:#fff;border:1px solid var(--bd);border-radius:12px;padding:8px 10px;
-    box-shadow:var(--shadow)
-  }
 
-  /* ===== Small interactions ===== */
-  @media(min-width:740px){ .card{width:170px;height:120px;font-size:44px}.diamond{height:460px} }
-  @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-2px)}50%{transform:translateX(2px)}75%{transform:translateX(-2px)}100%{transform:translateX(0)}}
+  .toast{min-height:24px;text-align:center;font-size:15px;margin-top:12px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:8px 10px;box-shadow:var(--shadow)}
+  .ok{color:var(--ok)} .err{color:var(--err)}
+
+  .pulse{animation:pulse .25s ease}
+  @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-2px)}75%{transform:translateX(2px)}}
   .shake{animation:shake .15s}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Make 24 <a id="pnum" class="linklike muted" href="#" tabindex="-1"></a></h1>
-    <span class="pill">Attempts <strong id="tries">0/4</strong></span>
+    <h1>Make 24 <span id="pnum" class="muted"></span></h1>
+    <span class="badge">Attempts <strong id="tries">0/4</strong></span>
   </header>
 
-  <div class="panel">
+  <div class="panel" id="panel">
     <div class="diamond" id="diamond">
       <div class="slot top"><div class="card" data-pos="top"></div></div>
       <div class="slot left"><div class="card" data-pos="left"></div></div>
@@ -135,56 +105,52 @@
       <button class="op" data-op="*">×</button>
       <button class="op" data-op="-">−</button>
     </div>
-
-    <div class="row">
-      <button id="undo"   class="btn" disabled>Undo</button>
-      <button id="reset"  class="btn">Reset</button>
-      <button id="submit" class="btn accent" disabled>Submit</button>
-      <button id="share"  class="btn" style="display:none">Share</button>
-    </div>
-
-    <div class="status">
-      <div id="modeLine" class="muted">Daily puzzle · Target 24</div>
-      <div id="shots" class="shots">● ○ ○ ○</div>
-      <div id="scoreline" class="muted"></div>
-    </div>
-
-    <div id="toast" class="toast muted" aria-live="polite"></div>
   </div>
 
-  <p class="muted" style="margin-top:14px">
-    Tap two numbers, then an operator. Use each original number exactly once. When one card remains, <strong>Submit</strong> to log an attempt.
+  <div class="row">
+    <button id="undo"  class="btn" disabled>Undo</button>
+    <button id="reset" class="btn">Reset</button>
+    <button id="share" class="btn" style="display:none">Share</button>
+  </div>
+
+  <div class="status">
+    <div id="modeLine" class="muted">Daily puzzle · Target 24</div>
+    <div id="shots" class="shots">● ○ ○ ○</div>
+    <div id="scoreline" class="muted"></div>
+  </div>
+
+  <div id="toast" class="toast muted" aria-live="polite"></div>
+
+  <p class="muted" style="margin-top:12px">
+    Tap two numbers, then an operator. Use each original number exactly once. When one card remains, your attempt is logged automatically.
   </p>
 </div>
 
-<!-- ========= Logic (unchanged core, with daily attempts, closeness & share) ========= -->
 <script>
 (function(){
-  const TARGET=24, MAX_TRIES=4;
+  const TARGET=24, MAX_TRIES=4, EPS=1e-6;
   const DAY=Math.floor(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),new Date().getUTCDate())/864e5);
-  const pnum=document.getElementById('pnum'); pnum.textContent=`#${DAY}`;
+  const NS="make24_daily_v3"; const KEY=k=>`${NS}_${k}`;
 
-  const NS="make24_daily_v2"; const KEY=k=>`${NS}_${k}`; const EPS=1e-6;
+  const pnum=document.getElementById('pnum'); pnum.textContent=`#${DAY}`;
+  const panel=document.getElementById('panel');
   const diamond=document.getElementById('diamond');
   const cardsDom=Array.from(diamond.querySelectorAll('.card'));
   const opsDom=Array.from(document.querySelectorAll('.op'));
   const undoEl=document.getElementById('undo');
   const resetEl=document.getElementById('reset');
-  const submitEl=document.getElementById('submit');
   const shareEl=document.getElementById('share');
   const toastEl=document.getElementById('toast');
   const triesEl=document.getElementById('tries');
   const shotsEl=document.getElementById('shots');
   const scoreline=document.getElementById('scoreline');
-
   const setToast=(m,cls="muted")=>{toastEl.textContent=m;toastEl.className=`toast ${cls}`;}
   const fmt=n=>{const r=Math.round(n*1000)/1000;return Math.abs(r-Math.round(r))<1e-9?String(Math.round(r)):String(r);}
-  const mulberry32=a=>()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
+  const mulberry32=a=>()=>{let t=a+=0x6D2B79F5; t=Math.imul(t^t>>>15,t|1); t^=t+Math.imul(t^t>>>7,t|61); return ((t^t>>>14)>>>0)/4294967296;}
   const rng=mulberry32((DAY^0x9E3779B9)>>>0);
   const ri=(a,b)=>Math.floor(rng()*(b-a+1))+a;
 
-  function generateSet(){return [ri(1,10),ri(1,10),ri(1,10),ri(1,10)];}
-
+  /* ----- Solver & puzzle generator (quality-gated) ----- */
   function solve24(nums){
     const arr=nums.map(n=>({val:n,expr:String(n)})); const sols=[];
     function dfs(items){
@@ -202,13 +168,13 @@
           cand.push({val:b.val-a.val,expr:`(${b.expr}-${a.expr})`});
           if(Math.abs(b.val)>EPS)cand.push({val:a.val/b.val,expr:`(${a.expr}/${b.expr})`});
           if(Math.abs(a.val)>EPS)cand.push({val:b.val/a.val,expr:`(${b.expr}/${a.expr})`});
-          for(const c of cand){if(isFinite(c.val)&&Math.abs(c.val)<1e6)dfs(rest.concat(c));}
+          for(const c of cand){ if(isFinite(c.val)&&Math.abs(c.val)<1e6) dfs(rest.concat(c)); }
         }
       }
     }
     dfs(arr); return {found:sols.length>0,solutions:sols};
   }
-  function isGood(nums,solved){
+  function isGood(nums, solved){
     if(!solved.found) return false;
     if(nums.reduce((a,b)=>a+b,0)===TARGET) return false;
     return !!solved.solutions.find(s=>s.usedOps.has('*')||s.usedOps.has('/'));
@@ -223,50 +189,68 @@
         return {nums,solution:sol.expr};
       } tries++;
     }
-    const nums=generateSet(); const solved=solve24(nums);
+    const nums=[ri(1,10),ri(1,10),ri(1,10),ri(1,10)];
+    const solved=solve24(nums);
     return {nums,solution:solved.found?solved.solutions[0].expr:""};
   }
 
+  /* ----- Game state ----- */
   let original=[], items=[], posOrder=['top','left','right','bottom'];
   let history=[], selectedIdx=[], tries=0, done=false, solutionExpr="";
+  let bestValue=null;
 
-  const save=()=>localStorage.setItem(KEY("daily"),JSON.stringify({day:DAY,original,items,history,selectedIdx,tries,done,solutionExpr}));
-  function load(){try{const s=JSON.parse(localStorage.getItem(KEY("daily"))||"{}"); if(s.day===DAY) return s;}catch(_){} return null;}
+  const save=()=>localStorage.setItem(KEY("daily"),JSON.stringify({day:DAY,original,items,history,selectedIdx,tries,done,solutionExpr,bestValue}));
+  function load(){ try{const s=JSON.parse(localStorage.getItem(KEY("daily"))||"{}"); if(s.day===DAY) return s;}catch(_){} return null; }
+  const setCardsFromOriginal=()=>{ items=original.map(n=>({val:n,expr:String(n)})); };
 
   function render(){
-    const dataByPos={}; for(let i=0;i<posOrder.length;i++){dataByPos[posOrder[i]]=items[i]??null;}
+    const byPos={}; for(let i=0;i<posOrder.length;i++){byPos[posOrder[i]]=items[i]??null;}
     cardsDom.forEach(card=>{
-      const pos=card.dataset.pos, data=dataByPos[pos];
-      if(data){card.textContent=fmt(data.val); card.classList.toggle('faded',false); card.classList.toggle('sel', selectedIdx.includes(items.indexOf(data))); }
-      else{ card.textContent=""; card.classList.add('faded'); card.classList.remove('sel'); }
+      const data=byPos[card.dataset.pos];
+      if(data){ card.textContent=fmt(data.val); card.classList.toggle('faded',false);
+        const idx=items.indexOf(data); card.classList.toggle('sel', selectedIdx.includes(idx));
+      } else { card.textContent=""; card.classList.add('faded'); card.classList.remove('sel'); }
     });
-    const ready=selectedIdx.length===2 && !done;
-    opsDom.forEach(b=> b.disabled=!ready);
+    const ready=selectedIdx.length===2 && !done; opsDom.forEach(o=>o.disabled=!ready);
     undoEl.disabled = history.length===0 || done;
     resetEl.disabled= done;
-    submitEl.disabled= !(items.length===1 && !done);
 
     triesEl.textContent=`${tries}/${MAX_TRIES}`;
-    const dots=["●","○","○","○"]; if(tries>=2)dots[1]="●"; if(tries>=3)dots[2]="●"; if(tries>=4)dots[3]="●"; shotsEl.textContent=dots.join(" ");
+    const dots=["●","○","○","○"]; if(tries>=2) dots[1]="●"; if(tries>=3) dots[2]="●"; if(tries>=4) dots[3]="●";
+    shotsEl.textContent=dots.join(" ");
   }
-  function setCardsFromOriginal(){ items=original.map(n=>({val:n,expr:String(n)})); }
-  function initNewDay(){ const {nums,solution}=makePuzzle((DAY^0x9E3779B9)>>>0); original=[nums[0],nums[1],nums[2],nums[3]]; solutionExpr=solution; setCardsFromOriginal(); history=[]; selectedIdx=[]; tries=0; done=false; }
 
-  function start(){
-    const s=load();
-    if(s){ original=s.original; items=s.items; history=s.history||[]; selectedIdx=s.selectedIdx||[]; tries=s.tries||0; done=!!s.done; solutionExpr=s.solutionExpr||""; }
-    else { initNewDay(); save(); }
-    render();
-    if(done){ setToast(endText(),"ok"); shareEl.style.display="inline-block"; }
-    else { if(tries>=MAX_TRIES){ done=true; render(); setToast(endText(),"ok"); shareEl.style.display="inline-block"; save(); } else { setToast("", "muted"); shareEl.style.display="none"; } }
+  function closenessText(v){
+    const pct=Math.round((Math.min(v,TARGET)/TARGET)*100);
+    const medal=pct>=100?"🏆":(pct>=90?"🥇":(pct>=75?"🥈":(pct>=60?"🥉":"")));
+    scoreline.textContent=`Best ${fmt(bestValue??0)} / ${TARGET} (${bestValue!=null?Math.round((Math.min(bestValue,TARGET)/TARGET)*100):0}%) ${bestValue!=null?medal:""}`;
+    return `Result ${fmt(v)} / ${TARGET} (${pct}%) ${medal}`;
   }
+
   function endText(){
-    const best=window._bestValue ?? null; let close="";
-    if(typeof best==="number"){ const pct=Math.round((Math.min(best,TARGET)/TARGET)*100); close=` · Best ${fmt(best)} / ${TARGET} (${pct}%)`; }
-    const ex=solutionExpr?` · Example: ${solutionExpr.replaceAll('*','×').replaceAll('/','÷')}`:"";
-    return `All attempts used. Come back tomorrow.${close}${ex}`;
+    const ex = solutionExpr ? ` · Example: ${solutionExpr.replaceAll('*','×').replaceAll('/','÷')}` : "";
+    return `All attempts used. Come back tomorrow.${ex}`;
   }
 
+  function autoSubmitIfSingle(){
+    if(done || items.length!==1) return;
+    const val=items[0].val;
+    bestValue = (bestValue==null) ? val : Math.max(bestValue, val);
+    tries++;
+    panel.classList.add('pulse');
+
+    if(Math.abs(val-TARGET)<EPS){
+      done=true; setToast(`Perfect! ${closenessText(val)} ✔`,"ok"); shareEl.style.display="inline-block";
+    }else{
+      setToast(closenessText(val),"err");
+      if(tries < MAX_TRIES){ setCardsFromOriginal(); history=[]; selectedIdx=[]; }
+      else { done=true; setToast(endText(),"ok"); shareEl.style.display="inline-block"; }
+    }
+    render(); save();
+    setTimeout(()=>panel.classList.remove('pulse'),220);
+  }
+
+  /* ----- Interaction ----- */
   cardsDom.forEach(card=>{
     card.addEventListener('click', ()=>{
       if(done) return;
@@ -274,7 +258,7 @@
       if(!items[idx]){ card.classList.add('shake'); setTimeout(()=>card.classList.remove('shake'),150); return; }
       const inv=selectedIdx.indexOf(idx);
       if(inv>=0) selectedIdx.splice(inv,1);
-      else{ if(selectedIdx.length<2) selectedIdx.push(idx); else selectedIdx=[selectedIdx[1],idx]; }
+      else { if(selectedIdx.length<2) selectedIdx.push(idx); else selectedIdx=[selectedIdx[1],idx]; }
       render();
     });
   });
@@ -289,47 +273,56 @@
     else if(op==='/'){ if(Math.abs(b.val)<EPS){ setToast("Cannot divide by zero.","err"); return; } val=a.val/b.val; }
 
     history.push(JSON.parse(JSON.stringify(items)));
+
     const hi=Math.max(i,j), lo=Math.min(i,j); items.splice(hi,1); items.splice(lo,1);
-    const free=posOrder.map((_,k)=>items[k]?null:k).filter(x=>x!==null); const slot=free.length?free[0]:items.length;
+    const free=posOrder.map((_,k)=>items[k]?null:k).filter(x=>x!==null);
+    const slot=free.length?free[0]:items.length;
     items.splice(slot,0,{val,expr:`(${a.expr}${op}${b.expr})`});
-    selectedIdx=[]; setToast(""); render();
+
+    selectedIdx=[]; render(); save();
+    // auto-submit if only one remains
+    if(items.length===1) autoSubmitIfSingle();
   }
   opsDom.forEach(btn=>btn.addEventListener('click',()=>combine(btn.dataset.op)));
 
-  undoEl.addEventListener('click', ()=>{ if(!history.length||done) return; items=history.pop(); selectedIdx=[]; setToast(""); render(); save(); });
-  resetEl.addEventListener('click', ()=>{ if(done) return; setCardsFromOriginal(); history=[]; selectedIdx=[]; setToast(""); render(); save(); });
-
-  function closenessText(v){
-    const pct=Math.round((Math.min(v,TARGET)/TARGET)*100);
-    const medal=pct>=100?"🏆":(pct>=90?"🥇":(pct>=75?"🥈":(pct>=60?"🥉":"")));
-    scoreline.textContent=`Best ${fmt(v)} / ${TARGET} (${pct}%) ${medal}`;
-    return `Result ${fmt(v)} / ${TARGET} (${pct}%) ${medal}`;
-  }
-
-  submitEl.addEventListener('click', ()=>{
-    if(done || items.length!==1) return;
-    const val=items[0].val;
-    const prevBest=window._bestValue ?? -Infinity; window._bestValue=Math.max(prevBest,val);
-
-    tries++;
-    if(Math.abs(val-TARGET)<EPS){ done=true; setToast(`Perfect! ${closenessText(val)} ✔`,"ok"); shareEl.style.display="inline-block"; }
-    else{
-      setToast(closenessText(val), "err");
-      if(tries<MAX_TRIES){ setCardsFromOriginal(); history=[]; selectedIdx=[]; }
-      else{ done=true; setToast(endText(),"ok"); shareEl.style.display="inline-block"; }
-    }
-    render(); save();
+  undoEl.addEventListener('click', ()=>{
+    if(!history.length || done) return;
+    items = history.pop(); selectedIdx=[]; setToast(""); render(); save();
+  });
+  resetEl.addEventListener('click', ()=>{
+    if(done) return;
+    setCardsFromOriginal(); history=[]; selectedIdx=[]; setToast(""); render(); save();
   });
 
   shareEl.addEventListener('click', async ()=>{
-    const best=typeof window._bestValue==="number"?window._bestValue:null;
-    const pct=best?Math.round((Math.min(best,TARGET)/TARGET)*100):0;
+    const pct = (bestValue!=null) ? Math.round((Math.min(bestValue,TARGET)/TARGET)*100) : 0;
     const medal=pct>=100?"🏆":(pct>=90?"🥇":(pct>=75?"🥈":(pct>=60?"🥉":"")));
-    const text=`Make 24 #${DAY} — ${tries}/${MAX_TRIES} tries · Best ${best?fmt(best):"–"}/${TARGET} (${pct}%) ${medal} [${original.join(", ")}]`;
-    try{ if(navigator.share){await navigator.share({text});} else {await navigator.clipboard.writeText(text); setToast("Result copied to clipboard.","ok");} }catch(_){}
+    const text = `Make 24 #${DAY} — ${tries}/${MAX_TRIES} tries · Best ${bestValue!=null?fmt(bestValue):"–"}/${TARGET} (${pct}%) ${medal} [${original.join(", ")}]`;
+    try{ if(navigator.share){ await navigator.share({ text }); } else { await navigator.clipboard.writeText(text); setToast("Result copied to clipboard.","ok"); } }
+    catch(_){}
   });
 
+  /* ----- Boot ----- */
+  function initNewDay(){
+    const {nums,solution}=makePuzzle((DAY^0x9E3779B9)>>>0);
+    original=[nums[0],nums[1],nums[2],nums[3]]; solutionExpr=solution;
+    setCardsFromOriginal(); history=[]; selectedIdx=[]; tries=0; done=false; bestValue=null;
+  }
+  function start(){
+    const s=load();
+    if(s){
+      ({original,items,history,selectedIdx,tries,done,solutionExpr,bestValue} = s);
+    } else {
+      initNewDay(); save();
+    }
+    render();
+    if(done){ setToast(endText(),"ok"); shareEl.style.display="inline-block"; }
+    else { setToast(""); shareEl.style.display="none"; }
+  }
   start();
+
+  /* Resize guard: if viewport changes a lot (orientation), keep cards visible */
+  window.addEventListener('orientationchange', ()=> setTimeout(()=>render(), 200));
 })();
 </script>
 </body>
