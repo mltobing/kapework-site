@@ -858,6 +858,9 @@
             if (playState.completed) return;
             if (playState.cards[index].used) return;
             
+            // Request motion permission on first interaction (iOS requires user gesture)
+            maybeRequestMotion();
+            
             const pos = playState.selected.indexOf(index);
             if (pos !== -1) {
                 // Deselect
@@ -1243,36 +1246,76 @@
 
         // Shake to undo (using DeviceMotion API)
         let lastShakeTime = 0;
-        const SHAKE_THRESHOLD = 15;
-        const SHAKE_TIMEOUT = 1000;
+        let shakeEnabled = false;
+        const SHAKE_THRESHOLD = 25; // Higher threshold for more deliberate shakes
+        const SHAKE_TIMEOUT = 800;
+        let lastX = 0, lastY = 0, lastZ = 0;
 
         function handleMotion(event) {
-            const acc = event.accelerationIncludingGravity;
-            if (!acc) return;
+            if (!shakeEnabled || playState.completed) return;
             
-            const magnitude = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+            const acc = event.accelerationIncludingGravity;
+            if (!acc || acc.x === null) return;
+            
+            const x = acc.x;
+            const y = acc.y;
+            const z = acc.z;
+            
+            // Calculate change in acceleration
+            const deltaX = Math.abs(x - lastX);
+            const deltaY = Math.abs(y - lastY);
+            const deltaZ = Math.abs(z - lastZ);
+            
+            lastX = x;
+            lastY = y;
+            lastZ = z;
+            
+            const totalDelta = deltaX + deltaY + deltaZ;
             const now = Date.now();
             
-            if (magnitude > SHAKE_THRESHOLD && now - lastShakeTime > SHAKE_TIMEOUT) {
+            if (totalDelta > SHAKE_THRESHOLD && now - lastShakeTime > SHAKE_TIMEOUT) {
                 lastShakeTime = now;
+                console.log('Shake detected! Delta:', totalDelta);
                 undo();
             }
         }
 
-        function requestMotionPermission() {
-            if (typeof DeviceMotionEvent !== 'undefined' && 
-                typeof DeviceMotionEvent.requestPermission === 'function') {
-                // iOS 13+
-                DeviceMotionEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            window.addEventListener('devicemotion', handleMotion);
-                        }
-                    })
-                    .catch(console.error);
-            } else if ('DeviceMotionEvent' in window) {
-                // Non-iOS or older iOS
-                window.addEventListener('devicemotion', handleMotion);
+        async function requestMotionPermission() {
+            if (shakeEnabled) return true;
+            
+            try {
+                if (typeof DeviceMotionEvent !== 'undefined' && 
+                    typeof DeviceMotionEvent.requestPermission === 'function') {
+                    // iOS 13+ requires permission
+                    const response = await DeviceMotionEvent.requestPermission();
+                    if (response === 'granted') {
+                        window.addEventListener('devicemotion', handleMotion);
+                        shakeEnabled = true;
+                        console.log('Motion permission granted');
+                        return true;
+                    } else {
+                        console.log('Motion permission denied');
+                        return false;
+                    }
+                } else if ('DeviceMotionEvent' in window) {
+                    // Non-iOS or older iOS - no permission needed
+                    window.addEventListener('devicemotion', handleMotion);
+                    shakeEnabled = true;
+                    console.log('Motion events enabled (no permission needed)');
+                    return true;
+                }
+            } catch (e) {
+                console.error('Motion permission error:', e);
+            }
+            return false;
+        }
+
+        // Request motion permission on first card click (user gesture required for iOS)
+        let motionPermissionRequested = false;
+        function maybeRequestMotion() {
+            if (!motionPermissionRequested && 'DeviceMotionEvent' in window) {
+                motionPermissionRequested = true;
+                requestMotionPermission();
             }
         }
 
@@ -1314,19 +1357,18 @@
             }
         });
 
-        // Request motion permission on first touch (iOS requirement)
-        document.body.addEventListener('touchstart', () => {
-            requestMotionPermission();
-        }, { once: true });
-
         // Initialize
         loadState();
         updateStreak();
         initPuzzle(getTodayPuzzleNumber(), false);
         
-        // Auto-request motion on desktop (no permission needed)
+        // For non-iOS devices, try to enable motion right away
         if (!('ontouchstart' in window)) {
-            requestMotionPermission();
+            // Desktop - likely no motion support, but try anyway
+            if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission !== 'function') {
+                window.addEventListener('devicemotion', handleMotion);
+                shakeEnabled = true;
+            }
         }
     </script>
 </body>
