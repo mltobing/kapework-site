@@ -71,6 +71,38 @@
             opacity: 0.8;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .undo-btn {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s, color 0.2s;
+            padding: 4px;
+            pointer-events: none;
+        }
+
+        .undo-btn.visible {
+            opacity: 0.6;
+            pointer-events: auto;
+        }
+
+        .undo-btn.visible:hover {
+            opacity: 1;
+            color: var(--cyan);
+        }
+
+        .undo-btn.visible:active {
+            transform: scale(0.9);
+        }
+
         .streak-display {
             display: flex;
             align-items: center;
@@ -101,7 +133,7 @@
             position: relative;
         }
 
-        /* Current Result Display */
+        /* Current Result Display - only shown when down to 1 card */
         .result-display {
             font-family: 'Space Mono', monospace;
             font-size: 3rem;
@@ -111,8 +143,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.3s, transform 0.2s;
+            transition: color 0.3s, transform 0.2s, opacity 0.3s;
             margin-bottom: 32px;
+            opacity: 0;
+        }
+
+        .result-display.visible {
+            opacity: 1;
         }
 
         .result-display.success {
@@ -508,30 +545,18 @@
             display: block;
         }
 
-        /* Shake hint */
-        .shake-hint {
-            position: fixed;
-            bottom: 70px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .shake-hint.show {
-            opacity: 1;
-        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="puzzle-number" id="puzzleNumber" title="Tap for archive">#—</div>
-        <div class="streak-display">
-            <span class="fire">🔥</span>
-            <span id="streakCount">0</span>
-            <span class="freeze-indicator" id="freezeIndicator"></span>
+        <div class="header-right">
+            <button class="undo-btn" id="undoBtn" title="Undo">↶</button>
+            <div class="streak-display">
+                <span class="fire">🔥</span>
+                <span id="streakCount">0</span>
+                <span class="freeze-indicator" id="freezeIndicator"></span>
+            </div>
         </div>
     </div>
 
@@ -567,7 +592,6 @@
         <div class="attempt-dot"></div>
     </div>
 
-    <div class="shake-hint" id="shakeHint">Shake to undo</div>
 
     <div class="message" id="successMessage">
         <h2 id="successTitle">🎉 Nice!</h2>
@@ -898,7 +922,6 @@
             hideOperators();
             renderCards();
             updateResult();
-            showShakeHint();
             
             // Check for win/lose
             checkGameState();
@@ -917,12 +940,6 @@
             updateResult();
         }
 
-        function showShakeHint() {
-            const hint = document.getElementById('shakeHint');
-            hint.classList.add('show');
-            setTimeout(() => hint.classList.remove('show'), 2000);
-        }
-
         function updateResult() {
             const remaining = playState.cards.filter(c => !c.used);
             const display = document.getElementById('resultDisplay');
@@ -930,6 +947,7 @@
             if (remaining.length === 1) {
                 const val = remaining[0].value;
                 display.textContent = formatNumber(val);
+                display.classList.add('visible');
                 if (Math.abs(val - 24) < 0.0001) {
                     display.classList.add('success');
                     display.classList.remove('error');
@@ -938,8 +956,20 @@
                     display.classList.add('error');
                 }
             } else {
-                display.textContent = '—';
-                display.classList.remove('success', 'error');
+                display.textContent = '';
+                display.classList.remove('visible', 'success', 'error');
+            }
+            
+            // Update undo button visibility
+            updateUndoButton();
+        }
+        
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            if (playState.cardStates.length > 0 && !playState.completed) {
+                undoBtn.classList.add('visible');
+            } else {
+                undoBtn.classList.remove('visible');
             }
         }
 
@@ -1250,6 +1280,8 @@
         document.querySelectorAll('.op-btn').forEach(btn => {
             btn.addEventListener('click', () => applyOperation(btn.dataset.op));
         });
+
+        document.getElementById('undoBtn').addEventListener('click', undo);
 
         // Close operators overlay when clicking outside
         document.getElementById('operatorsOverlay').addEventListener('click', (e) => {
