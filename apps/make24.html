@@ -98,18 +98,23 @@ padding:20px;
 
 .diamond-container{
 position:relative;
-width:min(90vw, 400px);
-height:min(90vw, 400px);
-min-height:300px; /* Prevent collapse */
-max-width:400px;
-max-height:400px;
+width:320px; /* Fixed size, easier to debug */
+height:320px;
+margin:0 auto; /* Center it */
+}
+
+@media (min-width: 400px) {
+.diamond-container{
+width:360px;
+height:360px;
+}
 }
 
 /* Card positioning in diamond/cross pattern */
 .card{
 position:absolute;
-width:clamp(90px, 22vw, 130px);
-height:clamp(68px, 16vw, 98px);
+width:100px;
+height:75px;
 border:2px solid var(–bd);
 border-radius:16px;
 background:var(–panel);
@@ -117,12 +122,20 @@ box-shadow:var(–shadow);
 display:flex;
 align-items:center;
 justify-content:center;
-font-size:clamp(36px, 9vw, 56px);
+font-size:42px;
 font-weight:800;
 cursor:pointer;
 user-select:none;
 transition:all 0.2s ease;
 transform-origin:center;
+}
+
+@media (min-width: 400px) {
+.card{
+width:120px;
+height:90px;
+font-size:52px;
+}
 }
 
 /* Diamond positions - more explicit for cross-browser compatibility */
@@ -213,12 +226,12 @@ pointer-events:auto;
 }
 
 .op-btn{
-width:clamp(50px, 12vw, 65px);
-height:clamp(50px, 12vw, 65px);
+width:55px;
+height:55px;
 border:2px solid var(–accent);
 border-radius:50%;
 background:linear-gradient(135deg, var(–accent-bg) 0%, #cffafe 100%);
-font-size:clamp(24px, 6vw, 32px);
+font-size:28px;
 font-weight:700;
 display:flex;
 align-items:center;
@@ -227,6 +240,14 @@ box-shadow:0 4px 12px rgba(34,211,238,0.2);
 cursor:pointer;
 transition:all 0.2s;
 color:var(–accent-dark);
+}
+
+@media (min-width: 400px) {
+.op-btn{
+width:65px;
+height:65px;
+font-size:32px;
+}
 }
 
 .op-btn:active{
@@ -601,9 +622,9 @@ transform:translateY(0);
 
 <canvas id="confetti"></canvas>
 
-<!-- Supabase -->
+<!-- Supabase (optional) -->
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="console.warn('Supabase CDN failed to load')"></script>
 
 <script>
 (function(){
@@ -1118,11 +1139,36 @@ transform:translateY(0);
 
   // ===== Init =====
   async function start(){
-    try{sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);}catch(e){}
+    console.log('DEBUG: Starting game...');
+    console.log('DEBUG: Supabase available?', typeof window.supabase !== 'undefined');
+    
+    try{
+      if(typeof window.supabase !== 'undefined'){
+        sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
+        console.log('DEBUG: Supabase initialized');
+      }else{
+        console.warn('DEBUG: Supabase not loaded, continuing without tracking');
+      }
+    }catch(e){
+      console.warn('DEBUG: Supabase error:', e);
+    }
+    
+    console.log('DEBUG: Loading global state...');
     loadGlobalState();
+    
+    console.log('DEBUG: Initializing puzzle for day:', TODAY);
     initPuzzle(TODAY);
+    
+    console.log('DEBUG: Items after init:', items);
+    console.log('DEBUG: Diamond element:', diamondEl);
   }
-  start();
+  
+  // Wait for DOM and Supabase
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', start);
+  }else{
+    start();
+  }
 })();
 </script>
 
