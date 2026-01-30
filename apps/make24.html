@@ -1,1128 +1,1187 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Make 24 - Daily Challenge</title>
-<meta name="description" content="Daily math puzzle: use four numbers to make 24. New challenge every day!">
-<style>
-  :root{
-    --bg:#f7fafc;
-    --ink:#0f172a;
-    --muted:#64748b;
-    --bd:#e5e7eb;
-    --panel:#ffffff;
-    --shadow:0 1px 3px rgba(15,23,42,.06), 0 10px 24px rgba(15,23,42,.04);
-    --accent:#22d3ee;
-    --accent-bg:#ecfeff;
-    --accent-dark:#0e7490;
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-  html,body{height:100%; margin:0;}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);
-    font:16px/1.45 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,Roboto,Helvetica,Arial;
-    overflow:hidden;
-    touch-action: manipulation;
-    -webkit-font-smoothing: antialiased;
-  }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Make 24 | Kapework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-  /* Main container */
-  .wrap{
-    height:100vh; /* Fallback */
-    height:100dvh; /* Dynamic viewport height for mobile */
-    display:flex;
-    flex-direction:column;
-    max-width:600px;
-    margin:0 auto;
-    padding:12px;
-  }
+        :root {
+            --cyan: #22d3ee;
+            --cyan-dark: #0891b2;
+            --cyan-glow: rgba(34, 211, 238, 0.3);
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
 
-  /* Header - minimal, faded */
-  header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:8px 4px;
-    opacity:0.6;
-    transition:opacity 0.3s;
-  }
-  
-  .puzzle-num{
-    font-size:15px;
-    color:var(--muted);
-    font-weight:600;
-    cursor:pointer;
-    padding:6px 10px;
-    border-radius:8px;
-    transition:background 0.2s;
-  }
-  
-  .puzzle-num:active{
-    background:rgba(0,0,0,0.05);
-  }
-  
-  .streak{
-    font-size:20px;
-    font-weight:800;
-    display:flex;
-    align-items:center;
-    gap:4px;
-    color:var(--ink);
-  }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
 
-  /* Game board */
-  .panel{
-    flex:1;
-    background:var(--panel);
-    border:1px solid var(--bd);
-    border-radius:20px;
-    box-shadow:var(--shadow);
-    margin:8px 0;
-    display:flex;
-    flex-direction:column;
-    position:relative;
-    overflow:hidden;
-  }
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100dvh;
+            padding: 16px;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
 
-  /* Board area - GRID LAYOUT (proven to work) */
-  .board{
-    position:absolute;
-    inset:14px 14px 90px 14px;
-    display:grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 1fr 1fr 1fr;
-    gap:10px;
-  }
+        /* Header */
+        .header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            margin-bottom: 16px;
+        }
 
-  .slot{
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
+        .puzzle-number {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--cyan);
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
 
-  .slot.top{grid-column:2; grid-row:1;}
-  .slot.left{grid-column:1; grid-row:2;}
-  .slot.right{grid-column:3; grid-row:2;}
-  .slot.bottom{grid-column:2; grid-row:3;}
+        .puzzle-number:hover {
+            opacity: 0.8;
+        }
 
-  /* Card sizing */
-  .card{
-    width:100px;
-    height:75px;
-    border:2px solid var(--bd);
-    border-radius:14px;
-    background:var(--panel);
-    box-shadow:var(--shadow);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:42px;
-    font-weight:800;
-    cursor:pointer;
-    user-select:none;
-    transition:all 0.15s ease;
-  }
-  
-  @media (min-width: 400px) {
-    .card{
-      width:120px;
-      height:90px;
-      font-size:52px;
-    }
-  }
+        .streak-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
 
-  .card.selected{
-    border-color:var(--accent);
-    background:var(--accent-bg);
-    outline:3px solid var(--accent);
-    outline-offset:2px;
-  }
+        .streak-display .fire {
+            font-size: 1.5rem;
+        }
 
-  .card.faded{
-    opacity:0.25;
-    pointer-events:none;
-  }
+        .freeze-indicator {
+            font-size: 1rem;
+            margin-left: 4px;
+            opacity: 0.8;
+        }
 
-  .card:active{
-    transform:scale(0.98);
-  }
+        /* Game Container */
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 400px;
+            gap: 24px;
+        }
 
-  /* Operators at bottom */
-  .operators{
-    position:absolute;
-    left:0;
-    right:0;
-    bottom:12px;
-    display:flex;
-    gap:10px;
-    justify-content:center;
-    padding:0 10px;
-    opacity:1;
-    transition:opacity 0.3s ease;
-  }
+        /* Current Result Display */
+        .result-display {
+            font-family: 'Space Mono', monospace;
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--text);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.3s, transform 0.2s;
+        }
 
-  .operators.hidden{
-    opacity:0.4;
-  }
+        .result-display.success {
+            color: var(--success);
+            transform: scale(1.1);
+        }
 
-  .op-btn{
-    width:55px;
-    height:55px;
-    border:2px solid var(--accent);
-    border-radius:50%;
-    background:linear-gradient(135deg, var(--accent-bg) 0%, #cffafe 100%);
-    font-size:28px;
-    font-weight:700;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    box-shadow:0 4px 12px rgba(34,211,238,0.2);
-    cursor:pointer;
-    transition:all 0.2s;
-    color:var(--accent-dark);
-  }
-  
-  .op-btn:disabled{
-    opacity:0.3;
-    cursor:not-allowed;
-  }
-  
-  @media (min-width: 400px) {
-    .op-btn{
-      width:65px;
-      height:65px;
-      font-size:32px;
-    }
-  }
+        .result-display.error {
+            color: var(--error);
+        }
 
-  .op-btn:active:not(:disabled){
-    transform:scale(0.95);
-  }
+        /* Diamond Grid Layout - CRITICAL: Using CSS Grid, not absolute positioning */
+        .diamond-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 12px;
+            width: 280px;
+            height: 280px;
+        }
 
-  /* Attempt dots */
-  .attempts{
-    display:flex;
-    gap:10px;
-    justify-content:center;
-    padding:16px;
-  }
+        /* Grid slot positions */
+        .slot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-  .dot{
-    width:12px;
-    height:12px;
-    border-radius:50%;
-    background:var(--muted);
-    opacity:0.2;
-    transition:all 0.3s;
-  }
+        .slot.top {
+            grid-column: 2;
+            grid-row: 1;
+        }
 
-  .dot.used{
-    opacity:1;
-    background:var(--accent);
-  }
+        .slot.left {
+            grid-column: 1;
+            grid-row: 2;
+        }
 
-  /* First-time overlay */
-  .overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.7);
-    display:grid;
-    place-items:center;
-    z-index:100;
-    opacity:1;
-    transition:opacity 0.5s;
-  }
+        .slot.right {
+            grid-column: 3;
+            grid-row: 2;
+        }
 
-  .overlay.hidden{
-    opacity:0;
-    pointer-events:none;
-  }
+        .slot.bottom {
+            grid-column: 2;
+            grid-row: 3;
+        }
 
-  .overlay-content{
-    background:white;
-    padding:32px;
-    border-radius:20px;
-    text-align:center;
-    max-width:320px;
-    box-shadow:0 20px 60px rgba(0,0,0,0.3);
-  }
+        /* Cards */
+        .card {
+            width: 80px;
+            height: 80px;
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            -webkit-user-select: none;
+            user-select: none;
+        }
 
-  .overlay-content h2{
-    margin:0 0 16px;
-    font-size:24px;
-  }
+        .card:active {
+            transform: scale(0.95);
+        }
 
-  .overlay-content p{
-    margin:0;
-    color:var(--muted);
-    line-height:1.6;
-  }
+        .card.selected {
+            border-color: var(--cyan);
+            box-shadow: 0 0 20px var(--cyan-glow);
+            transform: scale(1.05);
+        }
 
-  /* Archive modal */
-  .modal{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.7);
-    display:grid;
-    place-items:center;
-    z-index:200;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity 0.3s;
-  }
+        .card.selected.first {
+            border-color: var(--cyan);
+        }
 
-  .modal.visible{
-    opacity:1;
-    pointer-events:auto;
-  }
+        .card.selected.second {
+            border-color: var(--warning);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+        }
 
-  .modal-content{
-    background:white;
-    padding:24px;
-    border-radius:20px;
-    max-width:400px;
-    width:90%;
-    max-height:80vh;
-    overflow-y:auto;
-    box-shadow:0 20px 60px rgba(0,0,0,0.3);
-  }
+        .card.used {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
 
-  .modal-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
-  }
+        /* Operators */
+        .operators {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
 
-  .modal-header h2{
-    margin:0;
-    font-size:20px;
-  }
+        .op-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: 2px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text);
+            font-size: 1.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-  .close-btn{
-    background:none;
-    border:none;
-    font-size:28px;
-    cursor:pointer;
-    padding:0;
-    width:32px;
-    height:32px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    border-radius:8px;
-    color:var(--muted);
-  }
+        .op-btn:not(:disabled):hover {
+            border-color: var(--cyan);
+            background: rgba(34, 211, 238, 0.1);
+        }
 
-  .close-btn:hover{
-    background:rgba(0,0,0,0.05);
-  }
+        .op-btn:not(:disabled):active {
+            transform: scale(0.9);
+        }
 
-  .calendar{
-    display:grid;
-    grid-template-columns:repeat(7,1fr);
-    gap:8px;
-  }
+        .op-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
 
-  .day-btn{
-    aspect-ratio:1;
-    border:1px solid var(--bd);
-    border-radius:10px;
-    background:white;
-    font-size:13px;
-    font-weight:600;
-    cursor:pointer;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:2px;
-    transition:all 0.2s;
-  }
+        /* Attempts */
+        .attempts {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 8px;
+        }
 
-  .day-btn:hover{
-    border-color:var(--accent);
-  }
+        .attempt-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--card-border);
+            transition: background 0.3s;
+        }
 
-  .day-btn.completed{
-    background:var(--accent-bg);
-    border-color:var(--accent);
-  }
+        .attempt-dot.used {
+            background: var(--error);
+        }
 
-  .day-btn.today{
-    outline:2px solid var(--accent);
-  }
+        .attempt-dot.success {
+            background: var(--success);
+        }
 
-  .day-btn.future{
-    opacity:0.3;
-    cursor:not-allowed;
-  }
+        /* Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 8px;
+        }
 
-  .day-label{
-    font-size:10px;
-    color:var(--muted);
-  }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
 
-  /* Completion modal */
-  .result-modal{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.8);
-    display:grid;
-    place-items:center;
-    z-index:300;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity 0.3s;
-  }
+        .btn-primary {
+            background: var(--cyan);
+            color: var(--bg);
+        }
 
-  .result-modal.visible{
-    opacity:1;
-    pointer-events:auto;
-  }
+        .btn-primary:hover {
+            background: var(--cyan-dark);
+        }
 
-  .result-content{
-    background:white;
-    padding:40px 32px;
-    border-radius:20px;
-    text-align:center;
-    max-width:360px;
-    box-shadow:0 20px 60px rgba(0,0,0,0.4);
-  }
+        .btn-secondary {
+            background: var(--card-bg);
+            color: var(--text);
+            border: 1px solid var(--card-border);
+        }
 
-  .result-content h2{
-    margin:0 0 12px;
-    font-size:28px;
-  }
+        .btn-secondary:hover {
+            border-color: var(--cyan);
+        }
 
-  .result-stats{
-    margin:20px 0;
-    padding:20px;
-    background:var(--bg);
-    border-radius:12px;
-  }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-  .stat-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:8px 0;
-    font-size:15px;
-  }
+        /* Message overlay */
+        .message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--card-bg);
+            border: 2px solid var(--cyan);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            z-index: 100;
+            max-width: 90%;
+            width: 320px;
+            box-shadow: 0 0 40px var(--cyan-glow);
+            display: none;
+        }
 
-  .stat-label{
-    color:var(--muted);
-  }
+        .message.show {
+            display: block;
+            animation: popIn 0.3s ease;
+        }
 
-  .stat-value{
-    font-weight:700;
-    font-size:18px;
-  }
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
 
-  .action-btns{
-    display:flex;
-    gap:12px;
-    margin-top:24px;
-  }
+        .message h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
 
-  .btn{
-    flex:1;
-    padding:14px;
-    border-radius:12px;
-    border:1px solid var(--bd);
-    background:white;
-    font:inherit;
-    font-weight:700;
-    cursor:pointer;
-    transition:all 0.2s;
-  }
+        .message p {
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
 
-  .btn.primary{
-    background:var(--accent);
-    border-color:var(--accent);
-    color:white;
-  }
+        .message .stats {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.25rem;
+            margin: 16px 0;
+        }
 
-  .btn:active{
-    transform:scale(0.98);
-  }
+        /* Archive Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 16px;
+        }
 
-  /* Confetti canvas */
-  #confetti{
-    position:fixed;
-    inset:0;
-    pointer-events:none;
-    z-index:400;
-  }
+        .modal-overlay.show {
+            display: flex;
+        }
 
-  /* Freeze badge */
-  .freeze-badge{
-    position:absolute;
-    top:12px;
-    right:12px;
-    background:linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-    color:white;
-    padding:6px 12px;
-    border-radius:12px;
-    font-size:13px;
-    font-weight:700;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    box-shadow:0 4px 12px rgba(59,130,246,0.3);
-    opacity:0;
-    transform:translateY(-10px);
-    transition:all 0.3s;
-  }
+        .modal {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
 
-  .freeze-badge.visible{
-    opacity:1;
-    transform:translateY(0);
-  }
-</style>
+        .modal h2 {
+            text-align: center;
+            margin-bottom: 16px;
+            color: var(--cyan);
+        }
+
+        .archive-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+
+        .archive-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .archive-item:hover {
+            border-color: var(--cyan);
+        }
+
+        .archive-item.completed {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--success);
+        }
+
+        .archive-item.failed {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--error);
+        }
+
+        .archive-item.today {
+            border-color: var(--cyan);
+            box-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .modal-close {
+            display: block;
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* Confetti */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Archive mode indicator */
+        .archive-banner {
+            background: var(--warning);
+            color: var(--bg);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: none;
+        }
+
+        .archive-banner.show {
+            display: block;
+        }
+    </style>
 </head>
 <body>
-
-<div class="wrap">
-  <header>
-    <div class="puzzle-num" id="puzzleNum">#20483</div>
-    <div class="streak"><span id="streakNum">0</span>🔥</div>
-  </header>
-
-  <div class="panel">
-    <div class="freeze-badge" id="freezeBadge">❄️ Freeze Ready</div>
-    
-    <div class="board">
-      <div class="slot top" data-slot="0"></div>
-      <div class="slot left" data-slot="1"></div>
-      <div class="slot right" data-slot="2"></div>
-      <div class="slot bottom" data-slot="3"></div>
+    <div class="header">
+        <div class="puzzle-number" id="puzzleNumber" title="Tap for archive">#—</div>
+        <div class="streak-display">
+            <span class="fire">🔥</span>
+            <span id="streakCount">0</span>
+            <span class="freeze-indicator" id="freezeIndicator"></span>
+        </div>
     </div>
 
-    <div class="operators" id="operators">
-      <button class="op-btn" data-op="+">+</button>
-      <button class="op-btn" data-op="/">÷</button>
-      <button class="op-btn" data-op="*">×</button>
-      <button class="op-btn" data-op="-">−</button>
+    <div class="archive-banner" id="archiveBanner">
+        📅 Archive Mode
     </div>
 
-    <div class="attempts" id="attempts">
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
-      <div class="dot"></div>
+    <div class="game-container">
+        <div class="result-display" id="resultDisplay">—</div>
+
+        <div class="diamond-grid" id="diamondGrid">
+            <div class="slot top" id="slot0"></div>
+            <div class="slot left" id="slot1"></div>
+            <div class="slot right" id="slot2"></div>
+            <div class="slot bottom" id="slot3"></div>
+        </div>
+
+        <div class="operators" id="operators">
+            <button class="op-btn" data-op="+" disabled>+</button>
+            <button class="op-btn" data-op="-" disabled>−</button>
+            <button class="op-btn" data-op="*" disabled>×</button>
+            <button class="op-btn" data-op="/" disabled>÷</button>
+        </div>
+
+        <div class="attempts" id="attempts">
+            <div class="attempt-dot"></div>
+            <div class="attempt-dot"></div>
+            <div class="attempt-dot"></div>
+            <div class="attempt-dot"></div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-secondary" id="undoBtn" disabled>Undo</button>
+            <button class="btn btn-secondary" id="resetBtn">Reset</button>
+        </div>
     </div>
-  </div>
-</div>
 
-<!-- First-time overlay -->
-<div class="overlay" id="firstTimeOverlay">
-  <div class="overlay-content">
-    <h2>Welcome to Make 24!</h2>
-    <p>Tap two numbers, then pick an operator. Use each number exactly once to make 24.</p>
-  </div>
-</div>
-
-<!-- Archive modal -->
-<div class="modal" id="archiveModal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>Archive</h2>
-      <button class="close-btn" id="closeArchive">×</button>
+    <div class="message" id="successMessage">
+        <h2>🎉 Nice!</h2>
+        <p>You made 24!</p>
+        <div class="stats" id="successStats"></div>
+        <button class="btn btn-primary" id="shareBtn">Share</button>
     </div>
-    <div class="calendar" id="calendar"></div>
-  </div>
-</div>
 
-<!-- Result modal -->
-<div class="result-modal" id="resultModal">
-  <div class="result-content">
-    <h2 id="resultTitle">Perfect! 🎯</h2>
-    <div class="result-stats">
-      <div class="stat-row">
-        <span class="stat-label">Moves</span>
-        <span class="stat-value" id="movesCount">3</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Streak</span>
-        <span class="stat-value" id="resultStreak">15🔥</span>
-      </div>
-      <div class="stat-row">
-        <span class="stat-label">Puzzle</span>
-        <span class="stat-value" id="resultPuzzle">#20483</span>
-      </div>
+    <div class="message" id="failMessage">
+        <h2>😢 Out of attempts</h2>
+        <p>Better luck tomorrow!</p>
+        <div class="stats" id="failStats"></div>
+        <button class="btn btn-primary" id="failShareBtn">Share</button>
     </div>
-    <div class="action-btns">
-      <button class="btn" id="shareBtn">Share</button>
-      <button class="btn primary" id="doneBtn">Done</button>
+
+    <div class="modal-overlay" id="archiveModal">
+        <div class="modal">
+            <h2>📅 Archive</h2>
+            <div class="archive-list" id="archiveList"></div>
+            <button class="modal-close" id="closeArchive">Close</button>
+        </div>
     </div>
-  </div>
-</div>
 
-<canvas id="confetti"></canvas>
+    <div class="confetti-container" id="confetti"></div>
 
-<!-- Supabase (optional) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" onerror="console.warn('Supabase CDN failed to load')"></script>
+    <script>
+        // Supabase config
+        const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
 
-<script>
-(function(){
-  const TARGET=24, MAX_TRIES=4, EPS=1e-6;
-  
-  // ===== Day & RNG =====
-  function dayIndexUTC(d=new Date()){
-    return Math.floor(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/864e5);
-  }
-  const TODAY = dayIndexUTC();
-  let CURRENT_DAY = TODAY;
+        // Constants
+        const STORAGE_KEY = 'make24_v3';
+        const MAX_ATTEMPTS = 4;
+        const ARCHIVE_DAYS = 30;
+        const STREAK_FREEZE_INTERVAL = 7;
 
-  function mulberry32(a){
-    return function(){
-      let t=a+=0x6D2B79F5;
-      t=Math.imul(t^t>>>15,t|1);
-      t^=t+Math.imul(t^t>>>7,t|61);
-      return((t^t>>>14)>>>0)/4294967296;
-    };
-  }
-
-  function makePuzzle(day){
-    const rng=mulberry32((day^0x9E3779B9)>>>0);
-    const ri=(a,b)=>Math.floor(rng()*(b-a+1))+a;
-    
-    // Try generating solvable puzzle
-    let tries=0;
-    while(tries<500){
-      const nums=[ri(1,10),ri(1,10),ri(1,10),ri(1,10)];
-      const solved=solve24(nums);
-      if(isGood(nums,solved)){
-        return {nums,solution:solved.solutions[0].expr};
-      }
-      tries++;
-    }
-    // Fallback
-    const nums=[ri(1,10),ri(1,10),ri(1,10),ri(1,10)];
-    return {nums,solution:""};
-  }
-
-  function solve24(nums){
-    const arr=nums.map(n=>({val:n,expr:String(n)}));
-    const sols=[];
-    
-    function dfs(items){
-      if(items.length===1){
-        if(Math.abs(items[0].val-TARGET)<EPS){
-          sols.push({expr:items[0].expr,usedOps:new Set(items[0].expr.replace(/[0-9(). ]/g,'').split(''))});
-        }
-        return;
-      }
-      for(let i=0;i<items.length;i++){
-        for(let j=i+1;j<items.length;j++){
-          const a=items[i],b=items[j];
-          const rest=items.filter((_,k)=>k!==i&&k!==j);
-          const cand=[];
-          cand.push({val:a.val+b.val,expr:`(${a.expr}+${b.expr})`});
-          cand.push({val:a.val*b.val,expr:`(${a.expr}*${b.expr})`});
-          cand.push({val:a.val-b.val,expr:`(${a.expr}-${b.expr})`});
-          cand.push({val:b.val-a.val,expr:`(${b.expr}-${a.expr})`});
-          if(Math.abs(b.val)>EPS)cand.push({val:a.val/b.val,expr:`(${a.expr}/${b.expr})`});
-          if(Math.abs(a.val)>EPS)cand.push({val:b.val/a.val,expr:`(${b.expr}/${a.expr})`});
-          for(const c of cand){
-            if(isFinite(c.val)&&Math.abs(c.val)<1e6)dfs(rest.concat(c));
-          }
-        }
-      }
-    }
-    dfs(arr);
-    return {found:sols.length>0,solutions:sols};
-  }
-
-  function isGood(nums,solved){
-    if(!solved.found)return false;
-    if(nums.reduce((a,b)=>a+b,0)===TARGET)return false;
-    return !!solved.solutions.find(s=>s.usedOps.has('*')||s.usedOps.has('/'));
-  }
-
-  // ===== Supabase =====
-  const SUPABASE_URL="https://fimsbfcvavpehryvvcho.supabase.co";
-  const SUPABASE_ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
-  const SLUG="make24";
-  let sb=null;
-
-  const DID_KEY="kapework_did_v1";
-  let deviceId=localStorage.getItem(DID_KEY);
-  if(!deviceId){
-    deviceId=(crypto?.randomUUID?.()||String(Math.random()).slice(2));
-    localStorage.setItem(DID_KEY,deviceId);
-  }
-
-  // ===== DOM refs =====
-  const puzzleNumEl=document.getElementById('puzzleNum');
-  const streakNumEl=document.getElementById('streakNum');
-  const slotsEl=document.querySelectorAll('.slot');
-  const operatorsEl=document.getElementById('operators');
-  const opBtns=document.querySelectorAll('.op-btn');
-  const attemptsEl=document.getElementById('attempts');
-  const firstTimeEl=document.getElementById('firstTimeOverlay');
-  const archiveModalEl=document.getElementById('archiveModal');
-  const resultModalEl=document.getElementById('resultModal');
-  const calendarEl=document.getElementById('calendar');
-  const freezeBadgeEl=document.getElementById('freezeBadge');
-  const confettiCanvas=document.getElementById('confetti');
-  const ctx=confettiCanvas.getContext('2d');
-
-  // ===== State =====
-  const NS="make24_daily_v1";
-  const KEY=k=>`${NS}_${k}`;
-  
-  let original=[],items=[],selected=[],history=[];
-  let attempts=0,completed=false,solutionExpr="";
-  let streak=0,longestStreak=0,lastPlayedDay=null,freezeAvailable=false;
-
-  function loadGlobalState(){
-    streak=parseInt(localStorage.getItem(KEY('streak'))||'0',10);
-    longestStreak=parseInt(localStorage.getItem(KEY('longest'))||'0',10);
-    lastPlayedDay=parseInt(localStorage.getItem(KEY('lastDay'))||'0',10)||null;
-    freezeAvailable=localStorage.getItem(KEY('freeze'))==='true';
-    streakNumEl.textContent=streak;
-    if(freezeAvailable)freezeBadgeEl.classList.add('visible');
-  }
-
-  function saveGlobalState(){
-    localStorage.setItem(KEY('streak'),String(streak));
-    localStorage.setItem(KEY('longest'),String(longestStreak));
-    localStorage.setItem(KEY('lastDay'),String(lastPlayedDay||0));
-    localStorage.setItem(KEY('freeze'),freezeAvailable?'true':'false');
-  }
-
-  function loadDayState(day){
-    try{
-      const s=JSON.parse(localStorage.getItem(KEY(`day_${day}`))||"{}");
-      return s;
-    }catch{return{};}
-  }
-
-  function saveDayState(day){
-    localStorage.setItem(KEY(`day_${day}`),JSON.stringify({
-      day,original,items,history,selected,attempts,completed,solutionExpr
-    }));
-  }
-
-  // ===== First-time overlay =====
-  if(!localStorage.getItem(KEY('seen'))){
-    setTimeout(()=>{
-      firstTimeEl.classList.add('hidden');
-      localStorage.setItem(KEY('seen'),'true');
-    },3000);
-  }else{
-    firstTimeEl.classList.add('hidden');
-  }
-
-  // ===== Shake to reset =====
-  let shakeThreshold=15;
-  let lastShake=0;
-  
-  if(window.DeviceMotionEvent){
-    window.addEventListener('devicemotion',(e)=>{
-      const acc=e.accelerationIncludingGravity;
-      if(!acc)return;
-      const magnitude=Math.sqrt((acc.x||0)**2+(acc.y||0)**2+(acc.z||0)**2);
-      const now=Date.now();
-      if(magnitude>shakeThreshold && now-lastShake>500){
-        lastShake=now;
-        if(!completed && history.length>0){
-          resetPuzzle();
-        }
-      }
-    },{passive:true});
-  }
-
-  // ===== Rendering =====
-  function renderCards(){
-    console.log('Rendering cards:', items); // Debug
-    
-    slotsEl.forEach((slot, idx)=>{
-      // Clear slot
-      slot.innerHTML='';
-      
-      const item=items[idx];
-      if(item && !item.used){
-        const card=document.createElement('div');
-        card.className='card';
-        card.textContent=fmt(item.val);
-        
-        if(selected.includes(idx))card.classList.add('selected');
-        if(idx===items.length-1 && items.length<original.length)card.classList.add('newest');
-        
-        card.onclick=()=>selectCard(idx);
-        slot.appendChild(card);
-      }else if(item && item.used){
-        // Faded placeholder
-        const card=document.createElement('div');
-        card.className='card faded';
-        card.textContent=fmt(item.val);
-        slot.appendChild(card);
-      }
-    });
-    
-    // Enable/disable operators
-    const ready=selected.length===2 && !completed;
-    opBtns.forEach(btn=>btn.disabled=!ready);
-  }
-
-  function renderAttempts(){
-    const dots=attemptsEl.querySelectorAll('.dot');
-    dots.forEach((d,i)=>d.classList.toggle('used',i<attempts));
-  }
-
-  function fmt(n){
-    const r=Math.round(n*1000)/1000;
-    return Math.abs(r-Math.round(r))<1e-9?String(Math.round(r)):String(r);
-  }
-
-  // ===== Game logic =====
-  function initPuzzle(day){
-    CURRENT_DAY=day;
-    puzzleNumEl.textContent=`#${day}`;
-    
-    const dayState=loadDayState(day);
-    if(dayState.day===day && dayState.original){
-      original=dayState.original;
-      items=dayState.items||[];
-      history=dayState.history||[];
-      attempts=dayState.attempts||0;
-      completed=dayState.completed||false;
-      solutionExpr=dayState.solutionExpr||"";
-    }else{
-      const puzzle=makePuzzle(day);
-      original=puzzle.nums;
-      solutionExpr=puzzle.solution;
-      items=original.map(n=>({val:n,expr:String(n),used:false}));
-      history=[];
-      attempts=0;
-      completed=false;
-    }
-    
-    selected=[];
-    operatorsEl.classList.remove('visible');
-    renderCards();
-    renderAttempts();
-    
-    if(completed)showResult();
-  }
-
-  function selectCard(idx){
-    if(completed || !items[idx] || items[idx].used)return;
-    
-    const pos=selected.indexOf(idx);
-    if(pos>=0){
-      selected.splice(pos,1);
-    }else{
-      if(selected.length<2)selected.push(idx);
-      else selected=[selected[1],idx];
-    }
-    
-    renderCards();
-  }
-
-  function combine(op){
-    if(selected.length!==2||completed)return;
-    
-    const i=selected[0],j=selected[1];
-    const a=items[i],b=items[j];
-    if(!a||!b||a.used||b.used)return;
-    
-    let val;
-    if(op==='+')val=a.val+b.val;
-    else if(op==='-')val=a.val-b.val;
-    else if(op==='*')val=a.val*b.val;
-    else if(op==='/'){
-      if(Math.abs(b.val)<EPS){alert("Cannot divide by zero");return;}
-      val=a.val/b.val;
-    }
-    
-    history.push(JSON.parse(JSON.stringify(items)));
-    
-    // Mark used
-    items[i].used=true;
-    items[j].used=true;
-    
-    // Find first empty slot
-    let slot=-1;
-    for(let k=0;k<items.length;k++){
-      if(items[k].used){slot=k;break;}
-    }
-    
-    // Add new card
-    const newCard={val,expr:`(${a.expr}${op}${b.expr})`,used:false};
-    if(slot>=0)items[slot]=newCard;
-    else items.push(newCard);
-    
-    selected=[];
-    renderCards();
-    
-    // Check for completion
-    const activeCards=items.filter(c=>!c.used);
-    if(activeCards.length===1){
-      autoSubmit();
-    }
-  }
-
-  function autoSubmit(){
-    const activeCards=items.filter(c=>!c.used);
-    if(activeCards.length!==1)return;
-    
-    const finalVal=activeCards[0].val;
-    attempts++;
-    renderAttempts();
-    
-    const won=Math.abs(finalVal-TARGET)<EPS;
-    
-    if(won){
-      completed=true;
-      saveDayState(CURRENT_DAY);
-      
-      // Update streak (only for today)
-      if(CURRENT_DAY===TODAY){
-        if(lastPlayedDay===null || lastPlayedDay<TODAY-1){
-          // New streak or broken
-          if(freezeAvailable && lastPlayedDay===TODAY-1){
-            // Freeze protected the streak
-            freezeAvailable=false;
-            freezeBadgeEl.classList.remove('visible');
-          }else{
-            streak=1;
-          }
-        }else if(lastPlayedDay===TODAY-1){
-          streak++;
-        }
-        // else already played today, no change
-        
-        if(streak>longestStreak)longestStreak=streak;
-        lastPlayedDay=TODAY;
-        
-        // Earn freeze after 7 consecutive days
-        if(streak>=7 && streak%7===0 && !freezeAvailable){
-          freezeAvailable=true;
-          freezeBadgeEl.classList.add('visible');
-        }
-        
-        streakNumEl.textContent=streak;
-        saveGlobalState();
-        
-        // Log to Supabase
-        trackPlay();
-      }
-      
-      confettiBurst();
-      setTimeout(showResult,800);
-    }else{
-      if(attempts>=MAX_TRIES){
-        completed=true;
-        saveDayState(CURRENT_DAY);
-        
-        // Streak breaks on failure (only for today)
-        if(CURRENT_DAY===TODAY){
-          if(lastPlayedDay!==TODAY){
-            streak=0;
-            streakNumEl.textContent=0;
-            lastPlayedDay=TODAY;
-            saveGlobalState();
-          }
-        }
-        
-        setTimeout(showResult,600);
-      }else{
-        // Reset for next attempt
-        items=original.map(n=>({val:n,expr:String(n),used:false}));
-        history=[];
-        saveDayState(CURRENT_DAY);
-        renderCards();
-      }
-    }
-  }
-
-  function resetPuzzle(){
-    items=original.map(n=>({val:n,expr:String(n),used:false}));
-    history=[];
-    selected=[];
-    operatorsEl.classList.remove('visible');
-    renderCards();
-  }
-
-  // ===== Confetti =====
-  function resizeConfetti(){
-    confettiCanvas.width=window.innerWidth;
-    confettiCanvas.height=window.innerHeight;
-  }
-  resizeConfetti();
-  window.addEventListener('resize',resizeConfetti);
-
-  function confettiBurst(){
-    resizeConfetti();
-    const pieces=[];
-    const colors=['#22d3ee','#f6c90e','#34d399','#60a5fa','#fb7185'];
-    for(let i=0;i<120;i++){
-      pieces.push({
-        x:confettiCanvas.width/2,
-        y:confettiCanvas.height/3,
-        vx:(Math.random()*2-1)*4,
-        vy:-Math.random()*4-2,
-        g:0.08+Math.random()*0.04,
-        w:4+Math.random()*3,
-        h:8+Math.random()*4,
-        r:Math.random()*Math.PI,
-        vr:(Math.random()*2-1)*0.2,
-        c:colors[i%colors.length],
-        a:1
-      });
-    }
-    let t=0;
-    function tick(){
-      ctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
-      pieces.forEach(p=>{
-        p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;p.a*=0.995;
-        ctx.save();ctx.globalAlpha=Math.max(0,p.a);
-        ctx.translate(p.x,p.y);ctx.rotate(p.r);
-        ctx.fillStyle=p.c;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
-        ctx.restore();
-      });
-      t++;
-      if(t<220)requestAnimationFrame(tick);
-      else ctx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
-    }
-    tick();
-  }
-
-  // ===== Result modal =====
-  function showResult(){
-    const won=Math.abs(items.filter(c=>!c.used)[0].val-TARGET)<EPS;
-    
-    document.getElementById('resultTitle').textContent=won?"Perfect! 🎯":"Out of Attempts";
-    document.getElementById('movesCount').textContent=attempts;
-    document.getElementById('resultStreak').textContent=`${streak}🔥`;
-    document.getElementById('resultPuzzle').textContent=`#${CURRENT_DAY}`;
-    
-    resultModalEl.classList.add('visible');
-  }
-
-  document.getElementById('doneBtn').onclick=()=>{
-    resultModalEl.classList.remove('visible');
-    if(CURRENT_DAY!==TODAY){
-      // Return to today
-      initPuzzle(TODAY);
-    }
-  };
-
-  document.getElementById('shareBtn').onclick=async()=>{
-    const won=Math.abs(items.filter(c=>!c.used)[0].val-TARGET)<EPS;
-    const moveCount=attempts;
-    const archiveNote=CURRENT_DAY!==TODAY?` (Archive #${CURRENT_DAY})`:'';
-    const text=`Make 24 #${CURRENT_DAY}${archiveNote} | ${moveCount} move${moveCount>1?'s':''} ${won?'⚡️':'❌'} | ${streak}🔥\n\nkapework.com/make24`;
-    
-    try{
-      if(navigator.share){
-        await navigator.share({text});
-      }else{
-        await navigator.clipboard.writeText(text);
-        alert("Result copied to clipboard!");
-      }
-    }catch(e){}
-  };
-
-  // ===== Archive =====
-  puzzleNumEl.onclick=()=>{
-    renderArchive();
-    archiveModalEl.classList.add('visible');
-  };
-
-  document.getElementById('closeArchive').onclick=()=>{
-    archiveModalEl.classList.remove('visible');
-  };
-
-  function renderArchive(){
-    calendarEl.innerHTML='';
-    for(let i=29;i>=0;i--){
-      const day=TODAY-i;
-      const btn=document.createElement('button');
-      btn.className='day-btn';
-      
-      const dayState=loadDayState(day);
-      if(dayState.completed)btn.classList.add('completed');
-      if(day===TODAY)btn.classList.add('today');
-      if(day>TODAY)btn.classList.add('future');
-      
-      const label=document.createElement('div');
-      label.className='day-label';
-      label.textContent=day===TODAY?'Today':day===TODAY-1?'Yest':`-${i}`;
-      btn.appendChild(label);
-      
-      const num=document.createElement('div');
-      num.textContent=day%100;
-      btn.appendChild(num);
-      
-      if(day<=TODAY){
-        btn.onclick=()=>{
-          archiveModalEl.classList.remove('visible');
-          initPuzzle(day);
+        // Game state
+        let gameState = {
+            deviceId: null,
+            streak: 0,
+            freezes: 0,
+            lastPlayedDate: null,
+            history: {}, // { puzzleNum: { completed: bool, attempts: num, moves: num } }
         };
-      }
-      
-      calendarEl.appendChild(btn);
-    }
-  }
 
-  // ===== Operators =====
-  opBtns.forEach(btn=>{
-    btn.onclick=()=>combine(btn.dataset.op);
-  });
+        let currentPuzzle = {
+            numbers: [],
+            puzzleNum: 0,
+            date: null,
+            isArchive: false
+        };
 
-  // ===== Supabase tracking =====
-  async function trackPlay(){
-    try{
-      if(!sb)sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-      await sb.from("plays").insert({
-        slug:SLUG,
-        device_id:deviceId,
-        metadata:{day:CURRENT_DAY,moves:attempts,nums:original}
-      });
-    }catch(e){
-      console.warn('Could not track play:',e);
-    }
-  }
+        let playState = {
+            cards: [], // { value, used, slot }
+            selected: [], // indices
+            attempts: 0,
+            moves: 0,
+            moveHistory: [],
+            completed: false
+        };
 
-  // ===== Init =====
-  async function start(){
-    console.log('DEBUG: Starting game...');
-    console.log('DEBUG: Supabase available?', typeof window.supabase !== 'undefined');
-    
-    try{
-      if(typeof window.supabase !== 'undefined'){
-        sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON);
-        console.log('DEBUG: Supabase initialized');
-      }else{
-        console.warn('DEBUG: Supabase not loaded, continuing without tracking');
-      }
-    }catch(e){
-      console.warn('DEBUG: Supabase error:', e);
-    }
-    
-    console.log('DEBUG: Loading global state...');
-    loadGlobalState();
-    
-    console.log('DEBUG: Initializing puzzle for day:', TODAY);
-    initPuzzle(TODAY);
-    
-    console.log('DEBUG: Items after init:', items);
-    console.log('DEBUG: Diamond element:', diamondEl);
-  }
-  
-  // Wait for DOM and Supabase
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', start);
-  }else{
-    start();
-  }
-})();
-</script>
+        // Seeded RNG (Mulberry32)
+        function mulberry32(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+
+        // Get puzzle number from date
+        function getPuzzleNumber(date) {
+            const epoch = new Date('2025-01-01T00:00:00Z');
+            const diff = date - epoch;
+            return Math.floor(diff / (24 * 60 * 60 * 1000)) + 1;
+        }
+
+        // Get date from puzzle number
+        function getDateFromPuzzleNumber(num) {
+            const epoch = new Date('2025-01-01T00:00:00Z');
+            return new Date(epoch.getTime() + (num - 1) * 24 * 60 * 60 * 1000);
+        }
+
+        // Get today's puzzle number (UTC)
+        function getTodayPuzzleNumber() {
+            const now = new Date();
+            const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            return getPuzzleNumber(utcDate);
+        }
+
+        // Generate 4 numbers for a puzzle
+        function generatePuzzle(puzzleNum) {
+            const rng = mulberry32(puzzleNum * 12345);
+            const numbers = [];
+            for (let i = 0; i < 4; i++) {
+                numbers.push(Math.floor(rng() * 9) + 1); // 1-9
+            }
+            return numbers;
+        }
+
+        // Check if puzzle has a solution (for validation)
+        function hasSolution(nums) {
+            if (nums.length === 1) return Math.abs(nums[0] - 24) < 0.0001;
+            
+            for (let i = 0; i < nums.length; i++) {
+                for (let j = 0; j < nums.length; j++) {
+                    if (i === j) continue;
+                    const remaining = nums.filter((_, k) => k !== i && k !== j);
+                    const a = nums[i], b = nums[j];
+                    
+                    const results = [a + b, a - b, a * b];
+                    if (b !== 0) results.push(a / b);
+                    
+                    for (const r of results) {
+                        if (hasSolution([...remaining, r])) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Device ID
+        function getDeviceId() {
+            let id = localStorage.getItem('make24_device_id');
+            if (!id) {
+                id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+                localStorage.setItem('make24_device_id', id);
+            }
+            return id;
+        }
+
+        // Load/save state
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    gameState = { ...gameState, ...JSON.parse(saved) };
+                }
+            } catch (e) {
+                console.error('Failed to load state:', e);
+            }
+            gameState.deviceId = getDeviceId();
+        }
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+            } catch (e) {
+                console.error('Failed to save state:', e);
+            }
+        }
+
+        // Streak management
+        function updateStreak() {
+            const today = getTodayPuzzleNumber();
+            const yesterday = today - 1;
+            
+            if (gameState.lastPlayedDate === today) {
+                // Already played today, no change
+                return;
+            }
+            
+            if (gameState.lastPlayedDate === yesterday) {
+                // Consecutive day - streak continues
+            } else if (gameState.lastPlayedDate === yesterday - 1 && gameState.freezes > 0) {
+                // Missed one day but have freeze
+                gameState.freezes--;
+            } else if (gameState.lastPlayedDate && gameState.lastPlayedDate < yesterday) {
+                // Streak broken
+                gameState.streak = 0;
+            }
+            
+            updateStreakDisplay();
+        }
+
+        function incrementStreak() {
+            gameState.streak++;
+            gameState.lastPlayedDate = currentPuzzle.puzzleNum;
+            
+            // Award freeze every 7 days
+            if (gameState.streak > 0 && gameState.streak % STREAK_FREEZE_INTERVAL === 0) {
+                gameState.freezes++;
+            }
+            
+            saveState();
+            updateStreakDisplay();
+        }
+
+        function updateStreakDisplay() {
+            document.getElementById('streakCount').textContent = gameState.streak;
+            const freezeEl = document.getElementById('freezeIndicator');
+            freezeEl.textContent = gameState.freezes > 0 ? '❄️'.repeat(Math.min(gameState.freezes, 3)) : '';
+        }
+
+        // Initialize puzzle
+        function initPuzzle(puzzleNum, isArchive = false) {
+            currentPuzzle.puzzleNum = puzzleNum;
+            currentPuzzle.numbers = generatePuzzle(puzzleNum);
+            currentPuzzle.isArchive = isArchive;
+            currentPuzzle.date = getDateFromPuzzleNumber(puzzleNum);
+            
+            // Check history
+            const history = gameState.history[puzzleNum];
+            if (history && history.completed) {
+                playState.completed = true;
+                playState.attempts = history.attempts;
+                playState.moves = history.moves;
+            } else if (history) {
+                playState.attempts = history.attempts;
+            } else {
+                playState.attempts = 0;
+                playState.completed = false;
+            }
+            
+            resetPlay();
+            updateUI();
+        }
+
+        function resetPlay() {
+            playState.cards = currentPuzzle.numbers.map((v, i) => ({
+                value: v,
+                used: false,
+                slot: i
+            }));
+            playState.selected = [];
+            playState.moveHistory = [];
+            
+            renderCards();
+            updateOperators();
+            updateResult();
+        }
+
+        // Render cards into grid slots
+        function renderCards() {
+            const slots = ['slot0', 'slot1', 'slot2', 'slot3'];
+            
+            slots.forEach((slotId, i) => {
+                const slot = document.getElementById(slotId);
+                slot.innerHTML = '';
+                
+                const cardData = playState.cards.find(c => c.slot === i && !c.used);
+                if (cardData) {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.textContent = formatNumber(cardData.value);
+                    card.dataset.index = playState.cards.indexOf(cardData);
+                    
+                    const cardIndex = playState.cards.indexOf(cardData);
+                    if (playState.selected.includes(cardIndex)) {
+                        card.classList.add('selected');
+                        if (playState.selected[0] === cardIndex) {
+                            card.classList.add('first');
+                        } else {
+                            card.classList.add('second');
+                        }
+                    }
+                    
+                    card.addEventListener('click', () => selectCard(cardIndex));
+                    slot.appendChild(card);
+                }
+            });
+        }
+
+        function formatNumber(n) {
+            if (Number.isInteger(n)) return n.toString();
+            return n.toFixed(2).replace(/\.?0+$/, '');
+        }
+
+        function selectCard(index) {
+            if (playState.completed) return;
+            if (playState.cards[index].used) return;
+            
+            const pos = playState.selected.indexOf(index);
+            if (pos !== -1) {
+                playState.selected.splice(pos, 1);
+            } else if (playState.selected.length < 2) {
+                playState.selected.push(index);
+            }
+            
+            renderCards();
+            updateOperators();
+        }
+
+        function updateOperators() {
+            const btns = document.querySelectorAll('.op-btn');
+            const enabled = playState.selected.length === 2 && !playState.completed;
+            btns.forEach(btn => btn.disabled = !enabled);
+        }
+
+        function applyOperation(op) {
+            if (playState.selected.length !== 2 || playState.completed) return;
+            
+            const [i, j] = playState.selected;
+            const a = playState.cards[i].value;
+            const b = playState.cards[j].value;
+            
+            let result;
+            switch (op) {
+                case '+': result = a + b; break;
+                case '-': result = a - b; break;
+                case '*': result = a * b; break;
+                case '/': 
+                    if (b === 0) return;
+                    result = a / b;
+                    break;
+            }
+            
+            // Save state for undo
+            playState.moveHistory.push({
+                cards: JSON.parse(JSON.stringify(playState.cards)),
+                selected: [...playState.selected]
+            });
+            
+            // Mark cards as used
+            playState.cards[i].used = true;
+            playState.cards[j].used = true;
+            
+            // Find empty slot (prefer first card's slot)
+            const emptySlot = playState.cards[i].slot;
+            
+            // Create new card
+            playState.cards.push({
+                value: result,
+                used: false,
+                slot: emptySlot
+            });
+            
+            playState.selected = [];
+            playState.moves++;
+            
+            renderCards();
+            updateOperators();
+            updateResult();
+            document.getElementById('undoBtn').disabled = false;
+            
+            // Check for win/lose
+            checkGameState();
+        }
+
+        function undo() {
+            if (playState.moveHistory.length === 0 || playState.completed) return;
+            
+            const prev = playState.moveHistory.pop();
+            playState.cards = prev.cards;
+            playState.selected = prev.selected;
+            playState.moves--;
+            
+            renderCards();
+            updateOperators();
+            updateResult();
+            
+            if (playState.moveHistory.length === 0) {
+                document.getElementById('undoBtn').disabled = true;
+            }
+        }
+
+        function updateResult() {
+            const remaining = playState.cards.filter(c => !c.used);
+            const display = document.getElementById('resultDisplay');
+            
+            if (remaining.length === 1) {
+                const val = remaining[0].value;
+                display.textContent = formatNumber(val);
+                if (Math.abs(val - 24) < 0.0001) {
+                    display.classList.add('success');
+                    display.classList.remove('error');
+                } else {
+                    display.classList.remove('success');
+                    display.classList.add('error');
+                }
+            } else {
+                display.textContent = '—';
+                display.classList.remove('success', 'error');
+            }
+        }
+
+        function checkGameState() {
+            const remaining = playState.cards.filter(c => !c.used);
+            
+            if (remaining.length === 1) {
+                const val = remaining[0].value;
+                
+                if (Math.abs(val - 24) < 0.0001) {
+                    // Win!
+                    handleWin();
+                } else {
+                    // Wrong answer
+                    handleWrongAnswer();
+                }
+            }
+        }
+
+        function handleWin() {
+            playState.completed = true;
+            playState.attempts++;
+            
+            // Update history
+            gameState.history[currentPuzzle.puzzleNum] = {
+                completed: true,
+                attempts: playState.attempts,
+                moves: playState.moves
+            };
+            
+            // Update streak only for today's puzzle
+            if (!currentPuzzle.isArchive) {
+                incrementStreak();
+            }
+            
+            saveState();
+            trackPlay(true);
+            
+            // Show success
+            updateAttempts();
+            showConfetti();
+            
+            const stats = document.getElementById('successStats');
+            stats.innerHTML = `Moves: ${playState.moves}<br>Attempts: ${playState.attempts}/${MAX_ATTEMPTS}`;
+            
+            setTimeout(() => {
+                document.getElementById('successMessage').classList.add('show');
+            }, 500);
+        }
+
+        function handleWrongAnswer() {
+            playState.attempts++;
+            
+            // Update history
+            if (!gameState.history[currentPuzzle.puzzleNum]) {
+                gameState.history[currentPuzzle.puzzleNum] = { completed: false, attempts: 0 };
+            }
+            gameState.history[currentPuzzle.puzzleNum].attempts = playState.attempts;
+            saveState();
+            
+            updateAttempts();
+            
+            if (playState.attempts >= MAX_ATTEMPTS) {
+                // Out of attempts
+                playState.completed = true;
+                trackPlay(false);
+                
+                const stats = document.getElementById('failStats');
+                stats.innerHTML = `The numbers were: ${currentPuzzle.numbers.join(', ')}`;
+                
+                setTimeout(() => {
+                    document.getElementById('failMessage').classList.add('show');
+                }, 500);
+            } else {
+                // Reset for next attempt
+                setTimeout(() => {
+                    resetPlay();
+                }, 800);
+            }
+        }
+
+        function updateAttempts() {
+            const dots = document.querySelectorAll('.attempt-dot');
+            dots.forEach((dot, i) => {
+                dot.classList.remove('used', 'success');
+                if (i < playState.attempts) {
+                    if (i === playState.attempts - 1 && playState.completed && 
+                        gameState.history[currentPuzzle.puzzleNum]?.completed) {
+                        dot.classList.add('success');
+                    } else {
+                        dot.classList.add('used');
+                    }
+                }
+            });
+        }
+
+        function updateUI() {
+            // Puzzle number
+            document.getElementById('puzzleNumber').textContent = `#${currentPuzzle.puzzleNum}`;
+            
+            // Archive banner
+            document.getElementById('archiveBanner').classList.toggle('show', currentPuzzle.isArchive);
+            
+            // Streak
+            updateStreakDisplay();
+            
+            // Attempts
+            updateAttempts();
+            
+            // Undo button
+            document.getElementById('undoBtn').disabled = true;
+        }
+
+        // Confetti
+        function showConfetti() {
+            const container = document.getElementById('confetti');
+            const colors = ['#22d3ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+            
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animation = `confetti-fall ${1.5 + Math.random()}s ease-out forwards`;
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                container.appendChild(confetti);
+            }
+            
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 3000);
+        }
+
+        // Share
+        function generateShareText() {
+            const emoji = playState.completed && gameState.history[currentPuzzle.puzzleNum]?.completed 
+                ? '✅' : '❌';
+            const nums = currentPuzzle.numbers.join(' ');
+            
+            let text = `Make 24 #${currentPuzzle.puzzleNum} ${emoji}\n`;
+            text += `Numbers: ${nums}\n`;
+            
+            if (gameState.history[currentPuzzle.puzzleNum]?.completed) {
+                text += `Moves: ${playState.moves} | Attempts: ${playState.attempts}/${MAX_ATTEMPTS}\n`;
+            } else {
+                text += `${playState.attempts}/${MAX_ATTEMPTS} attempts\n`;
+            }
+            
+            text += `🔥 Streak: ${gameState.streak}\n`;
+            text += `kapework.com/apps/make24`;
+            
+            return text;
+        }
+
+        function share() {
+            const text = generateShareText();
+            
+            if (navigator.share) {
+                navigator.share({ text }).catch(() => {
+                    copyToClipboard(text);
+                });
+            } else {
+                copyToClipboard(text);
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            }).catch(() => {
+                alert(text);
+            });
+        }
+
+        // Archive
+        function showArchive() {
+            const modal = document.getElementById('archiveModal');
+            const list = document.getElementById('archiveList');
+            list.innerHTML = '';
+            
+            const today = getTodayPuzzleNumber();
+            
+            for (let i = 0; i < ARCHIVE_DAYS; i++) {
+                const num = today - i;
+                if (num < 1) continue;
+                
+                const item = document.createElement('div');
+                item.className = 'archive-item';
+                item.textContent = num;
+                
+                const history = gameState.history[num];
+                if (history?.completed) {
+                    item.classList.add('completed');
+                } else if (history?.attempts >= MAX_ATTEMPTS) {
+                    item.classList.add('failed');
+                }
+                
+                if (num === today) {
+                    item.classList.add('today');
+                }
+                
+                item.addEventListener('click', () => {
+                    modal.classList.remove('show');
+                    initPuzzle(num, num !== today);
+                });
+                
+                list.appendChild(item);
+            }
+            
+            modal.classList.add('show');
+        }
+
+        // Track play to Supabase
+        async function trackPlay(success) {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/plays`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({
+                        slug: `make24-${currentPuzzle.puzzleNum}`,
+                        device_id: gameState.deviceId,
+                        metadata: {
+                            success,
+                            attempts: playState.attempts,
+                            moves: playState.moves,
+                            numbers: currentPuzzle.numbers,
+                            isArchive: currentPuzzle.isArchive,
+                            streak: gameState.streak
+                        }
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to track play:', e);
+            }
+        }
+
+        // Event listeners
+        document.querySelectorAll('.op-btn').forEach(btn => {
+            btn.addEventListener('click', () => applyOperation(btn.dataset.op));
+        });
+
+        document.getElementById('undoBtn').addEventListener('click', undo);
+        document.getElementById('resetBtn').addEventListener('click', resetPlay);
+        document.getElementById('puzzleNumber').addEventListener('click', showArchive);
+        document.getElementById('closeArchive').addEventListener('click', () => {
+            document.getElementById('archiveModal').classList.remove('show');
+        });
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            document.getElementById('successMessage').classList.remove('show');
+            share();
+        });
+        document.getElementById('failShareBtn').addEventListener('click', () => {
+            document.getElementById('failMessage').classList.remove('show');
+            share();
+        });
+
+        // Close modals on overlay click
+        document.getElementById('archiveModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.classList.remove('show');
+            }
+        });
+
+        // Initialize
+        loadState();
+        updateStreak();
+        initPuzzle(getTodayPuzzleNumber(), false);
+    </script>
 </body>
 </html>
