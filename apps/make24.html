@@ -25,11 +25,13 @@
     font:16px/1.45 -apple-system,BlinkMacSystemFont,system-ui,Segoe UI,Roboto,Helvetica,Arial;
     overflow:hidden;
     touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
   }
 
 /* Main container */
 .wrap{
-height:100vh;
+height:100vh; /* Fallback */
+height:100dvh; /* Dynamic viewport height for mobile */
 display:flex;
 flex-direction:column;
 max-width:600px;
@@ -98,6 +100,7 @@ padding:20px;
 position:relative;
 width:min(90vw, 400px);
 height:min(90vw, 400px);
+min-height:300px; /* Prevent collapse */
 max-width:400px;
 max-height:400px;
 }
@@ -122,22 +125,60 @@ transition:all 0.2s ease;
 transform-origin:center;
 }
 
-/* Diamond positions */
-.card[data-pos=“0”]{top:0;left:50%;transform:translateX(-50%);}
-.card[data-pos=“1”]{top:50%;left:0;transform:translateY(-50%);}
-.card[data-pos=“2”]{top:50%;right:0;transform:translate(0,-50%);}
-.card[data-pos=“3”]{bottom:0;left:50%;transform:translateX(-50%);}
+/* Diamond positions - more explicit for cross-browser compatibility */
+.card[data-pos=“0”]{
+top:0;
+left:50%;
+transform:translateX(-50%);
+-webkit-transform:translateX(-50%);
+}
+
+.card[data-pos=“1”]{
+top:50%;
+left:0;
+transform:translateY(-50%);
+-webkit-transform:translateY(-50%);
+}
+
+.card[data-pos=“2”]{
+top:50%;
+right:0;
+transform:translateY(-50%);
+-webkit-transform:translateY(-50%);
+}
+
+.card[data-pos=“3”]{
+bottom:0;
+left:50%;
+transform:translateX(-50%);
+-webkit-transform:translateX(-50%);
+}
 
 .card.selected{
 border-color:var(–accent);
 background:var(–accent-bg);
 box-shadow:0 4px 16px rgba(34,211,238,0.3);
-transform:translateX(-50%) translateY(-4px);
 }
 
-.card[data-pos=“1”].selected{transform:translateY(-50%) translateX(-4px);}
-.card[data-pos=“2”].selected{transform:translateY(-50%) translateX(4px);}
-.card[data-pos=“3”].selected{transform:translateX(-50%) translateY(4px);}
+.card[data-pos=“0”].selected{
+transform:translateX(-50%) translateY(-4px);
+-webkit-transform:translateX(-50%) translateY(-4px);
+}
+
+.card[data-pos=“1”].selected{
+transform:translateY(-50%) translateX(-4px);
+-webkit-transform:translateY(-50%) translateX(-4px);
+}
+
+.card[data-pos=“2”].selected{
+transform:translateY(-50%) translateX(4px);
+-webkit-transform:translateY(-50%) translateX(4px);
+}
+
+.card[data-pos=“3”].selected{
+transform:translateX(-50%) translateY(4px);
+-webkit-transform:translateX(-50%) translateY(4px);
+}
 
 .card.used{
 opacity:0.15;
@@ -155,12 +196,15 @@ position:absolute;
 top:50%;
 left:50%;
 transform:translate(-50%,-50%);
+-webkit-transform:translate(-50%,-50%);
 display:grid;
 grid-template-columns:repeat(2,1fr);
 gap:12px;
 opacity:0;
 pointer-events:none;
 transition:opacity 0.3s ease;
+-webkit-transition:opacity 0.3s ease;
+z-index:10; /* Ensure operators appear above cards */
 }
 
 .operators.visible{
@@ -733,6 +777,7 @@ transform:translateY(0);
 
   // ===== Rendering =====
   function renderCards(){
+    console.log('Rendering cards:', items); // Debug
     diamondEl.innerHTML='';
     items.forEach((item,idx)=>{
       const card=document.createElement('div');
@@ -744,6 +789,7 @@ transform:translateY(0);
       if(idx===items.length-1 && items.length<original.length)card.classList.add('newest');
       card.onclick=()=>selectCard(idx);
       diamondEl.appendChild(card);
+      console.log('Added card:', idx, fmt(item.val), card.dataset.pos); // Debug
     });
   }
 
