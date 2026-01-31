@@ -673,6 +673,10 @@
         selected: [], // indices
         moves: 0, // counts ALL moves including undos
         cardStates: [], // for undo - stores previous card states
+        operatorHistory: [], // tracks operators used (for perfect share)
+        undoCount: 0, // tracks number of undos
+        startTime: null, // when puzzle started
+        endTime: null, // when puzzle solved
         completed: false
     };
 
@@ -825,6 +829,10 @@
         }));
         playState.selected = [];
         playState.cardStates = [];
+        playState.operatorHistory = [];
+        playState.undoCount = 0;
+        playState.startTime = null;
+        playState.endTime = null;
         
         renderCards();
         hideOperators();
@@ -919,8 +927,19 @@
                 break;
         }
         
+        // Start timer on first move
+        if (!playState.startTime) {
+            playState.startTime = Date.now();
+        }
+        
         // Save state for undo (deep copy)
-        playState.cardStates.push(JSON.parse(JSON.stringify(playState.cards)));
+        playState.cardStates.push({
+            cards: JSON.parse(JSON.stringify(playState.cards)),
+            operators: [...playState.operatorHistory]
+        });
+        
+        // Track the operator used
+        playState.operatorHistory.push(op);
         
         // Mark cards as used
         playState.cards[i].used = true;
@@ -952,9 +971,12 @@
         if (playState.cardStates.length === 0 || playState.completed) return;
         
         // Restore previous state
-        playState.cards = playState.cardStates.pop();
+        const prevState = playState.cardStates.pop();
+        playState.cards = prevState.cards;
+        playState.operatorHistory = prevState.operators;
         playState.selected = [];
         playState.moves++; // Undo counts as a move!
+        playState.undoCount++; // Track undos separately for share
         
         hideOperators();
         renderCards();
@@ -1011,11 +1033,19 @@
 
     function handleWin() {
         playState.completed = true;
+        playState.endTime = Date.now();
+        
+        // Calculate solve time in seconds
+        const solveTime = playState.startTime ? 
+            Math.round((playState.endTime - playState.startTime) / 1000) : 0;
         
         // Update history
         gameState.history[currentPuzzle.puzzleNum] = {
             completed: true,
-            moves: playState.moves
+            moves: playState.moves,
+            operators: [...playState.operatorHistory],
+            undos: playState.undoCount,
+            solveTime: solveTime
         };
         
         // Update streak only for today's puzzle
@@ -1125,38 +1155,192 @@
         }, 3000);
     }
 
-    // Share
-    function generateShareText() {
-        const won = gameState.history[currentPuzzle.puzzleNum]?.completed;
-        const isPerfect = won && playState.moves === PERFECT_MOVES;
-        
-        let emoji = won ? (isPerfect ? '⭐' : '✅') : '❌';
-        
-        let text = `24 #${currentPuzzle.puzzleNum} ${emoji}\n`;
-        
-        if (won) {
-            if (isPerfect) {
-                text += `Perfect! 3 moves\n`;
+    // Share Image Generator
+    function generateShareImage() {
+        return new Promise((resolve) => {
+            const history = gameState.history[currentPuzzle.puzzleNum];
+            const isPerfect = history?.completed && history.moves === PERFECT_MOVES && history.undos === 0;
+            const isFast = history?.solveTime && history.solveTime <= 60;
+            const operators = history?.operators || playState.operatorHistory;
+            const undos = history?.undos || playState.undoCount;
+            
+            // Determine color scheme
+            // Green = perfect & fast (<60s), Yellow = perfect but slow, Grey = not perfect
+            let circleColor;
+            if (isPerfect && isFast) {
+                circleColor = '#22c55e'; // Green
+            } else if (isPerfect) {
+                circleColor = '#eab308'; // Yellow
             } else {
-                text += `Solved in ${playState.moves} moves\n`;
+                circleColor = '#6b7280'; // Grey
             }
-        }
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Canvas size
+            const width = 600;
+            const height = 200;
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Background
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Calculate layout
+            const logoSize = 56;
+            const circleSize = 44;
+            const circleGap = 12;
+            const startX = 30;
+            let currentX = startX;
+            const centerY = height / 2;
+            
+            // Draw "24" logo (gold rounded square)
+            ctx.fillStyle = '#ca8a04';
+            roundRect(ctx, currentX, centerY - logoSize/2, logoSize, logoSize, 10);
+            ctx.fill();
+            
+            // "24" text
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 32px "Space Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('24', currentX + logoSize/2, centerY + 2);
+            
+            currentX += logoSize + 20;
+            
+            // Draw puzzle number
+            ctx.fillStyle = '#22d3ee';
+            ctx.font = 'bold 36px "Space Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            const puzzleText = `#${currentPuzzle.puzzleNum}`;
+            ctx.fillText(puzzleText, currentX, centerY);
+            currentX += ctx.measureText(puzzleText).width + 24;
+            
+            // Draw operator circles
+            const opSymbols = {
+                '+': '+',
+                '-': '−',
+                '*': '×',
+                '/': '÷'
+            };
+            
+            operators.forEach((op, i) => {
+                // Circle
+                ctx.beginPath();
+                ctx.arc(currentX + circleSize/2, centerY, circleSize/2, 0, Math.PI * 2);
+                ctx.fillStyle = circleColor;
+                ctx.fill();
+                
+                // Operator symbol
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(opSymbols[op] || op, currentX + circleSize/2, centerY);
+                
+                currentX += circleSize + circleGap;
+            });
+            
+            // Draw undo circles (empty grey)
+            for (let i = 0; i < undos; i++) {
+                ctx.beginPath();
+                ctx.arc(currentX + circleSize/2, centerY, circleSize/2, 0, Math.PI * 2);
+                ctx.strokeStyle = '#6b7280';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Undo symbol (↶)
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('↶', currentX + circleSize/2, centerY);
+                
+                currentX += circleSize + circleGap;
+            }
+            
+            currentX += 12;
+            
+            // Draw URL pill
+            const urlText = `make24.app/${currentPuzzle.puzzleNum}`;
+            ctx.font = '18px "DM Sans", sans-serif';
+            const urlWidth = ctx.measureText(urlText).width + 24;
+            const pillHeight = 36;
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            roundRect(ctx, currentX, centerY - pillHeight/2, urlWidth, pillHeight, pillHeight/2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(urlText, currentX + 12, centerY);
+            
+            // Convert to blob
+            canvas.toBlob((blob) => {
+                resolve(blob);
+            }, 'image/png');
+        });
+    }
+    
+    // Helper function for rounded rectangles
+    function roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+    
+    // Generate text fallback for platforms that don't support image sharing
+    function generateShareText() {
+        const history = gameState.history[currentPuzzle.puzzleNum];
+        const isPerfect = history?.completed && history.moves === PERFECT_MOVES && history.undos === 0;
+        const operators = history?.operators || playState.operatorHistory;
         
+        const opEmojis = { '+': '➕', '-': '➖', '*': '✖️', '/': '➗' };
+        const opText = operators.map(op => opEmojis[op]).join(' ');
+        
+        let text = `24 #${currentPuzzle.puzzleNum}\n`;
+        text += isPerfect ? `🟢 ${opText} 🟢\n` : `${opText}\n`;
         text += `🔥 ${gameState.streak}\n`;
-        text += `kapework.com/apps/make24`;
+        text += `make24.app/${currentPuzzle.puzzleNum}`;
         
         return text;
     }
 
-    function share() {
-        const text = generateShareText();
-        
-        if (navigator.share) {
-            navigator.share({ text }).catch(() => {
-                copyToClipboard(text);
-            });
-        } else {
-            copyToClipboard(text);
+    async function share() {
+        try {
+            const imageBlob = await generateShareImage();
+            const file = new File([imageBlob], `make24_${currentPuzzle.puzzleNum}.png`, { type: 'image/png' });
+            
+            // Try to share image if supported
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `24 #${currentPuzzle.puzzleNum}`,
+                });
+            } else if (navigator.share) {
+                // Fall back to text sharing
+                await navigator.share({ text: generateShareText() });
+            } else {
+                // Fall back to clipboard
+                copyToClipboard(generateShareText());
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                // User didn't cancel, try text fallback
+                copyToClipboard(generateShareText());
+            }
         }
     }
 
