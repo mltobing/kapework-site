@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0f172a">
     <title>Make 24 | Kapework</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,17 +32,19 @@
         --error: #ef4444;
         --warning: #f59e0b;
         --gold: #fbbf24;
+        color-scheme: dark;
     }
 
     html, body {
         height: 100%;
         overflow: hidden;
+        background: #0f172a;
     }
 
     body {
         font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: var(--bg);
-        color: var(--text);
+        background: #0f172a;
+        color: #f1f5f9;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -64,7 +68,7 @@
         font-family: 'Space Mono', monospace;
         font-size: 1.5rem;
         font-weight: 700;
-        color: var(--cyan);
+        color: #22d3ee;
         cursor: pointer;
         transition: opacity 0.2s;
     }
@@ -81,7 +85,7 @@
 
     .undo-btn {
         font-size: 1.5rem;
-        color: var(--text-muted);
+        color: #94a3b8;
         background: none;
         border: none;
         cursor: pointer;
@@ -98,7 +102,7 @@
 
     .undo-btn.visible:hover {
         opacity: 1;
-        color: var(--cyan);
+        color: #22d3ee;
     }
 
     .undo-btn.visible:active {
@@ -141,7 +145,7 @@
         font-family: 'Space Mono', monospace;
         font-size: 3.5rem;
         font-weight: 700;
-        color: var(--text);
+        color: #f1f5f9;
         height: 60px;
         display: flex;
         align-items: center;
@@ -156,12 +160,12 @@
     }
 
     .result-display.success {
-        color: var(--success);
+        color: #10b981;
         transform: scale(1.1);
     }
 
     .result-display.error {
-        color: var(--error);
+        color: #ef4444;
     }
 
     /* Diamond Grid Layout - WIDER spread, LARGER tiles */
@@ -206,8 +210,8 @@
     .card {
         width: 96px;
         height: 96px;
-        background: var(--card-bg);
-        border: 2px solid var(--card-border);
+        background: #1e293b;
+        border: 2px solid #334155;
         border-radius: 16px;
         display: flex;
         align-items: center;
@@ -215,7 +219,7 @@
         font-family: 'Space Mono', monospace;
         font-size: 2.75rem;
         font-weight: 700;
-        color: var(--text);
+        color: #f1f5f9;
         cursor: pointer;
         transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         -webkit-user-select: none;
@@ -227,17 +231,17 @@
     }
 
     .card.selected {
-        border-color: var(--cyan);
-        box-shadow: 0 0 24px var(--cyan-glow);
+        border-color: #22d3ee;
+        box-shadow: 0 0 24px rgba(34, 211, 238, 0.3);
         transform: scale(1.08);
     }
 
     .card.selected.first {
-        border-color: var(--cyan);
+        border-color: #22d3ee;
     }
 
     .card.selected.second {
-        border-color: var(--warning);
+        border-color: #f59e0b;
         box-shadow: 0 0 24px rgba(245, 158, 11, 0.3);
     }
 
@@ -271,7 +275,7 @@
         grid-template-rows: 1fr 1fr;
         gap: 12px;
         padding: 14px;
-        background: rgba(30, 41, 59, 0.75);
+        background: rgba(30, 41, 59, 0.85);
         border-radius: 20px;
         border: 1px solid rgba(51, 65, 85, 0.6);
     }
@@ -280,9 +284,9 @@
         width: 54px;
         height: 54px;
         border-radius: 50%;
-        border: 2px solid var(--cyan);
-        background: rgba(30, 41, 59, 0.9);
-        color: var(--text);
+        border: 2px solid #22d3ee;
+        background: rgba(30, 41, 59, 0.95);
+        color: #f1f5f9;
         font-size: 1.5rem;
         font-weight: 700;
         cursor: pointer;
@@ -317,21 +321,21 @@
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--card-border);
+        background: #334155;
         transition: background 0.3s, transform 0.2s;
     }
 
     .move-dot.filled {
-        background: var(--success);
+        background: #10b981;
         transform: scale(1.1);
     }
 
     .move-dot.excess {
-        background: #475569;
+        background: #64748b;
     }
 
     .move-dot.perfect-hint {
-        background: var(--card-border);
+        background: #334155;
         opacity: 0.5;
     }
 
@@ -341,15 +345,15 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: var(--card-bg);
-        border: 2px solid var(--cyan);
+        background: #1e293b;
+        border: 2px solid #22d3ee;
         border-radius: 16px;
         padding: 32px;
         text-align: center;
         z-index: 100;
         max-width: 90%;
         width: 320px;
-        box-shadow: 0 0 40px var(--cyan-glow);
+        box-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
         display: none;
     }
 
@@ -372,14 +376,15 @@
     .message h2 {
         font-size: 1.5rem;
         margin-bottom: 8px;
+        color: #f1f5f9;
     }
 
     .message h2.perfect {
-        color: var(--gold);
+        color: #fbbf24;
     }
 
     .message p {
-        color: var(--text-muted);
+        color: #94a3b8;
         margin-bottom: 16px;
     }
 
@@ -387,6 +392,7 @@
         font-family: 'Space Mono', monospace;
         font-size: 1.25rem;
         margin: 16px 0;
+        color: #f1f5f9;
     }
 
     .message .btn {
@@ -405,18 +411,18 @@
     }
 
     .btn-primary {
-        background: var(--cyan);
-        color: var(--bg);
+        background: #22d3ee;
+        color: #0f172a;
     }
 
     .btn-primary:hover {
-        background: var(--cyan-dark);
+        background: #0891b2;
     }
 
     .btn-secondary {
-        background: var(--card-bg);
-        color: var(--text);
-        border: 1px solid var(--card-border);
+        background: #1e293b;
+        color: #f1f5f9;
+        border: 1px solid #334155;
         margin-left: 8px;
     }
 
@@ -440,7 +446,7 @@
     }
 
     .modal {
-        background: var(--card-bg);
+        background: #1e293b;
         border-radius: 16px;
         padding: 24px;
         max-width: 360px;
@@ -452,7 +458,7 @@
     .modal h2 {
         text-align: center;
         margin-bottom: 16px;
-        color: var(--cyan);
+        color: #22d3ee;
     }
 
     .archive-list {
@@ -466,27 +472,28 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--bg);
-        border: 1px solid var(--card-border);
+        background: #0f172a;
+        border: 1px solid #334155;
         border-radius: 8px;
         font-family: 'Space Mono', monospace;
         font-size: 0.875rem;
+        color: #f1f5f9;
         cursor: pointer;
         transition: all 0.15s;
     }
 
     .archive-item:hover {
-        border-color: var(--cyan);
+        border-color: #22d3ee;
     }
 
     .archive-item.completed {
         background: rgba(16, 185, 129, 0.2);
-        border-color: var(--success);
+        border-color: #10b981;
     }
 
     .archive-item.perfect {
         background: rgba(251, 191, 36, 0.2);
-        border-color: var(--gold);
+        border-color: #fbbf24;
         position: relative;
     }
 
@@ -498,14 +505,9 @@
         font-size: 0.6rem;
     }
 
-    .archive-item.failed {
-        background: rgba(239, 68, 68, 0.2);
-        border-color: var(--error);
-    }
-
     .archive-item.today {
-        border-color: var(--cyan);
-        box-shadow: 0 0 10px var(--cyan-glow);
+        border-color: #22d3ee;
+        box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
     }
 
     .modal-close {
@@ -513,10 +515,10 @@
         width: 100%;
         margin-top: 16px;
         padding: 12px;
-        background: var(--bg);
-        border: 1px solid var(--card-border);
+        background: #0f172a;
+        border: 1px solid #334155;
         border-radius: 8px;
-        color: var(--text);
+        color: #f1f5f9;
         font-size: 1rem;
         cursor: pointer;
     }
@@ -553,8 +555,8 @@
 
     /* Archive mode indicator */
     .archive-banner {
-        background: var(--warning);
-        color: var(--bg);
+        background: #f59e0b;
+        color: #0f172a;
         padding: 8px 16px;
         border-radius: 8px;
         font-size: 0.875rem;
@@ -940,6 +942,7 @@
         hideOperators();
         renderCards();
         updateResult();
+        updateMoveDots();
         
         // Check for win/lose
         checkGameState();
@@ -956,6 +959,7 @@
         hideOperators();
         renderCards();
         updateResult();
+        updateMoveDots();
     }
 
     function updateResult() {
