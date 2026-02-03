@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -18,576 +17,625 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-```
-    :root {
-        --cyan: #22d3ee;
-        --cyan-dark: #0891b2;
-        --cyan-glow: rgba(34, 211, 238, 0.3);
-        --bg: #0f172a;
-        --card-bg: #1e293b;
-        --card-border: #334155;
-        --text: #f1f5f9;
-        --text-muted: #94a3b8;
-        --success: #10b981;
-        --error: #ef4444;
-        --warning: #f59e0b;
-        --gold: #fbbf24;
-        color-scheme: dark;
-    }
+        :root {
+            --cyan: #22d3ee;
+            --cyan-dark: #0891b2;
+            --cyan-glow: rgba(34, 211, 238, 0.3);
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --card-border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --gold: #fbbf24;
+            color-scheme: dark;
+        }
 
-    html, body {
-        height: 100%;
-        overflow: hidden;
-        background: #0f172a;
-    }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            background: #0f172a;
+        }
 
-    body {
-        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #0f172a;
-        color: #f1f5f9;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100dvh;
-        padding: 16px;
-        padding-bottom: env(safe-area-inset-bottom, 16px);
-    }
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f172a;
+            color: #f1f5f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100dvh;
+            padding: 16px;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
 
-    /* Header */
-    .header {
-        width: 100%;
-        max-width: 400px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        margin-bottom: 24px;
-    }
+        /* Header */
+        .header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            margin-bottom: 24px;
+        }
 
-    .puzzle-number {
-        font-family: 'Space Mono', monospace;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #22d3ee;
-        cursor: pointer;
-        transition: opacity 0.2s;
-    }
+        .puzzle-number {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #22d3ee;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
 
-    .puzzle-number:hover {
-        opacity: 0.8;
-    }
+        .puzzle-number:hover {
+            opacity: 0.8;
+        }
 
-    .header-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
 
-    .undo-btn {
-        font-size: 1.5rem;
-        color: #94a3b8;
-        background: none;
-        border: none;
-        cursor: pointer;
-        opacity: 0;
-        transition: opacity 0.2s, color 0.2s;
-        padding: 4px;
-        pointer-events: none;
-    }
-
-    .undo-btn.visible {
-        opacity: 0.6;
-        pointer-events: auto;
-    }
-
-    .undo-btn.visible:hover {
-        opacity: 1;
-        color: #22d3ee;
-    }
-
-    .undo-btn.visible:active {
-        transform: scale(0.9);
-    }
-
-    .streak-display {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 1.25rem;
-        font-weight: 700;
-    }
-
-    .streak-display .fire {
-        font-size: 1.5rem;
-    }
-
-    .freeze-indicator {
-        font-size: 1rem;
-        margin-left: 4px;
-        opacity: 0.8;
-    }
-
-    /* Game Container - centered vertically, shifted up */
-    .game-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        max-width: 400px;
-        position: relative;
-        margin-top: -80px; /* Shift up more to center visually */
-    }
-
-    /* Current Result Display - only shown when down to 1 card */
-    .result-display {
-        font-family: 'Space Mono', monospace;
-        font-size: 3.5rem;
-        font-weight: 700;
-        color: #f1f5f9;
-        height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: color 0.3s, transform 0.2s, opacity 0.3s;
-        margin-bottom: 24px;
-        opacity: 0;
-    }
-
-    .result-display.visible {
-        opacity: 1;
-    }
-
-    .result-display.success {
-        color: #10b981;
-        transform: scale(1.1);
-    }
-
-    .result-display.error {
-        color: #ef4444;
-    }
-
-    /* Diamond Grid Layout - WIDER spread, LARGER tiles */
-    .diamond-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        grid-template-rows: 1fr 1fr 1fr;
-        gap: 12px;
-        width: 320px;
-        height: 320px;
-        position: relative;
-    }
-
-    /* Grid slot positions */
-    .slot {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .slot.top {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    .slot.left {
-        grid-column: 1;
-        grid-row: 2;
-    }
-
-    .slot.right {
-        grid-column: 3;
-        grid-row: 2;
-    }
-
-    .slot.bottom {
-        grid-column: 2;
-        grid-row: 3;
-    }
-
-    /* Cards - LARGER with bigger font */
-    .card {
-        width: 96px;
-        height: 96px;
-        background: #1e293b;
-        border: 2px solid #334155;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Space Mono', monospace;
-        font-size: 2.75rem;
-        font-weight: 700;
-        color: #f1f5f9;
-        cursor: pointer;
-        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-        -webkit-user-select: none;
-        user-select: none;
-    }
-
-    .card:active {
-        transform: scale(0.95);
-    }
-
-    .card.selected {
-        border-color: #22d3ee;
-        box-shadow: 0 0 24px rgba(34, 211, 238, 0.3);
-        transform: scale(1.08);
-    }
-
-    .card.selected.first {
-        border-color: #22d3ee;
-    }
-
-    .card.selected.second {
-        border-color: #f59e0b;
-        box-shadow: 0 0 24px rgba(245, 158, 11, 0.3);
-    }
-
-    .card.used {
-        opacity: 0;
-        pointer-events: none;
-        transform: scale(0.8);
-    }
-
-    /* Centered Operators Overlay - semi-transparent to see tiles */
-    .operators-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(15, 23, 42, 0.4);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 50;
-    }
-
-    .operators-overlay.show {
-        display: flex;
-    }
-
-    .operators-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
-        gap: 12px;
-        padding: 14px;
-        background: rgba(30, 41, 59, 0.85);
-        border-radius: 20px;
-        border: 1px solid rgba(51, 65, 85, 0.6);
-    }
-
-    .op-btn {
-        width: 54px;
-        height: 54px;
-        border-radius: 50%;
-        border: 2px solid #22d3ee;
-        background: rgba(30, 41, 59, 0.95);
-        color: #f1f5f9;
-        font-size: 1.5rem;
-        font-weight: 700;
-        cursor: pointer;
-        transition: all 0.15s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .op-btn:hover {
-        background: rgba(34, 211, 238, 0.2);
-        transform: scale(1.1);
-    }
-
-    .op-btn:active {
-        transform: scale(0.95);
-    }
-
-    /* Move dots - shows progress, green for moves, muted for excess */
-    .move-dots {
-        position: fixed;
-        bottom: 40px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 6px;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .move-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #334155;
-        transition: background 0.3s, transform 0.2s;
-    }
-
-    .move-dot.filled {
-        background: #10b981;
-        transform: scale(1.1);
-    }
-
-    .move-dot.excess {
-        background: #64748b;
-    }
-
-    .move-dot.perfect-hint {
-        background: #334155;
-        opacity: 0.5;
-    }
-
-    /* Message overlay */
-    .message {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #1e293b;
-        border: 2px solid #22d3ee;
-        border-radius: 16px;
-        padding: 32px;
-        text-align: center;
-        z-index: 100;
-        max-width: 90%;
-        width: 320px;
-        box-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
-        display: none;
-    }
-
-    .message.show {
-        display: block;
-        animation: popIn 0.3s ease;
-    }
-
-    @keyframes popIn {
-        from {
+        .undo-btn {
+            font-size: 1.5rem;
+            color: #94a3b8;
+            background: none;
+            border: none;
+            cursor: pointer;
             opacity: 0;
-            transform: translate(-50%, -50%) scale(0.8);
+            transition: opacity 0.2s, color 0.2s;
+            padding: 4px;
+            pointer-events: none;
         }
-        to {
+
+        .undo-btn.visible {
+            opacity: 0.6;
+            pointer-events: auto;
+        }
+
+        .undo-btn.visible:hover {
             opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
+            color: #22d3ee;
         }
-    }
 
-    .message h2 {
-        font-size: 1.5rem;
-        margin-bottom: 8px;
-        color: #f1f5f9;
-    }
-
-    .message h2.perfect {
-        color: #fbbf24;
-    }
-
-    .message p {
-        color: #94a3b8;
-        margin-bottom: 16px;
-    }
-
-    .message .stats {
-        font-family: 'Space Mono', monospace;
-        font-size: 1.25rem;
-        margin: 16px 0;
-        color: #f1f5f9;
-    }
-
-    .message .percentile {
-        font-size: 0.9rem;
-        color: #94a3b8;
-        margin-bottom: 16px;
-        min-height: 1.2em;
-    }
-
-    .message .percentile.highlight {
-        color: #22d3ee;
-        font-weight: 600;
-    }
-
-    .message .btn {
-        margin-top: 8px;
-    }
-
-    .btn {
-        padding: 12px 24px;
-        border-radius: 8px;
-        border: none;
-        font-family: 'DM Sans', sans-serif;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.15s ease;
-    }
-
-    .btn-primary {
-        background: #22d3ee;
-        color: #0f172a;
-    }
-
-    .btn-primary:hover {
-        background: #0891b2;
-    }
-
-    .btn-secondary {
-        background: #1e293b;
-        color: #f1f5f9;
-        border: 1px solid #334155;
-        margin-left: 8px;
-    }
-
-    /* Archive Modal */
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.85);
-        display: none;
-        align-items: center;
-        justify-content: center;
-        z-index: 200;
-        padding: 16px;
-    }
-
-    .modal-overlay.show {
-        display: flex;
-    }
-
-    .modal {
-        background: #1e293b;
-        border-radius: 16px;
-        padding: 24px;
-        max-width: 360px;
-        width: 100%;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-
-    .modal h2 {
-        text-align: center;
-        margin-bottom: 16px;
-        color: #22d3ee;
-    }
-
-    .archive-list {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 8px;
-    }
-
-    .archive-item {
-        aspect-ratio: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #0f172a;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        font-family: 'Space Mono', monospace;
-        font-size: 0.875rem;
-        color: #f1f5f9;
-        cursor: pointer;
-        transition: all 0.15s;
-    }
-
-    .archive-item:hover {
-        border-color: #22d3ee;
-    }
-
-    .archive-item.completed {
-        background: rgba(16, 185, 129, 0.2);
-        border-color: #10b981;
-    }
-
-    .archive-item.perfect {
-        background: rgba(251, 191, 36, 0.2);
-        border-color: #fbbf24;
-        position: relative;
-    }
-
-    .archive-item.perfect::after {
-        content: '⭐';
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        font-size: 0.6rem;
-    }
-
-    .archive-item.today {
-        border-color: #22d3ee;
-        box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
-    }
-
-    .modal-close {
-        display: block;
-        width: 100%;
-        margin-top: 16px;
-        padding: 12px;
-        background: #0f172a;
-        border: 1px solid #334155;
-        border-radius: 8px;
-        color: #f1f5f9;
-        font-size: 1rem;
-        cursor: pointer;
-    }
-
-    /* Confetti */
-    .confetti-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 1000;
-        overflow: hidden;
-    }
-
-    .confetti {
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        opacity: 0;
-    }
-
-    @keyframes confetti-fall {
-        0% {
-            transform: translateY(-100px) rotate(0deg);
-            opacity: 1;
+        .undo-btn.visible:active {
+            transform: scale(0.9);
         }
-        100% {
-            transform: translateY(100vh) rotate(720deg);
+
+        .streak-display {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .streak-display .fire {
+            font-size: 1.5rem;
+        }
+
+        .freeze-indicator {
+            font-size: 1rem;
+            margin-left: 4px;
+            opacity: 0.8;
+        }
+
+        /* Game Container - centered vertically, shifted up */
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            margin-top: -80px; /* Shift up more to center visually */
+        }
+
+        /* Current Result Display - only shown when down to 1 card */
+        .result-display {
+            font-family: 'Space Mono', monospace;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.3s, transform 0.2s, opacity 0.3s;
+            margin-bottom: 24px;
             opacity: 0;
         }
-    }
 
-    /* Archive mode indicator */
-    .archive-banner {
-        background: #f59e0b;
-        color: #0f172a;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-size: 0.875rem;
-        font-weight: 600;
-        position: fixed;
-        top: 60px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: none;
-        z-index: 10;
-    }
+        .result-display.visible {
+            opacity: 1;
+        }
 
-    .archive-banner.show {
-        display: block;
-    }
+        .result-display.success {
+            color: #10b981;
+            transform: scale(1.1);
+        }
 
-</style>
-```
+        .result-display.error {
+            color: #ef4444;
+        }
 
+        /* Diamond Grid Layout - WIDER spread, LARGER tiles */
+        .diamond-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 12px;
+            width: 320px;
+            height: 320px;
+            position: relative;
+        }
+
+        /* Grid slot positions */
+        .slot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .slot.top {
+            grid-column: 2;
+            grid-row: 1;
+        }
+
+        .slot.left {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .slot.right {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .slot.bottom {
+            grid-column: 2;
+            grid-row: 3;
+        }
+
+        /* Cards - LARGER with bigger font */
+        .card {
+            width: 96px;
+            height: 96px;
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 2.75rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .card:active {
+            transform: scale(0.95);
+        }
+
+        .card.selected {
+            border-color: #22d3ee;
+            box-shadow: 0 0 24px rgba(34, 211, 238, 0.3);
+            transform: scale(1.08);
+        }
+
+        .card.selected.first {
+            border-color: #22d3ee;
+        }
+
+        .card.selected.second {
+            border-color: #f59e0b;
+            box-shadow: 0 0 24px rgba(245, 158, 11, 0.3);
+        }
+
+        .card.used {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
+
+        /* Centered Operators Overlay - semi-transparent to see tiles */
+        .operators-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        .operators-overlay.show {
+            display: flex;
+        }
+
+        .operators-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 12px;
+            padding: 14px;
+            background: rgba(30, 41, 59, 0.85);
+            border-radius: 20px;
+            border: 1px solid rgba(51, 65, 85, 0.6);
+        }
+
+        .op-btn {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            border: 2px solid #22d3ee;
+            background: rgba(30, 41, 59, 0.95);
+            color: #f1f5f9;
+            font-size: 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .op-btn:hover {
+            background: rgba(34, 211, 238, 0.2);
+            transform: scale(1.1);
+        }
+
+        .op-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Move dots - shows progress, green for moves, muted for excess */
+        .move-dots {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .move-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        .move-dot.filled {
+            background: #10b981;
+            transform: scale(1.1);
+        }
+
+        .move-dot.excess {
+            background: #64748b;
+        }
+
+        .move-dot.perfect-hint {
+            background: #334155;
+            opacity: 0.5;
+        }
+
+        /* Message overlay */
+        .message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e293b;
+            border: 2px solid #22d3ee;
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            z-index: 100;
+            max-width: 90%;
+            width: 320px;
+            box-shadow: 0 0 40px rgba(34, 211, 238, 0.3);
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .message h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            color: #f1f5f9;
+        }
+
+        .message h2.perfect {
+            color: #fbbf24;
+        }
+
+        .message p {
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+
+        .message .stats {
+            font-family: 'Space Mono', monospace;
+            font-size: 1.25rem;
+            margin: 16px 0;
+            color: #f1f5f9;
+        }
+
+        .message .percentile {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 16px;
+            min-height: 1.2em;
+        }
+
+        .message .percentile.highlight {
+            color: #22d3ee;
+            font-weight: 600;
+        }
+
+        .message .btn {
+            margin-top: 8px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-primary {
+            background: #22d3ee;
+            color: #0f172a;
+        }
+
+        .btn-primary:hover {
+            background: #0891b2;
+        }
+
+        .btn-secondary {
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid #334155;
+            margin-left: 8px;
+        }
+
+        /* Archive Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 16px;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            text-align: center;
+            margin-bottom: 16px;
+            color: #22d3ee;
+        }
+
+        .archive-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .archive-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .archive-list::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+
+        .archive-list::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        .load-more-btn {
+            display: block;
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: transparent;
+            border: 1px dashed #475569;
+            border-radius: 8px;
+            color: #94a3b8;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .load-more-btn:hover {
+            border-color: #22d3ee;
+            color: #22d3ee;
+        }
+
+        .archive-item {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.875rem;
+            color: #f1f5f9;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .archive-item:hover {
+            border-color: #22d3ee;
+        }
+
+        .archive-item.completed {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+        }
+
+        .archive-item.perfect {
+            background: rgba(251, 191, 36, 0.15);
+            border-color: #fbbf24;
+            position: relative;
+        }
+
+        .archive-item.perfect::after {
+            content: '⭐';
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            font-size: 0.6rem;
+        }
+
+        .archive-item.fast-perfect {
+            background: rgba(251, 191, 36, 0.3);
+            border-color: #fbbf24;
+            position: relative;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+        }
+
+        .archive-item.fast-perfect::after {
+            content: '⚡';
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            font-size: 0.7rem;
+        }
+
+        .archive-item.today {
+            border-color: #22d3ee;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+        }
+
+        .modal-close {
+            display: block;
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #f1f5f9;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* Confetti */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+        }
+
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        /* Archive mode indicator */
+        .archive-banner {
+            background: #f59e0b;
+            color: #0f172a;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 10;
+        }
+
+        .archive-banner.show {
+            display: block;
+        }
+
+    </style>
 </head>
 <body>
     <div class="header">
@@ -602,250 +650,531 @@
         </div>
     </div>
 
-```
-<div class="archive-banner" id="archiveBanner">
-    📅 History Mode
-</div>
-
-<div class="game-container">
-    <div class="result-display" id="resultDisplay">—</div>
-
-    <div class="diamond-grid" id="diamondGrid">
-        <div class="slot top" id="slot0"></div>
-        <div class="slot left" id="slot1"></div>
-        <div class="slot right" id="slot2"></div>
-        <div class="slot bottom" id="slot3"></div>
+    <div class="archive-banner" id="archiveBanner">
+        📅 History Mode
     </div>
-</div>
 
-<!-- Operators appear centered when 2 cards selected -->
-<div class="operators-overlay" id="operatorsOverlay">
-    <div class="operators-grid">
-        <button class="op-btn" data-op="+">+</button>
-        <button class="op-btn" data-op="-">−</button>
-        <button class="op-btn" data-op="*">×</button>
-        <button class="op-btn" data-op="/">÷</button>
+    <div class="game-container">
+        <div class="result-display" id="resultDisplay"></div>
+
+        <div class="diamond-grid" id="diamondGrid">
+            <div class="slot top" id="slot0"></div>
+            <div class="slot left" id="slot1"></div>
+            <div class="slot right" id="slot2"></div>
+            <div class="slot bottom" id="slot3"></div>
+        </div>
     </div>
-</div>
 
-<div class="move-dots" id="moveDots">
-    <div class="move-dot perfect-hint"></div>
-    <div class="move-dot perfect-hint"></div>
-    <div class="move-dot perfect-hint"></div>
-</div>
-
-
-<div class="message" id="successMessage">
-    <h2 id="successTitle">🎉 Nice!</h2>
-    <p id="successSubtitle">You made 24!</p>
-    <div class="stats" id="successStats"></div>
-    <div class="percentile" id="percentileDisplay"></div>
-    <button class="btn btn-primary" id="shareBtn">Share</button>
-    <button class="btn btn-secondary" id="closeSuccessBtn">Close</button>
-</div>
-
-<div class="modal-overlay" id="archiveModal">
-    <div class="modal">
-        <h2>📅 History</h2>
-        <div class="archive-list" id="archiveList"></div>
-        <button class="modal-close" id="closeArchive">Close</button>
+    <!-- Operators appear centered when 2 cards selected -->
+    <div class="operators-overlay" id="operatorsOverlay">
+        <div class="operators-grid">
+            <button class="op-btn" data-op="+">+</button>
+            <button class="op-btn" data-op="-">−</button>
+            <button class="op-btn" data-op="*">×</button>
+            <button class="op-btn" data-op="/">÷</button>
+        </div>
     </div>
-</div>
 
-<div class="confetti-container" id="confetti"></div>
+    <div class="move-dots" id="moveDots">
+        <div class="move-dot perfect-hint"></div>
+        <div class="move-dot perfect-hint"></div>
+        <div class="move-dot perfect-hint"></div>
+    </div>
 
-<script>
-    // Supabase config
-    const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
 
-    // Constants
-    const STORAGE_KEY = 'make24_v5';
-    const ARCHIVE_DAYS = 30;
-    const STREAK_FREEZE_INTERVAL = 7;
-    const PERFECT_MOVES = 3;
+    <div class="message" id="successMessage">
+        <h2 id="successTitle">🎉 Nice!</h2>
+        <p id="successSubtitle">You made 24!</p>
+        <div class="stats" id="successStats"></div>
+        <div class="percentile" id="percentileDisplay"></div>
+        <button class="btn btn-primary" id="shareBtn">Share</button>
+        <button class="btn btn-secondary" id="closeSuccessBtn">Close</button>
+    </div>
 
-    // Game state (persisted per device)
-    let gameState = {
-        deviceId: null,
-        streak: 0,
-        freezes: 0,
-        lastPlayedDate: null,
-        history: {}, // { puzzleNum: { completed: bool, moves: num } }
-    };
+    <div class="modal-overlay" id="archiveModal">
+        <div class="modal">
+            <h2>📅 History</h2>
+            <div class="archive-list" id="archiveList"></div>
+            <button class="modal-close" id="closeArchive">Close</button>
+        </div>
+    </div>
 
-    let currentPuzzle = {
-        numbers: [],
-        puzzleNum: 0,
-        date: null,
-        isArchive: false
-    };
+    <div class="confetti-container" id="confetti"></div>
 
-    let playState = {
-        cards: [], // { value, used, slot }
-        selected: [], // indices
-        moves: 0, // counts ALL moves including undos
-        cardStates: [], // for undo - stores previous card states
-        operatorHistory: [], // tracks operators used (for perfect share)
-        undoCount: 0, // tracks number of undos
-        startTime: null, // when puzzle started
-        endTime: null, // when puzzle solved
-        completed: false
-    };
+    <script>
+        // Supabase config
+        const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
 
-    // Seeded RNG (Mulberry32)
-    function mulberry32(seed) {
-        return function() {
-            let t = seed += 0x6D2B79F5;
-            t = Math.imul(t ^ t >>> 15, t | 1);
-            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        // Constants
+        const STORAGE_KEY = 'make24_v5';
+        const ARCHIVE_DAYS = 30;
+        const STREAK_FREEZE_INTERVAL = 7;
+        const PERFECT_MOVES = 3;
+
+        // Game state (persisted per device)
+        let gameState = {
+            deviceId: null,
+            streak: 0,
+            freezes: 0,
+            lastPlayedDate: null,
+            history: {}, // { puzzleNum: { completed: bool, moves: num } }
         };
-    }
 
-    // Get puzzle number from date
-    function getPuzzleNumber(date) {
-        const epoch = new Date('2025-01-01T00:00:00Z');
-        const diff = date - epoch;
-        return Math.floor(diff / (24 * 60 * 60 * 1000)) + 1;
-    }
+        let currentPuzzle = {
+            numbers: [],
+            puzzleNum: 0,
+            date: null,
+            isArchive: false
+        };
 
-    // Get date from puzzle number
-    function getDateFromPuzzleNumber(num) {
-        const epoch = new Date('2025-01-01T00:00:00Z');
-        return new Date(epoch.getTime() + (num - 1) * 24 * 60 * 60 * 1000);
-    }
+        let playState = {
+            cards: [], // { value, used, slot }
+            selected: [], // indices
+            moves: 0, // counts ALL moves including undos
+            cardStates: [], // for undo - stores previous card states
+            operatorHistory: [], // tracks operators used (for perfect share)
+            undoCount: 0, // tracks number of undos
+            startTime: null, // when puzzle started
+            endTime: null, // when puzzle solved
+            completed: false
+        };
 
-    // Get today's puzzle number (UTC)
-    function getTodayPuzzleNumber() {
-        const now = new Date();
-        const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        return getPuzzleNumber(utcDate);
-    }
+        // Valid solvable puzzles (404 combinations of 4 numbers 1-9 that can make 24)
+        // Shuffled with seed 24242424 for consistent daily puzzles
+        const VALID_PUZZLES = [[5,6,7,9],[1,6,8,9],[4,8,9,9],[1,5,8,9],[2,3,4,7],[1,7,8,8],[3,6,7,8],[4,6,6,7],[2,5,6,7],[1,3,3,4],[1,4,4,6],[1,1,6,9],[2,4,6,9],[1,5,6,7],[1,3,4,4],[1,1,5,8],[1,3,7,8],[2,4,4,6],[3,3,4,4],[2,3,5,8],[2,3,4,4],[1,1,3,4],[3,4,6,8],[1,3,8,8],[6,8,8,9],[6,6,6,6],[4,6,6,9],[4,5,5,8],[1,5,7,8],[1,1,6,6],[2,6,6,6],[1,4,8,8],[4,4,4,6],[1,2,6,9],[2,4,4,7],[5,5,9,9],[1,4,5,9],[5,5,5,6],[1,2,4,5],[2,2,2,7],[3,5,7,8],[2,5,5,8],[1,2,3,8],[3,4,5,7],[5,7,8,9],[1,4,6,8],[1,3,3,6],[2,2,2,9],[3,3,7,9],[3,3,6,7],[1,3,4,8],[1,1,4,4],[1,4,4,9],[2,2,3,4],[1,4,5,6],[1,2,5,9],[1,1,1,8],[2,3,3,9],[3,4,9,9],[2,5,8,9],[4,4,6,9],[2,2,7,8],[4,5,5,7],[3,6,6,6],[1,2,6,8],[2,6,6,7],[2,6,6,8],[1,2,5,6],[2,6,7,8],[2,4,6,7],[3,3,3,4],[5,5,5,9],[3,8,9,9],[3,4,4,7],[2,2,4,7],[3,7,7,8],[3,3,3,6],[3,6,7,9],[4,6,6,6],[1,2,6,7],[1,1,4,8],[3,4,6,9],[2,3,9,9],[2,2,3,8],[5,5,8,8],[1,1,8,8],[2,2,5,9],[3,3,3,9],[3,7,7,7],[3,3,6,8],[5,5,8,9],[4,6,9,9],[1,4,4,5],[4,4,5,5],[6,6,6,8],[3,7,8,8],[3,9,9,9],[2,5,6,8],[3,3,4,6],[6,6,7,9],[2,4,5,5],[1,5,8,8],[1,1,3,8],[2,2,3,5],[1,3,5,6],[1,6,6,8],[1,4,5,7],[2,4,5,8],[1,2,2,6],[2,4,7,7],[2,2,3,9],[3,3,3,5],[1,5,6,9],[2,2,5,6],[1,4,5,5],[2,8,9,9],[5,6,6,9],[3,5,8,9],[1,4,6,9],[2,5,7,8],[3,6,8,8],[4,5,5,9],[1,2,3,5],[3,4,7,9],[5,5,6,7],[2,4,6,8],[4,5,8,8],[4,7,7,7],[2,4,7,8],[1,2,5,5],[4,5,6,8],[3,6,7,7],[1,3,4,7],[2,3,4,8],[1,3,7,7],[2,3,4,5],[2,2,2,4],[1,3,3,5],[1,2,3,4],[2,2,6,8],[3,3,5,7],[1,2,4,9],[1,1,2,8],[5,6,6,8],[3,6,6,7],[1,3,8,9],[1,3,6,7],[1,1,2,6],[4,5,6,7],[1,2,5,7],[2,4,5,6],[2,4,7,9],[1,1,2,9],[6,8,8,8],[1,2,3,6],[1,1,5,7],[6,6,6,9],[3,7,9,9],[3,6,6,9],[3,6,6,8],[1,3,5,8],[2,3,6,9],[1,2,4,8],[2,3,5,7],[2,5,5,7],[3,3,9,9],[4,4,5,6],[2,2,5,7],[1,8,8,8],[2,4,5,7],[4,5,7,7],[1,6,9,9],[1,1,4,7],[1,7,8,9],[1,3,4,9],[3,3,5,5],[1,2,8,8],[5,6,9,9],[1,3,4,5],[6,8,9,9],[3,5,6,6],[2,2,4,9],[3,5,5,9],[4,4,8,8],[2,3,3,7],[4,4,4,8],[6,7,8,9],[1,3,6,6],[3,3,6,6],[4,4,7,9],[1,1,2,7],[4,7,7,8],[3,3,4,9],[1,6,6,9],[2,2,4,5],[1,2,8,9],[3,4,4,5],[1,5,9,9],[2,4,4,9],[2,3,3,5],[3,6,8,9],[2,4,6,6],[3,4,5,8],[3,3,4,5],[1,2,3,7],[2,2,6,9],[2,3,8,9],[2,3,7,7],[2,5,5,9],[1,2,6,6],[1,2,2,5],[5,8,8,8],[3,4,5,6],[1,4,5,8],[1,3,6,8],[4,6,6,8],[3,3,8,9],[2,2,3,6],[2,4,8,9],[3,3,7,8],[1,8,8,9],[4,5,7,9],[7,8,8,9],[5,8,8,9],[2,7,8,8],[1,4,4,7],[3,3,3,7],[3,5,8,8],[1,2,7,7],[1,3,3,9],[2,5,8,8],[1,2,4,7],[2,3,4,9],[2,7,8,9],[1,3,9,9],[2,2,5,8],[3,3,3,8],[3,7,7,9],[4,5,8,9],[5,6,8,8],[2,3,3,3],[1,2,5,8],[2,3,5,9],[1,2,2,7],[1,4,6,6],[3,8,8,8],[4,5,9,9],[3,5,5,6],[1,4,6,7],[3,3,7,7],[4,4,5,8],[1,1,3,5],[1,1,5,5],[1,2,3,3],[1,5,5,6],[1,6,8,8],[1,3,5,7],[1,3,7,9],[2,2,4,4],[1,6,6,6],[3,3,8,8],[1,1,4,9],[1,2,3,9],[2,5,6,6],[5,5,6,8],[3,5,6,8],[4,4,4,9],[2,7,7,8],[3,5,5,8],[4,5,7,8],[2,3,7,8],[2,3,8,8],[3,4,6,6],[3,4,4,6],[4,4,4,5],[4,6,8,9],[2,3,7,9],[3,8,8,9],[4,4,7,8],[1,4,7,9],[4,6,8,8],[2,2,4,6],[6,6,8,9],[3,3,4,7],[5,6,7,8],[1,5,5,9],[1,1,3,6],[4,6,7,9],[3,6,9,9],[4,7,8,8],[2,2,2,8],[1,2,7,8],[4,4,4,4],[2,4,4,5],[4,8,8,9],[2,5,6,9],[1,4,7,8],[4,6,7,7],[2,3,4,6],[5,5,7,7],[1,1,3,7],[2,2,6,6],[3,3,5,6],[5,5,6,6],[4,6,7,8],[2,2,8,9],[2,4,4,8],[4,7,8,9],[1,2,2,4],[2,3,6,6],[4,4,7,7],[3,5,7,9],[3,4,4,9],[2,4,5,9],[1,5,7,9],[2,6,6,9],[6,6,8,8],[2,2,8,8],[1,4,4,4],[4,5,6,6],[4,4,8,9],[3,7,8,9],[3,4,7,8],[3,5,9,9],[6,7,9,9],[1,7,7,9],[3,4,4,8],[3,4,4,4],[5,7,8,8],[3,5,5,7],[2,5,7,7],[1,3,6,9],[2,2,6,7],[5,5,5,5],[3,3,4,8],[4,7,9,9],[5,6,7,7],[2,8,8,9],[3,4,8,9],[3,3,3,3],[1,4,7,7],[2,3,6,8],[1,5,6,8],[1,4,4,8],[2,2,5,5],[3,3,5,9],[2,5,7,9],[2,4,8,8],[2,2,2,5],[2,4,4,4],[2,6,8,9],[1,7,9,9],[1,3,5,9],[2,3,3,6],[2,6,9,9],[4,4,6,8],[2,3,5,5],[2,2,7,7],[3,5,6,9],[2,6,8,8],[2,3,5,6],[4,5,5,6],[1,3,3,7],[5,6,6,7],[5,5,7,8],[5,6,6,6],[1,2,4,4],[1,4,8,9],[4,5,5,5],[2,3,6,7],[2,2,3,3],[1,1,4,6],[4,4,4,7],[2,3,3,8],[3,4,5,5],[2,4,9,9],[2,2,3,7],[4,5,6,9],[1,5,6,6],[1,1,3,9],[2,2,4,8],[3,3,6,9],[3,4,7,7],[2,8,8,8],[1,1,6,8],[1,6,7,9],[5,7,7,9],[3,5,6,7],[2,2,2,3],[1,5,5,5],[1,2,2,8],[1,2,2,9],[4,4,5,7],[1,3,3,3],[1,3,4,6],[1,2,7,9],[3,4,5,9],[2,6,7,9],[1,1,5,6],[1,1,4,5],[1,3,3,8],[4,8,8,8],[1,2,4,6],[5,6,8,9]];
 
-    // Generate 4 numbers for a puzzle
-    function generatePuzzle(puzzleNum) {
-        const rng = mulberry32(puzzleNum * 12345);
-        const numbers = [];
-        for (let i = 0; i < 4; i++) {
-            numbers.push(Math.floor(rng() * 9) + 1); // 1-9
+        // Seeded RNG (Mulberry32)
+        function mulberry32(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ t >>> 15, t | 1);
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
         }
-        return numbers;
-    }
 
-    // Device ID
-    function getDeviceId() {
-        let id = localStorage.getItem('make24_device_id');
-        if (!id) {
-            id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-            localStorage.setItem('make24_device_id', id);
+        // Get puzzle number from date
+        function getPuzzleNumber(date) {
+            const epoch = new Date('2025-01-01T00:00:00Z');
+            const diff = date - epoch;
+            return Math.floor(diff / (24 * 60 * 60 * 1000)) + 1;
         }
-        return id;
-    }
 
-    // Load/save state
-    function loadState() {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                gameState = { ...gameState, ...JSON.parse(saved) };
+        // Get date from puzzle number
+        function getDateFromPuzzleNumber(num) {
+            const epoch = new Date('2025-01-01T00:00:00Z');
+            return new Date(epoch.getTime() + (num - 1) * 24 * 60 * 60 * 1000);
+        }
+
+        // Get today's puzzle number (UTC)
+        function getTodayPuzzleNumber() {
+            const now = new Date();
+            const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+            return getPuzzleNumber(utcDate);
+        }
+
+        // Generate 4 numbers for a puzzle - uses pre-validated solvable puzzles
+        function generatePuzzle(puzzleNum) {
+            // Get puzzle from valid list (cycles through all 404 puzzles)
+            const puzzleIndex = (puzzleNum - 1) % VALID_PUZZLES.length;
+            const basePuzzle = VALID_PUZZLES[puzzleIndex];
+            
+            // Shuffle the 4 numbers using puzzle-specific seed
+            const rng = mulberry32(puzzleNum * 12345);
+            const shuffled = [...basePuzzle];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(rng() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
-        } catch (e) {
-            console.error('Failed to load state:', e);
+            
+            return shuffled;
         }
-        gameState.deviceId = getDeviceId();
-    }
 
-    function saveState() {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
-        } catch (e) {
-            console.error('Failed to save state:', e);
+        // Device ID
+        function getDeviceId() {
+            let id = localStorage.getItem('make24_device_id');
+            if (!id) {
+                id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+                localStorage.setItem('make24_device_id', id);
+            }
+            return id;
         }
-    }
 
-    // Streak management
-    function updateStreak() {
-        const today = getTodayPuzzleNumber();
-        const yesterday = today - 1;
-        
-        if (gameState.lastPlayedDate === today) {
-            // Already played today
-            return;
+        // Load/save state
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    gameState = { ...gameState, ...JSON.parse(saved) };
+                }
+            } catch (e) {
+                console.error('Failed to load state:', e);
+            }
+            gameState.deviceId = getDeviceId();
         }
-        
-        if (gameState.lastPlayedDate === yesterday) {
-            // Consecutive day - streak continues
-        } else if (gameState.lastPlayedDate === yesterday - 1 && gameState.freezes > 0) {
-            // Missed one day but have freeze
-            gameState.freezes--;
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+            } catch (e) {
+                console.error('Failed to save state:', e);
+            }
+        }
+
+        // Streak management
+        function updateStreak() {
+            const today = getTodayPuzzleNumber();
+            const yesterday = today - 1;
+            
+            if (gameState.lastPlayedDate === today) {
+                // Already played today
+                return;
+            }
+            
+            if (gameState.lastPlayedDate === yesterday) {
+                // Consecutive day - streak continues
+            } else if (gameState.lastPlayedDate === yesterday - 1 && gameState.freezes > 0) {
+                // Missed one day but have freeze
+                gameState.freezes--;
+                saveState();
+            } else if (gameState.lastPlayedDate && gameState.lastPlayedDate < yesterday) {
+                // Streak broken
+                gameState.streak = 0;
+                saveState();
+            }
+            
+            updateStreakDisplay();
+        }
+
+        function incrementStreak() {
+            gameState.streak++;
+            gameState.lastPlayedDate = currentPuzzle.puzzleNum;
+            
+            // Award freeze every 7 days
+            if (gameState.streak > 0 && gameState.streak % STREAK_FREEZE_INTERVAL === 0) {
+                gameState.freezes++;
+            }
+            
             saveState();
-        } else if (gameState.lastPlayedDate && gameState.lastPlayedDate < yesterday) {
-            // Streak broken
-            gameState.streak = 0;
-            saveState();
+            updateStreakDisplay();
         }
-        
-        updateStreakDisplay();
-    }
 
-    function incrementStreak() {
-        gameState.streak++;
-        gameState.lastPlayedDate = currentPuzzle.puzzleNum;
-        
-        // Award freeze every 7 days
-        if (gameState.streak > 0 && gameState.streak % STREAK_FREEZE_INTERVAL === 0) {
-            gameState.freezes++;
+        function updateStreakDisplay() {
+            document.getElementById('streakCount').textContent = gameState.streak;
+            const freezeEl = document.getElementById('freezeIndicator');
+            freezeEl.textContent = gameState.freezes > 0 ? '❄️'.repeat(Math.min(gameState.freezes, 3)) : '';
         }
-        
-        saveState();
-        updateStreakDisplay();
-    }
 
-    function updateStreakDisplay() {
-        document.getElementById('streakCount').textContent = gameState.streak;
-        const freezeEl = document.getElementById('freezeIndicator');
-        freezeEl.textContent = gameState.freezes > 0 ? '❄️'.repeat(Math.min(gameState.freezes, 3)) : '';
-    }
+        // Initialize puzzle
+        function initPuzzle(puzzleNum, isArchive = false) {
+            // Close any open messages first
+            document.getElementById('successMessage').classList.remove('show');
+            hideOperators();
+            
+            currentPuzzle.puzzleNum = puzzleNum;
+            currentPuzzle.numbers = generatePuzzle(puzzleNum);
+            currentPuzzle.isArchive = isArchive;
+            currentPuzzle.date = getDateFromPuzzleNumber(puzzleNum);
+            
+            // Check if already solved
+            const history = gameState.history[puzzleNum];
+            const alreadySolved = history?.completed;
+            
+            // For today's puzzle that's already solved, block further play
+            // For archive puzzles, always allow replay
+            if (alreadySolved && !isArchive) {
+                playState.completed = true;
+                playState.moves = history.moves || 0;
+                playState.operatorHistory = history.operators || [];
+                playState.undoCount = history.undos || 0;
+            } else {
+                // Fresh play or archive replay
+                playState.moves = 0;
+                playState.completed = false;
+                playState.operatorHistory = [];
+                playState.undoCount = 0;
+            }
+            
+            resetPlay();
+            updateUI();
+            
+            // If today's puzzle is already solved, show the success message
+            if (alreadySolved && !isArchive) {
+                const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
+                const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
+                
+                const title = document.getElementById('successTitle');
+                const subtitle = document.getElementById('successSubtitle');
+                const stats = document.getElementById('successStats');
+                
+                if (isFast) {
+                    title.textContent = '⚡ Perfect + Fast!';
+                    title.classList.add('perfect');
+                    subtitle.textContent = `Solved in ${history.solveTime}s!`;
+                } else if (isPerfect) {
+                    title.textContent = '⭐ Perfect!';
+                    title.classList.add('perfect');
+                    subtitle.textContent = 'Solved in just 3 moves!';
+                } else {
+                    title.textContent = '🎉 Nice!';
+                    title.classList.remove('perfect');
+                    subtitle.textContent = 'You made 24!';
+                }
+                
+                stats.innerHTML = `Moves: ${history.moves}`;
+                document.getElementById('percentileDisplay').textContent = '';
+                
+                // Show already-solved message after a brief delay
+                setTimeout(() => {
+                    document.getElementById('successMessage').classList.add('show');
+                }, 300);
+            }
+        }
 
-    // Initialize puzzle
-    function initPuzzle(puzzleNum, isArchive = false) {
-        // Close any open messages first
-        document.getElementById('successMessage').classList.remove('show');
-        hideOperators();
-        
-        currentPuzzle.puzzleNum = puzzleNum;
-        currentPuzzle.numbers = generatePuzzle(puzzleNum);
-        currentPuzzle.isArchive = isArchive;
-        currentPuzzle.date = getDateFromPuzzleNumber(puzzleNum);
-        
-        // Check if already solved
-        const history = gameState.history[puzzleNum];
-        const alreadySolved = history?.completed;
-        
-        // For today's puzzle that's already solved, block further play
-        // For archive puzzles, always allow replay
-        if (alreadySolved && !isArchive) {
-            playState.completed = true;
-            playState.moves = history.moves || 0;
-            playState.operatorHistory = history.operators || [];
-            playState.undoCount = history.undos || 0;
-        } else {
-            // Fresh play or archive replay
-            playState.moves = 0;
-            playState.completed = false;
+        function resetPlay() {
+            playState.cards = currentPuzzle.numbers.map((v, i) => ({
+                value: v,
+                used: false,
+                slot: i
+            }));
+            playState.selected = [];
+            playState.cardStates = [];
             playState.operatorHistory = [];
             playState.undoCount = 0;
+            playState.startTime = null;
+            playState.endTime = null;
+            
+            renderCards();
+            hideOperators();
+            updateResult();
+        }
+
+        // Render cards into grid slots
+        function renderCards() {
+            const slots = ['slot0', 'slot1', 'slot2', 'slot3'];
+            
+            slots.forEach((slotId, i) => {
+                const slot = document.getElementById(slotId);
+                slot.innerHTML = '';
+                
+                const cardData = playState.cards.find(c => c.slot === i && !c.used);
+                if (cardData) {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.textContent = formatNumber(cardData.value);
+                    card.dataset.index = playState.cards.indexOf(cardData);
+                    
+                    const cardIndex = playState.cards.indexOf(cardData);
+                    if (playState.selected.includes(cardIndex)) {
+                        card.classList.add('selected');
+                        if (playState.selected[0] === cardIndex) {
+                            card.classList.add('first');
+                        } else {
+                            card.classList.add('second');
+                        }
+                    }
+                    
+                    card.addEventListener('click', () => selectCard(cardIndex));
+                    slot.appendChild(card);
+                }
+            });
+        }
+
+        function formatNumber(n) {
+            if (Number.isInteger(n)) return n.toString();
+            // Show fractions nicely
+            const rounded = Math.round(n * 100) / 100;
+            if (Number.isInteger(rounded)) return rounded.toString();
+            return rounded.toFixed(2).replace(/\.?0+$/, '');
+        }
+
+        function selectCard(index) {
+            if (playState.completed) return;
+            if (playState.cards[index].used) return;
+            
+            const pos = playState.selected.indexOf(index);
+            if (pos !== -1) {
+                // Deselect
+                playState.selected.splice(pos, 1);
+                hideOperators();
+            } else if (playState.selected.length < 2) {
+                playState.selected.push(index);
+                if (playState.selected.length === 2) {
+                    showOperators();
+                }
+            }
+            
+            renderCards();
+            
+            // Request motion permission on first interaction (iOS requires user gesture)
+            // Do this after selection logic so it doesn't interfere
+            maybeRequestMotion();
+        }
+
+        function showOperators() {
+            document.getElementById('operatorsOverlay').classList.add('show');
+        }
+
+        function hideOperators() {
+            document.getElementById('operatorsOverlay').classList.remove('show');
+        }
+
+        function applyOperation(op) {
+            if (playState.selected.length !== 2 || playState.completed) return;
+            
+            const [i, j] = playState.selected;
+            const a = playState.cards[i].value;
+            const b = playState.cards[j].value;
+            
+            let result;
+            switch (op) {
+                case '+': result = a + b; break;
+                case '-': result = a - b; break;
+                case '*': result = a * b; break;
+                case '/': 
+                    if (b === 0) return;
+                    result = a / b;
+                    break;
+            }
+            
+            // Start timer on first move
+            if (!playState.startTime) {
+                playState.startTime = Date.now();
+            }
+            
+            // Save state for undo (deep copy)
+            playState.cardStates.push({
+                cards: JSON.parse(JSON.stringify(playState.cards)),
+                operators: [...playState.operatorHistory]
+            });
+            
+            // Track the operator used
+            playState.operatorHistory.push(op);
+            
+            // Mark cards as used
+            playState.cards[i].used = true;
+            playState.cards[j].used = true;
+            
+            // Find empty slot (prefer first card's slot)
+            const emptySlot = playState.cards[i].slot;
+            
+            // Create new card
+            playState.cards.push({
+                value: result,
+                used: false,
+                slot: emptySlot
+            });
+            
+            playState.selected = [];
+            playState.moves++; // Count as a move
+            
+            hideOperators();
+            renderCards();
+            updateResult();
+            updateMoveDots();
+            
+            // Check for win/lose
+            checkGameState();
+        }
+
+        function undo() {
+            if (playState.cardStates.length === 0 || playState.completed) return;
+            
+            // Restore previous state
+            const prevState = playState.cardStates.pop();
+            playState.cards = prevState.cards;
+            playState.operatorHistory = prevState.operators;
+            playState.selected = [];
+            playState.moves++; // Undo counts as a move!
+            playState.undoCount++; // Track undos separately for share
+            
+            hideOperators();
+            renderCards();
+            updateResult();
+            updateMoveDots();
+        }
+
+        function updateResult() {
+            const remaining = playState.cards.filter(c => !c.used);
+            const display = document.getElementById('resultDisplay');
+            
+            if (remaining.length === 1) {
+                const val = remaining[0].value;
+                display.textContent = formatNumber(val);
+                display.classList.add('visible');
+                if (Math.abs(val - 24) < 0.0001) {
+                    display.classList.add('success');
+                    display.classList.remove('error');
+                } else {
+                    display.classList.remove('success');
+                    display.classList.add('error');
+                }
+            } else {
+                display.textContent = '';
+                display.classList.remove('visible', 'success', 'error');
+            }
+            
+            // Update undo button visibility
+            updateUndoButton();
         }
         
-        resetPlay();
-        updateUI();
-        
-        // If today's puzzle is already solved, show the success message
-        if (alreadySolved && !isArchive) {
-            const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
-            const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
+        function updateUndoButton() {
+            const undoBtn = document.getElementById('undoBtn');
+            if (playState.cardStates.length > 0 && !playState.completed) {
+                undoBtn.classList.add('visible');
+            } else {
+                undoBtn.classList.remove('visible');
+            }
+        }
+
+        function checkGameState() {
+            const remaining = playState.cards.filter(c => !c.used);
             
+            if (remaining.length === 1) {
+                const val = remaining[0].value;
+                
+                if (Math.abs(val - 24) < 0.0001) {
+                    handleWin();
+                } else {
+                    handleWrongAnswer();
+                }
+            }
+        }
+
+        async function handleWin() {
+            playState.completed = true;
+            playState.endTime = Date.now();
+            
+            // Calculate solve time in seconds
+            const solveTime = playState.startTime ? 
+                Math.round((playState.endTime - playState.startTime) / 1000) : 0;
+            
+            // Check for perfect and fast
+            const isPerfect = playState.moves === PERFECT_MOVES && playState.undoCount === 0;
+            const isFast = isPerfect && solveTime <= 60;
+            
+            // Update history
+            gameState.history[currentPuzzle.puzzleNum] = {
+                completed: true,
+                moves: playState.moves,
+                operators: [...playState.operatorHistory],
+                undos: playState.undoCount,
+                solveTime: solveTime
+            };
+            
+            // Update streak only for today's puzzle
+            if (!currentPuzzle.isArchive) {
+                incrementStreak();
+                syncStreakToSupabase();
+            }
+            
+            saveState();
+            
+            updateMoveDots();
+            showConfetti();
+            
+            // Set up success message
             const title = document.getElementById('successTitle');
             const subtitle = document.getElementById('successSubtitle');
             const stats = document.getElementById('successStats');
@@ -853,7 +1182,7 @@
             if (isFast) {
                 title.textContent = '⚡ Perfect + Fast!';
                 title.classList.add('perfect');
-                subtitle.textContent = `Solved in ${history.solveTime}s!`;
+                subtitle.textContent = `Solved in ${solveTime}s!`;
             } else if (isPerfect) {
                 title.textContent = '⭐ Perfect!';
                 title.classList.add('perfect');
@@ -864,687 +1193,438 @@
                 subtitle.textContent = 'You made 24!';
             }
             
-            stats.innerHTML = `Moves: ${history.moves}`;
-            document.getElementById('percentileDisplay').textContent = '';
+            stats.innerHTML = `Moves: ${playState.moves}`;
             
-            // Show already-solved message after a brief delay
+            // Clear percentile while loading
+            document.getElementById('percentileDisplay').textContent = 'Loading...';
+            
+            // Show message
             setTimeout(() => {
                 document.getElementById('successMessage').classList.add('show');
-            }, 300);
-        }
-    }
-
-    function resetPlay() {
-        playState.cards = currentPuzzle.numbers.map((v, i) => ({
-            value: v,
-            used: false,
-            slot: i
-        }));
-        playState.selected = [];
-        playState.cardStates = [];
-        playState.operatorHistory = [];
-        playState.undoCount = 0;
-        playState.startTime = null;
-        playState.endTime = null;
-        
-        renderCards();
-        hideOperators();
-        updateResult();
-    }
-
-    // Render cards into grid slots
-    function renderCards() {
-        const slots = ['slot0', 'slot1', 'slot2', 'slot3'];
-        
-        slots.forEach((slotId, i) => {
-            const slot = document.getElementById(slotId);
-            slot.innerHTML = '';
+            }, 500);
             
-            const cardData = playState.cards.find(c => c.slot === i && !c.used);
-            if (cardData) {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.textContent = formatNumber(cardData.value);
-                card.dataset.index = playState.cards.indexOf(cardData);
+            // Track to Supabase and get percentile (async)
+            const percentileData = await trackPlay(true);
+            displayPercentile(percentileData);
+        }
+
+        function handleWrongAnswer() {
+            // Just reset the cards and let player try again
+            // Moves already counted, so player sees their progress
+            setTimeout(() => {
+                playState.cards = currentPuzzle.numbers.map((v, i) => ({
+                    value: v,
+                    used: false,
+                    slot: i
+                }));
+                playState.selected = [];
+                playState.cardStates = [];
+                renderCards();
+                updateResult();
+            }, 800);
+        }
+
+        function updateMoveDots() {
+            const container = document.getElementById('moveDots');
+            container.innerHTML = '';
+            
+            // Always show at least 3 dots (perfect target)
+            const totalDots = Math.max(3, playState.moves);
+            
+            for (let i = 0; i < totalDots; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'move-dot';
                 
-                const cardIndex = playState.cards.indexOf(cardData);
-                if (playState.selected.includes(cardIndex)) {
-                    card.classList.add('selected');
-                    if (playState.selected[0] === cardIndex) {
-                        card.classList.add('first');
+                if (i < playState.moves) {
+                    // Filled dots for moves made
+                    if (i < 3) {
+                        dot.classList.add('filled'); // Green for first 3
                     } else {
-                        card.classList.add('second');
+                        dot.classList.add('excess'); // Muted for excess
+                    }
+                } else {
+                    // Unfilled dots showing perfect target
+                    dot.classList.add('perfect-hint');
+                }
+                
+                container.appendChild(dot);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('puzzleNumber').textContent = `#${currentPuzzle.puzzleNum}`;
+            document.getElementById('archiveBanner').classList.toggle('show', currentPuzzle.isArchive);
+            updateStreakDisplay();
+            updateMoveDots();
+        }
+
+        // Confetti
+        function showConfetti() {
+            const container = document.getElementById('confetti');
+            const colors = ['#22d3ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#fbbf24'];
+            
+            for (let i = 0; i < 60; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animation = `confetti-fall ${1.5 + Math.random()}s ease-out forwards`;
+                confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                confetti.style.width = (6 + Math.random() * 8) + 'px';
+                confetti.style.height = (6 + Math.random() * 8) + 'px';
+                container.appendChild(confetti);
+            }
+            
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 3000);
+        }
+
+        // Share - Text/Emoji approach (like Wordle)
+        function generateShareText() {
+            const history = gameState.history[currentPuzzle.puzzleNum];
+            const isPerfect = history?.completed && history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
+            const isFast = isPerfect && history?.solveTime && history.solveTime <= 60;
+            const operators = history?.operators || playState.operatorHistory;
+            const undos = history?.undos || playState.undoCount;
+            
+            // Operator symbols
+            const opSymbols = { '+': '➕', '-': '➖', '*': '✖️', '/': '➗' };
+            const opLine = operators.map(op => opSymbols[op]).join(' ');
+            
+            let text = `24 #${currentPuzzle.puzzleNum}\n`;
+            text += `${opLine}\n`;
+            
+            if (isFast) {
+                text += `⚡ Perfect + Fast!\n`;
+            } else if (isPerfect) {
+                text += `⭐ Perfect!\n`;
+            }
+            
+            text += `🔥 ${gameState.streak}\n`;
+            text += `kapework.com/apps/make24`;
+            
+            return text;
+        }
+
+        function share() {
+            const text = generateShareText();
+            
+            if (navigator.share) {
+                navigator.share({ text }).catch(() => {
+                    copyToClipboard(text);
+                });
+            } else {
+                copyToClipboard(text);
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            }).catch(() => {
+                alert(text);
+            });
+        }
+
+        // Archive
+        // History
+        let archiveDisplayCount = 30; // Start with 30 days
+        
+        function showArchive() {
+            const modal = document.getElementById('archiveModal');
+            const list = document.getElementById('archiveList');
+            list.innerHTML = '';
+            
+            const today = getTodayPuzzleNumber();
+            
+            for (let i = 0; i < archiveDisplayCount; i++) {
+                const num = today - i;
+                if (num < 1) continue;
+                
+                const item = document.createElement('div');
+                item.className = 'archive-item';
+                item.textContent = num;
+                
+                const history = gameState.history[num];
+                if (history?.completed) {
+                    const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
+                    const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
+                    
+                    if (isFast) {
+                        item.classList.add('fast-perfect');
+                    } else if (isPerfect) {
+                        item.classList.add('perfect');
+                    } else {
+                        item.classList.add('completed');
                     }
                 }
                 
-                card.addEventListener('click', () => selectCard(cardIndex));
-                slot.appendChild(card);
-            }
-        });
-    }
-
-    function formatNumber(n) {
-        if (Number.isInteger(n)) return n.toString();
-        // Show fractions nicely
-        const rounded = Math.round(n * 100) / 100;
-        if (Number.isInteger(rounded)) return rounded.toString();
-        return rounded.toFixed(2).replace(/\.?0+$/, '');
-    }
-
-    function selectCard(index) {
-        if (playState.completed) return;
-        if (playState.cards[index].used) return;
-        
-        const pos = playState.selected.indexOf(index);
-        if (pos !== -1) {
-            // Deselect
-            playState.selected.splice(pos, 1);
-            hideOperators();
-        } else if (playState.selected.length < 2) {
-            playState.selected.push(index);
-            if (playState.selected.length === 2) {
-                showOperators();
-            }
-        }
-        
-        renderCards();
-        
-        // Request motion permission on first interaction (iOS requires user gesture)
-        // Do this after selection logic so it doesn't interfere
-        maybeRequestMotion();
-    }
-
-    function showOperators() {
-        document.getElementById('operatorsOverlay').classList.add('show');
-    }
-
-    function hideOperators() {
-        document.getElementById('operatorsOverlay').classList.remove('show');
-    }
-
-    function applyOperation(op) {
-        if (playState.selected.length !== 2 || playState.completed) return;
-        
-        const [i, j] = playState.selected;
-        const a = playState.cards[i].value;
-        const b = playState.cards[j].value;
-        
-        let result;
-        switch (op) {
-            case '+': result = a + b; break;
-            case '-': result = a - b; break;
-            case '*': result = a * b; break;
-            case '/': 
-                if (b === 0) return;
-                result = a / b;
-                break;
-        }
-        
-        // Start timer on first move
-        if (!playState.startTime) {
-            playState.startTime = Date.now();
-        }
-        
-        // Save state for undo (deep copy)
-        playState.cardStates.push({
-            cards: JSON.parse(JSON.stringify(playState.cards)),
-            operators: [...playState.operatorHistory]
-        });
-        
-        // Track the operator used
-        playState.operatorHistory.push(op);
-        
-        // Mark cards as used
-        playState.cards[i].used = true;
-        playState.cards[j].used = true;
-        
-        // Find empty slot (prefer first card's slot)
-        const emptySlot = playState.cards[i].slot;
-        
-        // Create new card
-        playState.cards.push({
-            value: result,
-            used: false,
-            slot: emptySlot
-        });
-        
-        playState.selected = [];
-        playState.moves++; // Count as a move
-        
-        hideOperators();
-        renderCards();
-        updateResult();
-        updateMoveDots();
-        
-        // Check for win/lose
-        checkGameState();
-    }
-
-    function undo() {
-        if (playState.cardStates.length === 0 || playState.completed) return;
-        
-        // Restore previous state
-        const prevState = playState.cardStates.pop();
-        playState.cards = prevState.cards;
-        playState.operatorHistory = prevState.operators;
-        playState.selected = [];
-        playState.moves++; // Undo counts as a move!
-        playState.undoCount++; // Track undos separately for share
-        
-        hideOperators();
-        renderCards();
-        updateResult();
-        updateMoveDots();
-    }
-
-    function updateResult() {
-        const remaining = playState.cards.filter(c => !c.used);
-        const display = document.getElementById('resultDisplay');
-        
-        if (remaining.length === 1) {
-            const val = remaining[0].value;
-            display.textContent = formatNumber(val);
-            display.classList.add('visible');
-            if (Math.abs(val - 24) < 0.0001) {
-                display.classList.add('success');
-                display.classList.remove('error');
-            } else {
-                display.classList.remove('success');
-                display.classList.add('error');
-            }
-        } else {
-            display.textContent = '';
-            display.classList.remove('visible', 'success', 'error');
-        }
-        
-        // Update undo button visibility
-        updateUndoButton();
-    }
-    
-    function updateUndoButton() {
-        const undoBtn = document.getElementById('undoBtn');
-        if (playState.cardStates.length > 0 && !playState.completed) {
-            undoBtn.classList.add('visible');
-        } else {
-            undoBtn.classList.remove('visible');
-        }
-    }
-
-    function checkGameState() {
-        const remaining = playState.cards.filter(c => !c.used);
-        
-        if (remaining.length === 1) {
-            const val = remaining[0].value;
-            
-            if (Math.abs(val - 24) < 0.0001) {
-                handleWin();
-            } else {
-                handleWrongAnswer();
-            }
-        }
-    }
-
-    async function handleWin() {
-        playState.completed = true;
-        playState.endTime = Date.now();
-        
-        // Calculate solve time in seconds
-        const solveTime = playState.startTime ? 
-            Math.round((playState.endTime - playState.startTime) / 1000) : 0;
-        
-        // Check for perfect and fast
-        const isPerfect = playState.moves === PERFECT_MOVES && playState.undoCount === 0;
-        const isFast = isPerfect && solveTime <= 60;
-        
-        // Update history
-        gameState.history[currentPuzzle.puzzleNum] = {
-            completed: true,
-            moves: playState.moves,
-            operators: [...playState.operatorHistory],
-            undos: playState.undoCount,
-            solveTime: solveTime
-        };
-        
-        // Update streak only for today's puzzle
-        if (!currentPuzzle.isArchive) {
-            incrementStreak();
-            syncStreakToSupabase();
-        }
-        
-        saveState();
-        
-        updateMoveDots();
-        showConfetti();
-        
-        // Set up success message
-        const title = document.getElementById('successTitle');
-        const subtitle = document.getElementById('successSubtitle');
-        const stats = document.getElementById('successStats');
-        
-        if (isFast) {
-            title.textContent = '⚡ Perfect + Fast!';
-            title.classList.add('perfect');
-            subtitle.textContent = `Solved in ${solveTime}s!`;
-        } else if (isPerfect) {
-            title.textContent = '⭐ Perfect!';
-            title.classList.add('perfect');
-            subtitle.textContent = 'Solved in just 3 moves!';
-        } else {
-            title.textContent = '🎉 Nice!';
-            title.classList.remove('perfect');
-            subtitle.textContent = 'You made 24!';
-        }
-        
-        stats.innerHTML = `Moves: ${playState.moves}`;
-        
-        // Clear percentile while loading
-        document.getElementById('percentileDisplay').textContent = 'Loading...';
-        
-        // Show message
-        setTimeout(() => {
-            document.getElementById('successMessage').classList.add('show');
-        }, 500);
-        
-        // Track to Supabase and get percentile (async)
-        const percentileData = await trackPlay(true);
-        displayPercentile(percentileData);
-    }
-
-    function handleWrongAnswer() {
-        // Just reset the cards and let player try again
-        // Moves already counted, so player sees their progress
-        setTimeout(() => {
-            playState.cards = currentPuzzle.numbers.map((v, i) => ({
-                value: v,
-                used: false,
-                slot: i
-            }));
-            playState.selected = [];
-            playState.cardStates = [];
-            renderCards();
-            updateResult();
-        }, 800);
-    }
-
-    function updateMoveDots() {
-        const container = document.getElementById('moveDots');
-        container.innerHTML = '';
-        
-        // Always show at least 3 dots (perfect target)
-        const totalDots = Math.max(3, playState.moves);
-        
-        for (let i = 0; i < totalDots; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'move-dot';
-            
-            if (i < playState.moves) {
-                // Filled dots for moves made
-                if (i < 3) {
-                    dot.classList.add('filled'); // Green for first 3
-                } else {
-                    dot.classList.add('excess'); // Muted for excess
+                if (num === today) {
+                    item.classList.add('today');
                 }
-            } else {
-                // Unfilled dots showing perfect target
-                dot.classList.add('perfect-hint');
+                
+                item.addEventListener('click', () => {
+                    modal.classList.remove('show');
+                    initPuzzle(num, num !== today);
+                });
+                
+                list.appendChild(item);
             }
             
-            container.appendChild(dot);
-        }
-    }
-
-    function updateUI() {
-        document.getElementById('puzzleNumber').textContent = `#${currentPuzzle.puzzleNum}`;
-        document.getElementById('archiveBanner').classList.toggle('show', currentPuzzle.isArchive);
-        updateStreakDisplay();
-        updateMoveDots();
-    }
-
-    // Confetti
-    function showConfetti() {
-        const container = document.getElementById('confetti');
-        const colors = ['#22d3ee', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#fbbf24'];
-        
-        for (let i = 0; i < 60; i++) {
-            const confetti = document.createElement('div');
-            confetti.className = 'confetti';
-            confetti.style.left = Math.random() * 100 + '%';
-            confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-            confetti.style.animation = `confetti-fall ${1.5 + Math.random()}s ease-out forwards`;
-            confetti.style.animationDelay = Math.random() * 0.5 + 's';
-            confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-            confetti.style.width = (6 + Math.random() * 8) + 'px';
-            confetti.style.height = (6 + Math.random() * 8) + 'px';
-            container.appendChild(confetti);
-        }
-        
-        setTimeout(() => {
-            container.innerHTML = '';
-        }, 3000);
-    }
-
-    // Share - Text/Emoji approach (like Wordle)
-    function generateShareText() {
-        const history = gameState.history[currentPuzzle.puzzleNum];
-        const isPerfect = history?.completed && history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
-        const isFast = isPerfect && history?.solveTime && history.solveTime <= 60;
-        const operators = history?.operators || playState.operatorHistory;
-        const undos = history?.undos || playState.undoCount;
-        
-        // Operator symbols
-        const opSymbols = { '+': '➕', '-': '➖', '*': '✖️', '/': '➗' };
-        const opLine = operators.map(op => opSymbols[op]).join(' ');
-        
-        let text = `24 #${currentPuzzle.puzzleNum}\n`;
-        text += `${opLine}\n`;
-        
-        if (isFast) {
-            text += `⚡ Perfect + Fast!\n`;
-        } else if (isPerfect) {
-            text += `⭐ Perfect!\n`;
-        }
-        
-        text += `🔥 ${gameState.streak}\n`;
-        text += `kapework.com/apps/make24`;
-        
-        return text;
-    }
-
-    function share() {
-        const text = generateShareText();
-        
-        if (navigator.share) {
-            navigator.share({ text }).catch(() => {
-                copyToClipboard(text);
-            });
-        } else {
-            copyToClipboard(text);
-        }
-    }
-
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('Copied to clipboard!');
-        }).catch(() => {
-            alert(text);
-        });
-    }
-
-    // Archive
-    // History
-    function showArchive() {
-        const modal = document.getElementById('archiveModal');
-        const list = document.getElementById('archiveList');
-        list.innerHTML = '';
-        
-        const today = getTodayPuzzleNumber();
-        
-        for (let i = 0; i < ARCHIVE_DAYS; i++) {
-            const num = today - i;
-            if (num < 1) continue;
-            
-            const item = document.createElement('div');
-            item.className = 'archive-item';
-            item.textContent = num;
-            
-            const history = gameState.history[num];
-            if (history?.completed) {
-                // Check if perfect (3 moves)
-                if (history.moves === PERFECT_MOVES) {
-                    item.classList.add('perfect');
-                } else {
-                    item.classList.add('completed');
-                }
+            // Add "Load More" button if there are more puzzles
+            if (today > archiveDisplayCount) {
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.className = 'load-more-btn';
+                loadMoreBtn.textContent = '↓ Load More History';
+                loadMoreBtn.addEventListener('click', () => {
+                    archiveDisplayCount += 30;
+                    showArchive();
+                });
+                
+                // Add after the list
+                const modalContent = modal.querySelector('.modal');
+                const existingBtn = modalContent.querySelector('.load-more-btn');
+                if (existingBtn) existingBtn.remove();
+                modalContent.insertBefore(loadMoreBtn, modalContent.querySelector('.modal-close'));
             }
             
-            if (num === today) {
-                item.classList.add('today');
-            }
-            
-            item.addEventListener('click', () => {
-                modal.classList.remove('show');
-                initPuzzle(num, num !== today);
-            });
-            
-            list.appendChild(item);
+            modal.classList.add('show');
         }
-        
-        modal.classList.add('show');
-    }
+        }
 
-    // Track play to Supabase using RPC function
-    let lastPercentileData = null;
-    
-    async function trackPlay(success) {
-        if (currentPuzzle.isArchive) {
-            console.log('Skipping tracking for archive puzzle');
-            return null;
-        }
+        // Track play to Supabase using RPC function
+        let lastPercentileData = null;
         
-        try {
-            const solveTime = playState.startTime ? 
-                Math.round((playState.endTime - playState.startTime) / 1000) : 0;
-            
-            const payload = {
-                p_device_id: gameState.deviceId,
-                p_puzzle_num: currentPuzzle.puzzleNum,
-                p_solved: success,
-                p_moves: playState.moves,
-                p_solve_time: solveTime,
-                p_operators: playState.operatorHistory,
-                p_undos: playState.undoCount
-            };
-            
-            console.log('Recording solve to Supabase:', payload);
-            
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_solve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`
-                },
-                body: JSON.stringify(payload)
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Supabase error:', response.status, errorText);
+        async function trackPlay(success) {
+            if (currentPuzzle.isArchive) {
+                console.log('Skipping tracking for archive puzzle');
                 return null;
             }
             
-            const result = await response.json();
-            console.log('Supabase result:', result);
+            try {
+                const solveTime = playState.startTime ? 
+                    Math.round((playState.endTime - playState.startTime) / 1000) : 0;
+                
+                const payload = {
+                    p_device_id: gameState.deviceId,
+                    p_puzzle_num: currentPuzzle.puzzleNum,
+                    p_solved: success,
+                    p_moves: playState.moves,
+                    p_solve_time: solveTime,
+                    p_operators: playState.operatorHistory,
+                    p_undos: playState.undoCount
+                };
+                
+                console.log('Recording solve to Supabase:', payload);
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_solve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Supabase error:', response.status, errorText);
+                    return null;
+                }
+                
+                const result = await response.json();
+                console.log('Supabase result:', result);
+                
+                // Store percentile data for display
+                if (result && result.length > 0) {
+                    lastPercentileData = result[0];
+                    return result[0];
+                }
+                
+                return null;
+            } catch (e) {
+                console.error('Failed to track play:', e);
+                return null;
+            }
+        }
+        
+        // Update player streak in Supabase
+        async function syncStreakToSupabase() {
+            try {
+                await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_player_streak`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    },
+                    body: JSON.stringify({
+                        p_device_id: gameState.deviceId,
+                        p_new_streak: gameState.streak,
+                        p_freezes: gameState.freezes
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to sync streak:', e);
+            }
+        }
+        
+        // Display percentile in success message
+        function displayPercentile(data) {
+            const display = document.getElementById('percentileDisplay');
             
-            // Store percentile data for display
-            if (result && result.length > 0) {
-                lastPercentileData = result[0];
-                return result[0];
+            if (!data || !data.percentile || !data.total_players) {
+                display.textContent = '';
+                display.classList.remove('highlight');
+                return;
             }
             
-            return null;
-        } catch (e) {
-            console.error('Failed to track play:', e);
-            return null;
+            const percentile = data.percentile;
+            const totalPlayers = data.total_players;
+            
+            let message = '';
+            if (percentile >= 90) {
+                message = `🏆 Top ${100 - percentile}% of ${totalPlayers} players today!`;
+                display.classList.add('highlight');
+            } else if (percentile >= 75) {
+                message = `⭐ Better than ${percentile}% of ${totalPlayers} players!`;
+                display.classList.add('highlight');
+            } else if (percentile >= 50) {
+                message = `📊 Better than ${percentile}% of ${totalPlayers} players`;
+                display.classList.remove('highlight');
+            } else {
+                message = `${totalPlayers} players solved today`;
+                display.classList.remove('highlight');
+            }
+            
+            display.textContent = message;
         }
-    }
-    
-    // Update player streak in Supabase
-    async function syncStreakToSupabase() {
-        try {
-            await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_player_streak`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`
-                },
-                body: JSON.stringify({
-                    p_device_id: gameState.deviceId,
-                    p_new_streak: gameState.streak,
-                    p_freezes: gameState.freezes
-                })
-            });
-        } catch (e) {
-            console.error('Failed to sync streak:', e);
-        }
-    }
-    
-    // Display percentile in success message
-    function displayPercentile(data) {
-        const display = document.getElementById('percentileDisplay');
-        
-        if (!data || !data.percentile || !data.total_players) {
-            display.textContent = '';
-            display.classList.remove('highlight');
-            return;
-        }
-        
-        const percentile = data.percentile;
-        const totalPlayers = data.total_players;
-        
-        let message = '';
-        if (percentile >= 90) {
-            message = `🏆 Top ${100 - percentile}% of ${totalPlayers} players today!`;
-            display.classList.add('highlight');
-        } else if (percentile >= 75) {
-            message = `⭐ Better than ${percentile}% of ${totalPlayers} players!`;
-            display.classList.add('highlight');
-        } else if (percentile >= 50) {
-            message = `📊 Better than ${percentile}% of ${totalPlayers} players`;
-            display.classList.remove('highlight');
-        } else {
-            message = `${totalPlayers} players solved today`;
-            display.classList.remove('highlight');
-        }
-        
-        display.textContent = message;
-    }
 
-    // Shake to undo (using DeviceMotion API)
-    let lastShakeTime = 0;
-    let shakeEnabled = false;
-    const SHAKE_THRESHOLD = 25; // Higher threshold for more deliberate shakes
-    const SHAKE_TIMEOUT = 800;
-    let lastX = 0, lastY = 0, lastZ = 0;
+        // Shake to undo (using DeviceMotion API)
+        let lastShakeTime = 0;
+        let shakeEnabled = false;
+        const SHAKE_THRESHOLD = 25; // Higher threshold for more deliberate shakes
+        const SHAKE_TIMEOUT = 800;
+        let lastX = 0, lastY = 0, lastZ = 0;
 
-    function handleMotion(event) {
-        if (!shakeEnabled || playState.completed) return;
-        
-        const acc = event.accelerationIncludingGravity;
-        if (!acc || acc.x === null) return;
-        
-        const x = acc.x;
-        const y = acc.y;
-        const z = acc.z;
-        
-        // Calculate change in acceleration
-        const deltaX = Math.abs(x - lastX);
-        const deltaY = Math.abs(y - lastY);
-        const deltaZ = Math.abs(z - lastZ);
-        
-        lastX = x;
-        lastY = y;
-        lastZ = z;
-        
-        const totalDelta = deltaX + deltaY + deltaZ;
-        const now = Date.now();
-        
-        if (totalDelta > SHAKE_THRESHOLD && now - lastShakeTime > SHAKE_TIMEOUT) {
-            lastShakeTime = now;
-            console.log('Shake detected! Delta:', totalDelta);
-            undo();
+        function handleMotion(event) {
+            if (!shakeEnabled || playState.completed) return;
+            
+            const acc = event.accelerationIncludingGravity;
+            if (!acc || acc.x === null) return;
+            
+            const x = acc.x;
+            const y = acc.y;
+            const z = acc.z;
+            
+            // Calculate change in acceleration
+            const deltaX = Math.abs(x - lastX);
+            const deltaY = Math.abs(y - lastY);
+            const deltaZ = Math.abs(z - lastZ);
+            
+            lastX = x;
+            lastY = y;
+            lastZ = z;
+            
+            const totalDelta = deltaX + deltaY + deltaZ;
+            const now = Date.now();
+            
+            if (totalDelta > SHAKE_THRESHOLD && now - lastShakeTime > SHAKE_TIMEOUT) {
+                lastShakeTime = now;
+                console.log('Shake detected! Delta:', totalDelta);
+                undo();
+            }
         }
-    }
 
-    async function requestMotionPermission() {
-        if (shakeEnabled) return true;
-        
-        try {
-            if (typeof DeviceMotionEvent !== 'undefined' && 
-                typeof DeviceMotionEvent.requestPermission === 'function') {
-                // iOS 13+ requires permission
-                const response = await DeviceMotionEvent.requestPermission();
-                if (response === 'granted') {
+        async function requestMotionPermission() {
+            if (shakeEnabled) return true;
+            
+            try {
+                if (typeof DeviceMotionEvent !== 'undefined' && 
+                    typeof DeviceMotionEvent.requestPermission === 'function') {
+                    // iOS 13+ requires permission
+                    const response = await DeviceMotionEvent.requestPermission();
+                    if (response === 'granted') {
+                        window.addEventListener('devicemotion', handleMotion);
+                        shakeEnabled = true;
+                        console.log('Motion permission granted');
+                        return true;
+                    } else {
+                        console.log('Motion permission denied');
+                        return false;
+                    }
+                } else if ('DeviceMotionEvent' in window) {
+                    // Non-iOS or older iOS - no permission needed
                     window.addEventListener('devicemotion', handleMotion);
                     shakeEnabled = true;
-                    console.log('Motion permission granted');
+                    console.log('Motion events enabled (no permission needed)');
                     return true;
-                } else {
-                    console.log('Motion permission denied');
-                    return false;
                 }
-            } else if ('DeviceMotionEvent' in window) {
-                // Non-iOS or older iOS - no permission needed
+            } catch (e) {
+                console.error('Motion permission error:', e);
+            }
+            return false;
+        }
+
+        // Request motion permission on first card click (user gesture required for iOS)
+        let motionPermissionRequested = false;
+        function maybeRequestMotion() {
+            if (!motionPermissionRequested && 'DeviceMotionEvent' in window) {
+                motionPermissionRequested = true;
+                requestMotionPermission();
+            }
+        }
+
+        // Event listeners
+        document.querySelectorAll('.op-btn').forEach(btn => {
+            btn.addEventListener('click', () => applyOperation(btn.dataset.op));
+        });
+
+        document.getElementById('undoBtn').addEventListener('click', undo);
+
+        // Close operators overlay when clicking outside
+        document.getElementById('operatorsOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                playState.selected = [];
+                hideOperators();
+                renderCards();
+            }
+        });
+
+        document.getElementById('puzzleNumber').addEventListener('click', showArchive);
+        document.getElementById('closeArchive').addEventListener('click', () => {
+            document.getElementById('archiveModal').classList.remove('show');
+        });
+        
+        document.getElementById('shareBtn').addEventListener('click', share);
+        
+        document.getElementById('closeSuccessBtn').addEventListener('click', () => {
+            document.getElementById('successMessage').classList.remove('show');
+        });
+
+        // Close modals on overlay click
+        document.getElementById('archiveModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.classList.remove('show');
+            }
+        });
+
+        // Initialize
+        loadState();
+        updateStreak();
+        initPuzzle(getTodayPuzzleNumber(), false);
+        
+        // For non-iOS devices, try to enable motion right away
+        if (!('ontouchstart' in window)) {
+            // Desktop - likely no motion support, but try anyway
+            if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission !== 'function') {
                 window.addEventListener('devicemotion', handleMotion);
                 shakeEnabled = true;
-                console.log('Motion events enabled (no permission needed)');
-                return true;
             }
-        } catch (e) {
-            console.error('Motion permission error:', e);
         }
-        return false;
-    }
-
-    // Request motion permission on first card click (user gesture required for iOS)
-    let motionPermissionRequested = false;
-    function maybeRequestMotion() {
-        if (!motionPermissionRequested && 'DeviceMotionEvent' in window) {
-            motionPermissionRequested = true;
-            requestMotionPermission();
-        }
-    }
-
-    // Event listeners
-    document.querySelectorAll('.op-btn').forEach(btn => {
-        btn.addEventListener('click', () => applyOperation(btn.dataset.op));
-    });
-
-    document.getElementById('undoBtn').addEventListener('click', undo);
-
-    // Close operators overlay when clicking outside
-    document.getElementById('operatorsOverlay').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) {
-            playState.selected = [];
-            hideOperators();
-            renderCards();
-        }
-    });
-
-    document.getElementById('puzzleNumber').addEventListener('click', showArchive);
-    document.getElementById('closeArchive').addEventListener('click', () => {
-        document.getElementById('archiveModal').classList.remove('show');
-    });
-    
-    document.getElementById('shareBtn').addEventListener('click', share);
-    
-    document.getElementById('closeSuccessBtn').addEventListener('click', () => {
-        document.getElementById('successMessage').classList.remove('show');
-    });
-
-    // Close modals on overlay click
-    document.getElementById('archiveModal').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) {
-            e.currentTarget.classList.remove('show');
-        }
-    });
-
-    // Initialize
-    loadState();
-    updateStreak();
-    initPuzzle(getTodayPuzzleNumber(), false);
-    
-    // For non-iOS devices, try to enable motion right away
-    if (!('ontouchstart' in window)) {
-        // Desktop - likely no motion support, but try anyway
-        if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission !== 'function') {
-            window.addEventListener('devicemotion', handleMotion);
-            shakeEnabled = true;
-        }
-    }
-</script>
-```
-
+    </script>
 </body>
 </html>
