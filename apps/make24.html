@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Make 24 | Kapework</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,6 +41,15 @@
         height: 100%;
         overflow: hidden;
         background: #0f172a;
+        /* FIX: Suppress iOS overscroll indicators / bounce */
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: auto;
+    }
+
+    html {
+        /* FIX: Prevent iOS rubber-banding that shows grey artifacts */
+        position: fixed;
+        width: 100%;
     }
 
     body {
@@ -51,6 +62,10 @@
         min-height: 100dvh;
         padding: 16px;
         padding-bottom: env(safe-area-inset-bottom, 16px);
+        /* FIX: Prevent touch-move scroll on body to eliminate iOS scroll indicators */
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     /* Header */
@@ -574,6 +589,21 @@
         box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
     }
 
+    /* FIX: Locked archive items - already solved, no replay upgrade */
+    .archive-item.locked {
+        cursor: default;
+        position: relative;
+    }
+
+    .archive-item.locked::before {
+        content: '🔒';
+        position: absolute;
+        bottom: -4px;
+        left: -4px;
+        font-size: 0.5rem;
+        opacity: 0.7;
+    }
+
     .modal-close {
         display: block;
         width: 100%;
@@ -707,6 +737,19 @@
 <div class="confetti-container" id="confetti"></div>
 
 <script>
+    // FIX: Prevent iOS bounce/overscroll that creates visual artifacts (the "dashes")
+    document.addEventListener('touchmove', function(e) {
+        // Allow scrolling inside the archive modal list
+        if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+        e.preventDefault();
+    }, { passive: false });
+
+    // Also prevent default on the body level to stop iOS scroll indicators
+    document.body.addEventListener('touchmove', function(e) {
+        if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+        e.preventDefault();
+    }, { passive: false });
+
     // Supabase config
     const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
@@ -871,6 +914,20 @@
         freezeEl.textContent = gameState.freezes > 0 ? '❄️'.repeat(Math.min(gameState.freezes, 3)) : '';
     }
 
+    // FIX: Check if an archive puzzle result can be upgraded
+    // Returns true only if the puzzle was never completed, or if the puzzle
+    // hasn't been "locked" (i.e., it's today's puzzle)
+    function canUpgradeResult(puzzleNum) {
+        const today = getTodayPuzzleNumber();
+        // Today's puzzle can always be played/replayed
+        if (puzzleNum === today) return true;
+        // Past puzzles that were already completed are LOCKED
+        const history = gameState.history[puzzleNum];
+        if (history?.completed) return false;
+        // Past puzzles never completed can be played
+        return true;
+    }
+
     // Initialize puzzle
     function initPuzzle(puzzleNum, isArchive = false) {
         // Close any open messages first
@@ -886,15 +943,56 @@
         const history = gameState.history[puzzleNum];
         const alreadySolved = history?.completed;
         
+        // FIX: For archive puzzles that are already completed, block replay
+        // This preserves history integrity - no retroactive upgrades
+        if (alreadySolved && isArchive) {
+            playState.completed = true;
+            playState.moves = history.moves || 0;
+            playState.operatorHistory = history.operators || [];
+            playState.undoCount = history.undos || 0;
+            
+            resetPlay();
+            updateUI();
+            
+            // Show the locked result
+            const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
+            const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
+            
+            const title = document.getElementById('successTitle');
+            const subtitle = document.getElementById('successSubtitle');
+            const stats = document.getElementById('successStats');
+            
+            if (isFast) {
+                title.textContent = '⚡ Perfect + Fast!';
+                title.classList.add('perfect');
+                subtitle.textContent = `Solved in ${history.solveTime}s!`;
+            } else if (isPerfect) {
+                title.textContent = '⭐ Perfect!';
+                title.classList.add('perfect');
+                subtitle.textContent = 'Solved in just 3 moves!';
+            } else {
+                title.textContent = '🎉 Already Solved';
+                title.classList.remove('perfect');
+                subtitle.textContent = `Completed in ${history.moves} moves`;
+            }
+            
+            stats.innerHTML = `Moves: ${history.moves}`;
+            document.getElementById('percentileDisplay').textContent = '🔒 History is locked';
+            
+            setTimeout(() => {
+                document.getElementById('successMessage').classList.add('show');
+            }, 300);
+            return;
+        }
+        
         // For today's puzzle that's already solved, block further play
-        // For archive puzzles, always allow replay
         if (alreadySolved && !isArchive) {
             playState.completed = true;
             playState.moves = history.moves || 0;
             playState.operatorHistory = history.operators || [];
             playState.undoCount = history.undos || 0;
         } else {
-            // Fresh play or archive replay
+            // Fresh play or unsolved archive puzzle
             playState.moves = 0;
             playState.completed = false;
             playState.operatorHistory = [];
@@ -1159,14 +1257,17 @@
         const isPerfect = playState.moves === PERFECT_MOVES && playState.undoCount === 0;
         const isFast = isPerfect && solveTime <= 60;
         
-        // Update history
-        gameState.history[currentPuzzle.puzzleNum] = {
-            completed: true,
-            moves: playState.moves,
-            operators: [...playState.operatorHistory],
-            undos: playState.undoCount,
-            solveTime: solveTime
-        };
+        // FIX: Only save to history if result can be upgraded
+        // For archive puzzles that were already completed, don't overwrite
+        if (canUpgradeResult(currentPuzzle.puzzleNum)) {
+            gameState.history[currentPuzzle.puzzleNum] = {
+                completed: true,
+                moves: playState.moves,
+                operators: [...playState.operatorHistory],
+                undos: playState.undoCount,
+                solveTime: solveTime
+            };
+        }
         
         // Update streak only for today's puzzle
         if (!currentPuzzle.isArchive) {
@@ -1363,6 +1464,11 @@
                     item.classList.add('perfect');
                 } else {
                     item.classList.add('completed');
+                }
+                
+                // FIX: Mark completed past puzzles as locked (not today)
+                if (num !== today) {
+                    item.classList.add('locked');
                 }
             }
             
