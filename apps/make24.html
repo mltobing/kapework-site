@@ -326,10 +326,9 @@
         border-radius: 12px;
         margin-bottom: 12px;
         font-weight: 600;
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
     }
-    .difficulty-badge.easy { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-    .difficulty-badge.medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-    .difficulty-badge.hard { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
     .message .btn { margin-top: 8px; }
 
@@ -668,9 +667,9 @@
     function getPuzzleDifficulty(numbers) {
         const result = evaluateAllExpressions(...numbers);
         // More solutions = easier puzzle
-        if (result.solutionCount >= 20) return { level: 'easy', label: 'Quick one', emoji: '🟢' };
-        if (result.solutionCount >= 6) return { level: 'medium', label: 'Solid puzzle', emoji: '🟡' };
-        return { level: 'hard', label: 'Tough one', emoji: '🔴' };
+        if (result.solutionCount >= 20) return { level: 'easy', label: 'Easy', emoji: '🧩' };
+        if (result.solutionCount >= 6) return { level: 'medium', label: 'Medium', emoji: '🧩🧩' };
+        return { level: 'hard', label: 'Hard', emoji: '🧩🧩🧩' };
     }
 
     // Cache difficulty per puzzle
@@ -1200,7 +1199,7 @@
         const badge = document.getElementById('difficultyBadge');
         const diff = getCachedDifficulty(puzzleNum);
         badge.textContent = `${diff.emoji} ${diff.label}`;
-        badge.className = `difficulty-badge ${diff.level}`;
+        badge.className = 'difficulty-badge';
         badge.style.display = 'inline-block';
     }
 
@@ -1227,6 +1226,11 @@
         renderCards();
         hideOperators();
         updateResult();
+
+        // Start timer immediately when puzzle becomes visible
+        if (!playState.completed) {
+            playState.startTime = Date.now();
+        }
     }
 
     function renderCards() {
@@ -1297,7 +1301,7 @@
                 break;
         }
 
-        if (!playState.startTime) playState.startTime = Date.now();
+        if (!playState.startTime) playState.startTime = Date.now(); // fallback safety
 
         // Hide hint once player makes a move
         document.getElementById('hintDisplay').classList.remove('visible');
