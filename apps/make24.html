@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -20,459 +21,556 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+```
+:root {
+    --cyan: #22d3ee;
+    --cyan-dark: #0891b2;
+    --cyan-glow: rgba(34, 211, 238, 0.3);
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --gold: #fbbf24;
+    color-scheme: dark;
+}
 
-    :root {
-        --cyan: #22d3ee;
-        --cyan-dark: #0891b2;
-        --cyan-glow: rgba(34, 211, 238, 0.3);
-        --bg: #0f172a;
-        --card-bg: #1e293b;
-        --card-border: #334155;
-        --text: #f1f5f9;
-        --text-muted: #94a3b8;
-        --success: #10b981;
-        --error: #ef4444;
-        --warning: #f59e0b;
-        --gold: #fbbf24;
-        color-scheme: dark;
-    }
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #0f172a;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+}
 
-    html, body {
-        height: 100%;
-        overflow: hidden;
-        background: #0f172a;
-        overscroll-behavior: none;
-        -webkit-overflow-scrolling: auto;
-    }
+html {
+    position: fixed;
+    width: 100%;
+}
 
-    html {
-        position: fixed;
-        width: 100%;
-    }
+body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100dvh;
+    padding: 16px;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
-    body {
-        font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: #0f172a;
-        color: #f1f5f9;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 100dvh;
-        padding: 16px;
-        padding-bottom: env(safe-area-inset-bottom, 16px);
-        touch-action: manipulation;
-        -webkit-user-select: none;
-        user-select: none;
-    }
+/* Header */
+.header {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 5;
+}
 
-    /* Header */
-    .header {
-        width: 100%;
-        max-width: 400px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        margin-bottom: 24px;
-        position: relative;
-        z-index: 5;
-    }
+.puzzle-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #22d3ee;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
 
-    .puzzle-number {
-        font-family: 'Space Mono', monospace;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #22d3ee;
-        cursor: pointer;
-        transition: opacity 0.2s;
-    }
+.puzzle-number:hover {
+    opacity: 0.8;
+}
 
-    .puzzle-number:hover {
-        opacity: 0.8;
-    }
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
 
-    .header-right {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
+.undo-btn {
+    font-size: 1.5rem;
+    color: #94a3b8;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s;
+    padding: 4px;
+    pointer-events: none;
+}
 
-    .undo-btn {
-        font-size: 1.5rem;
-        color: #94a3b8;
-        background: none;
-        border: none;
-        cursor: pointer;
-        opacity: 0;
-        transition: opacity 0.2s, color 0.2s;
-        padding: 4px;
-        pointer-events: none;
-    }
+.undo-btn.visible {
+    opacity: 0.6;
+    pointer-events: auto;
+}
 
-    .undo-btn.visible {
-        opacity: 0.6;
-        pointer-events: auto;
-    }
+.undo-btn.visible:hover {
+    opacity: 1;
+    color: #22d3ee;
+}
 
-    .undo-btn.visible:hover {
-        opacity: 1;
-        color: #22d3ee;
-    }
+.undo-btn.visible:active {
+    transform: scale(0.9);
+}
 
-    .undo-btn.visible:active {
-        transform: scale(0.9);
-    }
+/* Hint button */
+.hint-btn {
+    font-size: 1.25rem;
+    color: #94a3b8;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.6s ease-in, color 0.2s;
+    padding: 4px;
+    pointer-events: none;
+}
 
-    /* Hint button - appears after inactivity */
-    .hint-btn {
-        font-size: 1.25rem;
-        color: #94a3b8;
-        background: none;
-        border: none;
-        cursor: pointer;
-        opacity: 0;
-        transition: opacity 0.6s ease-in, color 0.2s;
-        padding: 4px;
-        pointer-events: none;
-    }
+.hint-btn.visible {
+    opacity: 0.5;
+    pointer-events: auto;
+    animation: hint-pulse 2s ease-in-out infinite;
+}
 
-    .hint-btn.visible {
-        opacity: 0.5;
-        pointer-events: auto;
-        animation: hint-pulse 2s ease-in-out infinite;
-    }
+.hint-btn.visible:hover {
+    opacity: 1;
+    color: #f59e0b;
+}
 
-    .hint-btn.visible:hover {
-        opacity: 1;
-        color: #f59e0b;
-    }
+@keyframes hint-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.65; }
+}
 
-    @keyframes hint-pulse {
-        0%, 100% { opacity: 0.35; }
-        50% { opacity: 0.65; }
-    }
+/* Sync link in archive modal */
+.sync-section {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(34, 211, 238, 0.05);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    text-align: center;
+}
 
-    .streak-display {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 1.25rem;
-        font-weight: 700;
-    }
+.sync-section.signed-in {
+    border-color: rgba(34, 211, 238, 0.3);
+}
 
-    .streak-display .fire {
-        font-size: 1.5rem;
-    }
+.sync-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 6px;
+}
 
-    .freeze-indicator {
-        font-size: 1rem;
-        margin-left: 4px;
-        opacity: 0.8;
-    }
+.sync-btn {
+    background: none;
+    border: none;
+    color: #22d3ee;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
 
-    /* Game Container */
-    .game-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        max-width: 400px;
-        position: relative;
-        margin-top: -80px;
-    }
+.sync-btn:hover {
+    background: rgba(34, 211, 238, 0.1);
+}
 
-    .result-display {
-        font-family: 'Space Mono', monospace;
-        font-size: 3.5rem;
-        font-weight: 700;
-        color: #f1f5f9;
-        height: 60px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: color 0.3s, transform 0.2s, opacity 0.3s;
-        margin-bottom: 24px;
-        opacity: 0;
-    }
+/* Streak milestone nudge toast */
+.sync-nudge {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    text-align: center;
+    z-index: 80;
+    max-width: 300px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s, transform 0.4s;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
 
-    .result-display.visible { opacity: 1; }
-    .result-display.success { color: #10b981; transform: scale(1.1); }
-    .result-display.error { color: #ef4444; }
+.sync-nudge.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
 
-    /* Hint display - shows the suggested operation */
-    .hint-display {
-        font-family: 'DM Sans', sans-serif;
-        font-size: 0.875rem;
-        color: #f59e0b;
-        opacity: 0;
-        transition: opacity 0.5s;
-        margin-top: -16px;
-        margin-bottom: 8px;
-        height: 20px;
-    }
+.sync-nudge-link {
+    color: #22d3ee;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 500;
+}
 
-    .hint-display.visible {
-        opacity: 0.7;
-    }
+.sync-nudge-dismiss {
+    color: #475569;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 8px;
+}
 
-    /* Diamond Grid */
-    .diamond-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        grid-template-rows: 1fr 1fr 1fr;
-        gap: 12px;
-        width: 320px;
-        height: 320px;
-        position: relative;
-    }
+.streak-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
 
-    .slot { display: flex; align-items: center; justify-content: center; }
-    .slot.top { grid-column: 2; grid-row: 1; }
-    .slot.left { grid-column: 1; grid-row: 2; }
-    .slot.right { grid-column: 3; grid-row: 2; }
-    .slot.bottom { grid-column: 2; grid-row: 3; }
+.streak-display .fire {
+    font-size: 1.5rem;
+}
 
-    .card {
-        width: 96px;
-        height: 96px;
-        background: #1e293b;
-        border: 2px solid #334155;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: 'Space Mono', monospace;
-        font-size: 2.75rem;
-        font-weight: 700;
-        color: #f1f5f9;
-        cursor: pointer;
-        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-        -webkit-user-select: none;
-        user-select: none;
-    }
+.freeze-indicator {
+    font-size: 1rem;
+    margin-left: 4px;
+    opacity: 0.8;
+}
 
-    .card:active { transform: scale(0.95); }
-    .card.selected { border-color: #22d3ee; box-shadow: 0 0 24px rgba(34, 211, 238, 0.3); transform: scale(1.08); }
-    .card.selected.first { border-color: #22d3ee; }
-    .card.selected.second { border-color: #f59e0b; box-shadow: 0 0 24px rgba(245, 158, 11, 0.3); }
-    .card.used { opacity: 0; pointer-events: none; transform: scale(0.8); }
+/* Game Container */
+.game-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 400px;
+    position: relative;
+    margin-top: -80px;
+}
 
-    /* Operators Overlay */
-    .operators-overlay {
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(15, 23, 42, 0.4);
-        display: none; align-items: center; justify-content: center; z-index: 50;
-    }
-    .operators-overlay.show { display: flex; }
+.result-display {
+    font-family: 'Space Mono', monospace;
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s, transform 0.2s, opacity 0.3s;
+    margin-bottom: 24px;
+    opacity: 0;
+}
 
-    .operators-grid {
-        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-        gap: 12px; padding: 14px;
-        background: rgba(30, 41, 59, 0.85); border-radius: 20px;
-        border: 1px solid rgba(51, 65, 85, 0.6);
-    }
+.result-display.visible { opacity: 1; }
+.result-display.success { color: #10b981; transform: scale(1.1); }
+.result-display.error { color: #ef4444; }
 
-    .op-btn {
-        width: 54px; height: 54px; border-radius: 50%;
-        border: 2px solid #22d3ee; background: rgba(30, 41, 59, 0.95);
-        color: #f1f5f9; font-size: 1.5rem; font-weight: 700;
-        cursor: pointer; transition: all 0.15s ease;
-        display: flex; align-items: center; justify-content: center;
-    }
-    .op-btn:hover { background: rgba(34, 211, 238, 0.2); transform: scale(1.1); }
-    .op-btn:active { transform: scale(0.95); }
+/* Clean win state: hide cards, show big result */
+.result-display.win-clean {
+    font-size: 5rem;
+    color: #10b981;
+    opacity: 1;
+    transform: scale(1);
+    animation: win-pulse 0.6s ease-out;
+}
 
-    /* Move dots */
-    .move-dots {
-        position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
-        display: flex; gap: 6px; justify-content: center; align-items: center;
-    }
+@keyframes win-pulse {
+    0% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
 
-    .move-dot {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: #334155; transition: background 0.3s, transform 0.2s;
-    }
-    .move-dot.filled { background: #10b981; transform: scale(1.1); }
-    .move-dot.excess { background: #64748b; }
-    .move-dot.perfect-hint { background: #334155; opacity: 0.5; }
+.diamond-grid.win-hidden .slot {
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
 
-    /* Message overlay */
-    .message {
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-        background: #1e293b; border: 2px solid #22d3ee; border-radius: 16px;
-        padding: 32px; text-align: center; z-index: 100;
-        max-width: 90%; width: 320px;
-        box-shadow: 0 0 40px rgba(34, 211, 238, 0.3); display: none;
-    }
-    .message.show { display: block; animation: popIn 0.3s ease; }
+/* Hint display */
+.hint-display {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    color: #f59e0b;
+    opacity: 0;
+    transition: opacity 0.5s;
+    margin-top: -16px;
+    margin-bottom: 8px;
+    height: 20px;
+}
 
-    @keyframes popIn {
-        from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-        to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    }
+.hint-display.visible {
+    opacity: 0.7;
+}
 
-    .message h2 { font-size: 1.5rem; margin-bottom: 8px; color: #f1f5f9; }
-    .message h2.perfect { color: #fbbf24; }
-    .message p { color: #94a3b8; margin-bottom: 16px; }
-    .message .stats { font-family: 'Space Mono', monospace; font-size: 1.25rem; margin: 16px 0; color: #f1f5f9; }
-    .message .percentile { font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px; min-height: 1.2em; }
-    .message .percentile.highlight { color: #22d3ee; font-weight: 600; }
+/* Diamond Grid */
+.diamond-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 12px;
+    width: 320px;
+    height: 320px;
+    position: relative;
+}
 
-    /* Difficulty badge in success modal */
-    .difficulty-badge {
-        display: inline-block;
-        font-size: 0.75rem;
-        padding: 3px 10px;
-        border-radius: 12px;
-        margin-bottom: 12px;
-        font-weight: 600;
-        background: rgba(148, 163, 184, 0.15);
-        color: #94a3b8;
-    }
+.slot { display: flex; align-items: center; justify-content: center; transition: opacity 0.4s ease, transform 0.4s ease; }
+.slot.top { grid-column: 2; grid-row: 1; }
+.slot.left { grid-column: 1; grid-row: 2; }
+.slot.right { grid-column: 3; grid-row: 2; }
+.slot.bottom { grid-column: 2; grid-row: 3; }
 
-    .message .btn { margin-top: 8px; }
+.card {
+    width: 96px;
+    height: 96px;
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 2.75rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
-    .btn {
-        padding: 12px 24px; border-radius: 8px; border: none;
-        font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 600;
-        cursor: pointer; transition: all 0.15s ease;
-    }
-    .btn-primary { background: #22d3ee; color: #0f172a; }
-    .btn-primary:hover { background: #0891b2; }
-    .btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; margin-left: 8px; }
+.card:active { transform: scale(0.95); }
+.card.selected { border-color: #22d3ee; box-shadow: 0 0 24px rgba(34, 211, 238, 0.3); transform: scale(1.08); }
+.card.selected.first { border-color: #22d3ee; }
+.card.selected.second { border-color: #f59e0b; box-shadow: 0 0 24px rgba(245, 158, 11, 0.3); }
+.card.used { opacity: 0; pointer-events: none; transform: scale(0.8); }
 
-    /* Button row in success modal */
-    .btn-row {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-top: 12px;
-    }
+/* Operators Overlay */
+.operators-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+}
+.operators-overlay.show { display: flex; }
 
-    .btn-row .btn {
-        margin: 0;
-        font-size: 0.875rem;
-        padding: 10px 16px;
-    }
+.operators-grid {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 12px; padding: 14px;
+    background: rgba(30, 41, 59, 0.85); border-radius: 20px;
+    border: 1px solid rgba(51, 65, 85, 0.6);
+}
 
-    .btn-challenge {
-        background: transparent;
-        color: #f59e0b;
-        border: 1px solid #f59e0b;
-    }
-    .btn-challenge:hover {
-        background: rgba(245, 158, 11, 0.15);
-    }
+.op-btn {
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 2px solid #22d3ee; background: rgba(30, 41, 59, 0.95);
+    color: #f1f5f9; font-size: 1.5rem; font-weight: 700;
+    cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; justify-content: center;
+}
+.op-btn:hover { background: rgba(34, 211, 238, 0.2); transform: scale(1.1); }
+.op-btn:active { transform: scale(0.95); }
 
-    /* Archive Modal */
-    .modal-overlay {
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.85);
-        display: none; align-items: center; justify-content: center;
-        z-index: 200; padding: 16px;
-    }
-    .modal-overlay.show { display: flex; }
+/* Move dots */
+.move-dots {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; justify-content: center; align-items: center;
+}
 
-    .modal {
-        background: #1e293b; border-radius: 16px; padding: 24px;
-        max-width: 360px; width: 100%; max-height: 80vh; overflow-y: auto;
-    }
-    .modal h2 { text-align: center; margin-bottom: 16px; color: #22d3ee; }
+.move-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #334155; transition: background 0.3s, transform 0.2s;
+}
+.move-dot.filled { background: #10b981; transform: scale(1.1); }
+.move-dot.excess { background: #64748b; }
+.move-dot.perfect-hint { background: #334155; opacity: 0.5; }
 
-    .archive-list {
-        display: grid; grid-template-columns: repeat(5, 1fr);
-        gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px;
-    }
+/* Message overlay */
+.message {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #1e293b; border: 2px solid #22d3ee; border-radius: 16px;
+    padding: 32px; text-align: center; z-index: 100;
+    max-width: 90%; width: 320px;
+    box-shadow: 0 0 40px rgba(34, 211, 238, 0.3); display: none;
+}
+.message.show { display: block; animation: popIn 0.3s ease; }
 
-    .archive-list::-webkit-scrollbar { width: 6px; }
-    .archive-list::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
-    .archive-list::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+@keyframes popIn {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
 
-    .load-more-btn {
-        display: block; width: 100%; margin-top: 12px; padding: 10px;
-        background: transparent; border: 1px dashed #475569; border-radius: 8px;
-        color: #94a3b8; font-family: 'DM Sans', sans-serif; font-size: 0.875rem;
-        cursor: pointer; transition: all 0.15s;
-    }
-    .load-more-btn:hover { border-color: #22d3ee; color: #22d3ee; }
+.message h2 { font-size: 1.5rem; margin-bottom: 8px; color: #f1f5f9; }
+.message h2.perfect { color: #fbbf24; }
+.message p { color: #94a3b8; margin-bottom: 16px; }
+.message .stats { font-family: 'Space Mono', monospace; font-size: 1.25rem; margin: 16px 0; color: #f1f5f9; }
+.message .percentile { font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px; min-height: 1.2em; }
+.message .percentile.highlight { color: #22d3ee; font-weight: 600; }
 
-    /* Share history grid button in archive modal */
-    .share-history-btn {
-        display: block; width: 100%; margin-top: 12px; padding: 10px;
-        background: rgba(34, 211, 238, 0.1); border: 1px solid #22d3ee; border-radius: 8px;
-        color: #22d3ee; font-family: 'DM Sans', sans-serif; font-size: 0.875rem;
-        font-weight: 600; cursor: pointer; transition: all 0.15s;
-    }
-    .share-history-btn:hover { background: rgba(34, 211, 238, 0.2); }
+/* Difficulty badge in success modal */
+.difficulty-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+}
 
-    .archive-item {
-        aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-        background: #0f172a; border: 1px solid #334155; border-radius: 8px;
-        font-family: 'Space Mono', monospace; font-size: 0.875rem;
-        color: #f1f5f9; cursor: pointer; transition: all 0.15s;
-    }
-    .archive-item:hover { border-color: #22d3ee; }
+.message .btn { margin-top: 8px; }
 
-    .archive-item.completed { background: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+.btn {
+    padding: 12px 24px; border-radius: 8px; border: none;
+    font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: all 0.15s ease;
+}
+.btn-primary { background: #22d3ee; color: #0f172a; }
+.btn-primary:hover { background: #0891b2; }
+.btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; margin-left: 8px; }
 
-    .archive-item.perfect {
-        background: rgba(251, 191, 36, 0.15); border-color: #fbbf24; position: relative;
-    }
-    .archive-item.perfect::after {
-        content: '⭐'; position: absolute; top: -4px; right: -4px; font-size: 0.6rem;
-    }
+/* Button row in success modal */
+.btn-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
 
-    .archive-item.fast-perfect {
-        background: rgba(251, 191, 36, 0.3); border-color: #fbbf24; position: relative;
-        box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
-    }
-    .archive-item.fast-perfect::after {
-        content: '⭐⭐'; position: absolute; top: -6px; right: -8px; font-size: 0.5rem;
-    }
+.btn-row .btn {
+    margin: 0;
+    font-size: 0.875rem;
+    padding: 10px 16px;
+}
 
-    .archive-item.today { border-color: #22d3ee; box-shadow: 0 0 10px rgba(34, 211, 238, 0.3); }
+.btn-challenge {
+    background: transparent;
+    color: #f59e0b;
+    border: 1px solid #f59e0b;
+}
+.btn-challenge:hover {
+    background: rgba(245, 158, 11, 0.15);
+}
 
-    .archive-item.locked { cursor: default; position: relative; }
-    .archive-item.locked::before {
-        content: '🔒'; position: absolute; bottom: -4px; left: -4px; font-size: 0.5rem; opacity: 0.7;
-    }
+/* Archive Modal */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200; padding: 16px;
+}
+.modal-overlay.show { display: flex; }
 
-    .modal-close {
-        display: block; width: 100%; margin-top: 16px; padding: 12px;
-        background: #0f172a; border: 1px solid #334155; border-radius: 8px;
-        color: #f1f5f9; font-size: 1rem; cursor: pointer;
-    }
+.modal {
+    background: #1e293b; border-radius: 16px; padding: 24px;
+    max-width: 360px; width: 100%; max-height: 80vh; overflow-y: auto;
+}
+.modal h2 { text-align: center; margin-bottom: 16px; color: #22d3ee; }
 
-    /* Confetti */
-    .confetti-container {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        pointer-events: none; z-index: 1000; overflow: hidden;
-    }
-    .confetti { position: absolute; width: 10px; height: 10px; opacity: 0; }
+.archive-list {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px;
+}
 
-    @keyframes confetti-fall {
-        0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
-        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-    }
+.archive-list::-webkit-scrollbar { width: 6px; }
+.archive-list::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
+.archive-list::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
 
-    /* Archive mode indicator */
-    .archive-banner {
-        background: #f59e0b; color: #0f172a; padding: 8px 16px; border-radius: 8px;
-        font-size: 0.875rem; font-weight: 600;
-        position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-        display: none; z-index: 10;
-    }
-    .archive-banner.show { display: block; }
+.load-more-btn {
+    display: block; width: 100%; margin-top: 12px; padding: 10px;
+    background: transparent; border: 1px dashed #475569; border-radius: 8px;
+    color: #94a3b8; font-family: 'DM Sans', sans-serif; font-size: 0.875rem;
+    cursor: pointer; transition: all 0.15s;
+}
+.load-more-btn:hover { border-color: #22d3ee; color: #22d3ee; }
 
-    /* Hidden canvas for share image generation */
-    .share-canvas { display: none; }
+.share-history-btn {
+    display: block; width: 100%; margin-top: 12px; padding: 10px;
+    background: rgba(34, 211, 238, 0.1); border: 1px solid #22d3ee; border-radius: 8px;
+    color: #22d3ee; font-family: 'DM Sans', sans-serif; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.share-history-btn:hover { background: rgba(34, 211, 238, 0.2); }
+
+.archive-item {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    font-family: 'Space Mono', monospace; font-size: 0.875rem;
+    color: #f1f5f9; cursor: pointer; transition: all 0.15s;
+}
+.archive-item:hover { border-color: #22d3ee; }
+
+.archive-item.completed { background: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+
+.archive-item.perfect {
+    background: rgba(251, 191, 36, 0.15); border-color: #fbbf24; position: relative;
+}
+.archive-item.perfect::after {
+    content: '⭐'; position: absolute; top: -4px; right: -4px; font-size: 0.6rem;
+}
+
+.archive-item.fast-perfect {
+    background: rgba(251, 191, 36, 0.3); border-color: #fbbf24; position: relative;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+.archive-item.fast-perfect::after {
+    content: '⭐⭐'; position: absolute; top: -6px; right: -8px; font-size: 0.5rem;
+}
+
+.archive-item.today { border-color: #22d3ee; box-shadow: 0 0 10px rgba(34, 211, 238, 0.3); }
+
+.archive-item.locked { cursor: default; position: relative; }
+.archive-item.locked::before {
+    content: '🔒'; position: absolute; bottom: -4px; left: -4px; font-size: 0.5rem; opacity: 0.7;
+}
+
+.modal-close {
+    display: block; width: 100%; margin-top: 16px; padding: 12px;
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    color: #f1f5f9; font-size: 1rem; cursor: pointer;
+}
+
+/* Confetti */
+.confetti-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1000; overflow: hidden;
+}
+.confetti { position: absolute; width: 10px; height: 10px; opacity: 0; }
+
+@keyframes confetti-fall {
+    0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* Archive mode indicator */
+.archive-banner {
+    background: #f59e0b; color: #0f172a; padding: 8px 16px; border-radius: 8px;
+    font-size: 0.875rem; font-weight: 600;
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    display: none; z-index: 10;
+}
+.archive-banner.show { display: block; }
+
+/* Hidden canvas for share image generation */
+.share-canvas { display: none; }
+```
 
 </style>
-
-
 </head>
 <body>
     <div class="header">
@@ -488,7 +586,6 @@
         </div>
     </div>
 
-
 <div class="archive-banner" id="archiveBanner">
     📅 History Mode
 </div>
@@ -497,12 +594,15 @@
     <div class="result-display" id="resultDisplay"></div>
     <div class="hint-display" id="hintDisplay"></div>
 
-    <div class="diamond-grid" id="diamondGrid">
-        <div class="slot top" id="slot0"></div>
-        <div class="slot left" id="slot1"></div>
-        <div class="slot right" id="slot2"></div>
-        <div class="slot bottom" id="slot3"></div>
-    </div>
+```
+<div class="diamond-grid" id="diamondGrid">
+    <div class="slot top" id="slot0"></div>
+    <div class="slot left" id="slot1"></div>
+    <div class="slot right" id="slot2"></div>
+    <div class="slot bottom" id="slot3"></div>
+</div>
+```
+
 </div>
 
 <div class="operators-overlay" id="operatorsOverlay">
@@ -538,8 +638,17 @@
         <h2>📅 History</h2>
         <div class="archive-list" id="archiveList"></div>
         <button class="share-history-btn" id="shareHistoryBtn">📊 Share My Last 24 Days</button>
+        <div class="sync-section" id="syncSection">
+            <div class="sync-label" id="syncLabel">Keep your streak across devices</div>
+            <button class="sync-btn" id="syncBtn">Sign in to sync</button>
+        </div>
         <button class="modal-close" id="closeArchive">Close</button>
     </div>
+</div>
+
+<div class="sync-nudge" id="syncNudge">
+    🔥 Nice streak! <span class="sync-nudge-link" id="syncNudgeLink">Sign in</span> to keep it across devices.
+    <span class="sync-nudge-dismiss" id="syncNudgeDismiss">✕</span>
 </div>
 
 <div class="confetti-container" id="confetti"></div>
@@ -557,17 +666,29 @@
         e.preventDefault();
     }, { passive: false });
 
+    // ============================================================
+    // CONFIG (different per deployment)
+    // ============================================================
+    const APP_CONFIG = {
+        publicUrl: 'https://kapework.com/apps/make24.html',
+        shareLabel: 'kapework.com/apps/make24'
+    };
+
     // Supabase config
     const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
+
+    // Supabase client (auth-aware)
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Constants
     const STORAGE_KEY = 'make24_v5';
     const ARCHIVE_DAYS = 30;
     const STREAK_FREEZE_INTERVAL = 7;
     const PERFECT_MOVES = 3;
-    const HINT_DELAY_MS = 90000; // 90 seconds
-    const HISTORY_SHARE_DAYS = 24; // On-brand: 24 days for Make 24
+    const HINT_DELAY_MS = 90000;
+    const HISTORY_SHARE_DAYS = 24;
 
     // Game state
     let gameState = {
@@ -595,7 +716,7 @@
         startTime: null,
         endTime: null,
         completed: false,
-        hinted: false, // NEW: tracks if hint was used
+        hinted: false,
     };
 
     // Hint system state
@@ -607,15 +728,11 @@
 
     // ============================================================
     // DIFFICULTY SCORING ENGINE
-    // Estimates how hard a puzzle is based on # of unique solutions
-    // and whether solutions require division or fractions
     // ============================================================
     function evaluateAllExpressions(a, b, c, d) {
-        // Returns count of distinct ways to make 24 from 4 numbers
         const ops = ['+', '-', '*', '/'];
         const nums = [a, b, c, d];
         const perms = [];
-        // Generate all permutations of 4 numbers
         for (let i = 0; i < 4; i++)
             for (let j = 0; j < 4; j++) if (j !== i)
                 for (let k = 0; k < 4; k++) if (k !== i && k !== j)
@@ -629,7 +746,6 @@
         for (const perm of perms) {
             const [w, x, y, z] = perm;
             for (const o1 of ops) for (const o2 of ops) for (const o3 of ops) {
-                // Structure: ((w o1 x) o2 y) o3 z
                 const r1 = calc(w, o1, x);
                 if (r1 === null) continue;
                 const r2 = calc(r1, o2, y);
@@ -641,7 +757,6 @@
                     if (!Number.isInteger(r1) || !Number.isInteger(r2)) hasNonInteger = true;
                 }
 
-                // Structure: (w o1 x) o3 (y o2 z)
                 const s1 = calc(w, o1, x);
                 if (s1 === null) continue;
                 const s2 = calc(y, o2, z);
@@ -668,13 +783,11 @@
 
     function getPuzzleDifficulty(numbers) {
         const result = evaluateAllExpressions(...numbers);
-        // More solutions = easier puzzle
         if (result.solutionCount >= 20) return { level: 'easy', label: 'Easy', emoji: '🧩' };
         if (result.solutionCount >= 6) return { level: 'medium', label: 'Medium', emoji: '🧩🧩' };
         return { level: 'hard', label: 'Hard', emoji: '🧩🧩🧩' };
     }
 
-    // Cache difficulty per puzzle
     const difficultyCache = {};
     function getCachedDifficulty(puzzleNum) {
         if (!difficultyCache[puzzleNum]) {
@@ -685,16 +798,14 @@
     }
 
     // ============================================================
-    // HINT SYSTEM - find one valid first operation
+    // HINT SYSTEM
     // ============================================================
     function findHintForPuzzle(numbers) {
         const ops = ['+', '-', '*', '/'];
         const opSymbols = { '+': '+', '-': '−', '*': '×', '/': '÷' };
-        // Try all pairs and operations, check if remaining 3 numbers can make 24
         for (let i = 0; i < 4; i++) {
             for (let j = i + 1; j < 4; j++) {
                 for (const op of ops) {
-                    // Try both orderings for non-commutative ops
                     const orderings = (op === '+' || op === '*') ?
                         [[numbers[i], numbers[j]]] :
                         [[numbers[i], numbers[j]], [numbers[j], numbers[i]]];
@@ -702,10 +813,8 @@
                     for (const [a, b] of orderings) {
                         const r = calc(a, op, b);
                         if (r === null) continue;
-                        // Get remaining numbers
                         const remaining = numbers.filter((_, idx) => idx !== i && idx !== j);
                         remaining.push(r);
-                        // Check if these 3 numbers can make 24
                         if (canMake24From3(remaining)) {
                             return `Try ${a} ${opSymbols[op]} ${b}`;
                         }
@@ -718,19 +827,16 @@
 
     function canMake24From3(nums) {
         const ops = ['+', '-', '*', '/'];
-        // Try all orderings of 3 numbers
         for (let i = 0; i < 3; i++) {
             for (let j = 0; j < 3; j++) if (j !== i) {
                 for (let k = 0; k < 3; k++) if (k !== i && k !== j) {
                     const [a, b, c] = [nums[i], nums[j], nums[k]];
                     for (const o1 of ops) for (const o2 of ops) {
-                        // (a o1 b) o2 c
                         const r1 = calc(a, o1, b);
                         if (r1 !== null) {
                             const r2 = calc(r1, o2, c);
                             if (r2 !== null && Math.abs(r2 - 24) < 0.0001) return true;
                         }
-                        // a o1 (b o2 c)
                         const s1 = calc(b, o2, c);
                         if (s1 !== null) {
                             const s2 = calc(a, o1, s1);
@@ -749,12 +855,9 @@
         document.getElementById('hintBtn').classList.remove('visible');
         document.getElementById('hintDisplay').classList.remove('visible');
         document.getElementById('hintDisplay').textContent = '';
-
         if (playState.completed) return;
-
         hintTimer = setTimeout(() => {
             if (!playState.completed && playState.moves === 0) {
-                // Only show if player hasn't made any moves yet
                 document.getElementById('hintBtn').classList.add('visible');
                 hintVisible = true;
             }
@@ -762,24 +865,18 @@
     }
 
     function clearHintTimer() {
-        if (hintTimer) {
-            clearTimeout(hintTimer);
-            hintTimer = null;
-        }
+        if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
     }
 
     function useHint() {
         if (playState.completed || playState.hinted) return;
-
         const remaining = playState.cards.filter(c => !c.used).map(c => c.value);
         let hintText;
         if (remaining.length === 4) {
             hintText = findHintForPuzzle(remaining);
         } else {
-            // Hint only available at start
             hintText = null;
         }
-
         if (hintText) {
             playState.hinted = true;
             document.getElementById('hintDisplay').textContent = hintText;
@@ -790,7 +887,134 @@
     }
 
     // ============================================================
-    // SHAREABLE HISTORY GRID (canvas-based image)
+    // AUTH — background-only, guest-first
+    // ============================================================
+    const NUDGE_DISMISSED_KEY = 'make24_sync_nudge_dismissed';
+    const STREAK_NUDGE_MILESTONES = [3, 7, 14];
+
+    async function updateSyncUI() {
+        const syncSection = document.getElementById('syncSection');
+        const syncLabel = document.getElementById('syncLabel');
+        const syncBtnEl = document.getElementById('syncBtn');
+        if (!syncSection) return;
+
+        const { data: { session } } = await sb.auth.getSession();
+        const email = session?.user?.email;
+
+        if (email) {
+            syncSection.classList.add('signed-in');
+            syncLabel.textContent = `Synced as ${email}`;
+            syncBtnEl.textContent = 'Sign out';
+            syncBtnEl.onclick = promptSignOut;
+        } else {
+            syncSection.classList.remove('signed-in');
+            syncLabel.textContent = 'Keep your streak across devices';
+            syncBtnEl.textContent = 'Sign in to sync';
+            syncBtnEl.onclick = promptSignIn;
+        }
+    }
+
+    async function promptSignIn() {
+        const email = prompt('Enter your email to sync your Make 24 streak.\nWe only use it for sign-in — no spam, ever.');
+        if (!email) return;
+        const { error } = await sb.auth.signInWithOtp({
+            email,
+            options: { emailRedirectTo: window.location.href }
+        });
+        if (error) {
+            alert('Sign-in failed: ' + error.message);
+        } else {
+            alert('Check your email for the sign-in link.');
+        }
+    }
+
+    async function promptSignOut() {
+        const ok = confirm('Sign out? (Your local history stays on this device.)');
+        if (!ok) return;
+        const { error } = await sb.auth.signOut();
+        if (error) alert('Sign-out failed: ' + error.message);
+        await updateSyncUI();
+    }
+
+    // Show a gentle nudge toast at streak milestones (once per milestone, dismissable forever)
+    async function maybeShowSyncNudge() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) return; // already signed in
+
+        const dismissed = localStorage.getItem(NUDGE_DISMISSED_KEY);
+        if (dismissed === 'forever') return;
+
+        const streak = gameState.streak;
+        if (!STREAK_NUDGE_MILESTONES.includes(streak)) return;
+
+        // Only show once per milestone
+        const shownKey = `make24_nudge_shown_${streak}`;
+        if (localStorage.getItem(shownKey)) return;
+        localStorage.setItem(shownKey, '1');
+
+        const nudge = document.getElementById('syncNudge');
+        setTimeout(() => nudge.classList.add('visible'), 1200);
+        setTimeout(() => nudge.classList.remove('visible'), 8000);
+    }
+
+    function dismissSyncNudge() {
+        const nudge = document.getElementById('syncNudge');
+        nudge.classList.remove('visible');
+        localStorage.setItem(NUDGE_DISMISSED_KEY, 'forever');
+    }
+
+    async function ensureCanonicalDeviceId() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return;
+        const localId = getDeviceId();
+        try {
+            const { data, error } = await sb.rpc('get_or_set_device_id', { p_device_id: localId });
+            if (error) { console.log('get_or_set_device_id error:', error.message); return; }
+            const canonicalId = data;
+            if (canonicalId && canonicalId !== localId) {
+                localStorage.setItem('make24_device_id', canonicalId);
+                gameState.deviceId = canonicalId;
+                saveState();
+            }
+        } catch (e) { console.log('ensureCanonicalDeviceId skipped:', e); }
+    }
+
+    async function syncFromSupabase() {
+        try {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_or_create_player`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                },
+                body: JSON.stringify({ p_device_id: gameState.deviceId })
+            });
+            if (!response.ok) return;
+            const player = await response.json();
+            const serverStreak = Number(player?.current_streak ?? player?.streak ?? 0);
+            const serverFreezes = Number(player?.freezes ?? 0);
+            const localStreak = Number(gameState.streak ?? 0);
+            if (localStreak === 0 || (Number.isFinite(serverStreak) && serverStreak > localStreak)) {
+                gameState.streak = serverStreak;
+                gameState.freezes = serverFreezes;
+                saveState();
+            }
+            updateStreakDisplay();
+        } catch (e) { console.log('syncFromSupabase skipped:', e?.message || e); }
+    }
+
+    sb.auth.onAuthStateChange(async (_event, session) => {
+        await updateSyncUI();
+        if (session) {
+            await ensureCanonicalDeviceId();
+            await syncFromSupabase();
+            updateStreakDisplay();
+        }
+    });
+
+    // ============================================================
+    // SHAREABLE HISTORY GRID
     // ============================================================
     function generateHistoryImage() {
         const canvas = document.getElementById('shareCanvas');
@@ -798,40 +1022,33 @@
         const today = getTodayPuzzleNumber();
         const days = HISTORY_SHARE_DAYS;
         const cols = 6;
-        const rows = Math.ceil(days / cols); // 4 rows for 24 days
-
+        const rows = Math.ceil(days / cols);
         const cellSize = 48;
         const gap = 6;
         const padding = 24;
         const headerHeight = 60;
         const footerHeight = 44;
-
         const gridWidth = cols * cellSize + (cols - 1) * gap;
         const gridHeight = rows * cellSize + (rows - 1) * gap;
 
         canvas.width = gridWidth + padding * 2;
         canvas.height = headerHeight + gridHeight + footerHeight + padding;
 
-        // Background
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Title
         ctx.fillStyle = '#22d3ee';
         ctx.font = 'bold 18px "Space Mono", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(`Make 24 — Last ${days} Days`, canvas.width / 2, 36);
 
-        // Streak
         ctx.fillStyle = '#f1f5f9';
         ctx.font = '14px "DM Sans", sans-serif';
         ctx.fillText(`🔥 ${gameState.streak} streak`, canvas.width / 2, 54);
 
-        // Grid
         for (let i = 0; i < days; i++) {
             const num = today - i;
             if (num < 1) continue;
-
             const col = i % cols;
             const row = Math.floor(i / cols);
             const x = padding + col * (cellSize + gap);
@@ -842,18 +1059,11 @@
             const isPerfect = completed && history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
             const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
 
-            // Cell background
-            if (isFast) {
-                ctx.fillStyle = 'rgba(251, 191, 36, 0.5)';
-            } else if (isPerfect) {
-                ctx.fillStyle = 'rgba(251, 191, 36, 0.25)';
-            } else if (completed) {
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
-            } else {
-                ctx.fillStyle = '#1e293b';
-            }
+            if (isFast) ctx.fillStyle = 'rgba(251, 191, 36, 0.5)';
+            else if (isPerfect) ctx.fillStyle = 'rgba(251, 191, 36, 0.25)';
+            else if (completed) ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
+            else ctx.fillStyle = '#1e293b';
 
-            // Rounded rect
             const r = 6;
             ctx.beginPath();
             ctx.moveTo(x + r, y);
@@ -868,53 +1078,33 @@
             ctx.closePath();
             ctx.fill();
 
-            // Border
-            if (num === today) {
-                ctx.strokeStyle = '#22d3ee';
-                ctx.lineWidth = 2;
-            } else if (isFast || isPerfect) {
-                ctx.strokeStyle = '#fbbf24';
-                ctx.lineWidth = 1.5;
-            } else if (completed) {
-                ctx.strokeStyle = '#10b981';
-                ctx.lineWidth = 1;
-            } else {
-                ctx.strokeStyle = '#334155';
-                ctx.lineWidth = 1;
-            }
+            if (num === today) { ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2; }
+            else if (isFast || isPerfect) { ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1.5; }
+            else if (completed) { ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1; }
+            else { ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; }
             ctx.stroke();
 
-            // Number
             ctx.fillStyle = '#f1f5f9';
             ctx.font = 'bold 13px "Space Mono", monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(num.toString(), x + cellSize / 2, y + cellSize / 2);
 
-            // Star badges
-            if (isFast) {
-                ctx.font = '10px sans-serif';
-                ctx.fillText('⭐⭐', x + cellSize - 8, y + 8);
-            } else if (isPerfect) {
-                ctx.font = '10px sans-serif';
-                ctx.fillText('⭐', x + cellSize - 6, y + 8);
-            }
+            if (isFast) { ctx.font = '10px sans-serif'; ctx.fillText('⭐⭐', x + cellSize - 8, y + 8); }
+            else if (isPerfect) { ctx.font = '10px sans-serif'; ctx.fillText('⭐', x + cellSize - 6, y + 8); }
         }
 
-        // Footer
         ctx.fillStyle = '#64748b';
         ctx.font = '12px "DM Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText('kapework.com/apps/make24', canvas.width / 2, headerHeight + gridHeight + 16);
+        ctx.fillText(APP_CONFIG.shareLabel, canvas.width / 2, headerHeight + gridHeight + 16);
 
         return canvas;
     }
 
     function shareHistoryGrid() {
         const canvas = generateHistoryImage();
-
-        // Count stats for text fallback
         const today = getTodayPuzzleNumber();
         let solved = 0, perfect = 0, fastPerfect = 0;
         for (let i = 0; i < HISTORY_SHARE_DAYS; i++) {
@@ -928,14 +1118,12 @@
             }
         }
 
-        // Build emoji grid as text fallback (4 rows x 6 cols)
         let emojiGrid = '';
         for (let i = 0; i < HISTORY_SHARE_DAYS; i++) {
             const num = today - i;
             const h = gameState.history[num];
-            if (!h?.completed) {
-                emojiGrid += '⬛';
-            } else {
+            if (!h?.completed) emojiGrid += '⬛';
+            else {
                 const ip = h.moves === PERFECT_MOVES && (h.undos || 0) === 0;
                 const fast = ip && h.solveTime && h.solveTime <= 60;
                 if (fast) emojiGrid += '🌟';
@@ -945,26 +1133,19 @@
             if ((i + 1) % 6 === 0 && i < HISTORY_SHARE_DAYS - 1) emojiGrid += '\n';
         }
 
-        const shareText = `Make 24 — Last ${HISTORY_SHARE_DAYS} Days\n${emojiGrid}\n🔥 ${gameState.streak} | ${solved}/${HISTORY_SHARE_DAYS} solved\nkapework.com/apps/make24`;
+        const shareText = `Make 24 — Last ${HISTORY_SHARE_DAYS} Days\n${emojiGrid}\n🔥 ${gameState.streak} | ${solved}/${HISTORY_SHARE_DAYS} solved\n${APP_CONFIG.publicUrl}`;
 
-        // Try image share first, fall back to text
         canvas.toBlob(async (blob) => {
             if (blob && navigator.share && navigator.canShare) {
                 const file = new File([blob], 'make24-history.png', { type: 'image/png' });
                 const shareData = { text: shareText, files: [file] };
                 try {
-                    if (navigator.canShare(shareData)) {
-                        await navigator.share(shareData);
-                        return;
-                    }
+                    if (navigator.canShare(shareData)) { await navigator.share(shareData); return; }
                 } catch (e) { /* fall through */ }
             }
-            // Fallback: text-only share
             if (navigator.share) {
                 navigator.share({ text: shareText }).catch(() => copyToClipboard(shareText));
-            } else {
-                copyToClipboard(shareText);
-            }
+            } else { copyToClipboard(shareText); }
         }, 'image/png');
     }
 
@@ -981,19 +1162,16 @@
         text += `Puzzle #${puzzleNum}`;
         if (isPerfect) text += ` — I got ⭐ Perfect`;
         else text += ` — I solved it in ${moves} moves`;
-        text += `\n\nkapework.com/apps/make24`;
+        text += `\n\n${APP_CONFIG.publicUrl}`;
 
         if (navigator.share) {
             navigator.share({ text }).catch(() => copyToClipboard(text));
-        } else {
-            copyToClipboard(text);
-        }
+        } else { copyToClipboard(text); }
     }
 
     // ============================================================
-    // CORE GAME ENGINE (from original, with hint + difficulty hooks)
+    // CORE GAME ENGINE
     // ============================================================
-
     function mulberry32(seed) {
         return function() {
             let t = seed += 0x6D2B79F5;
@@ -1089,10 +1267,30 @@
         return true;
     }
 
+    // ============================================================
+    // CLEAN WIN SCREEN: fade cards, show big 24
+    // ============================================================
+    function showCleanWinState() {
+        const grid = document.getElementById('diamondGrid');
+        grid.classList.add('win-hidden');
+        const display = document.getElementById('resultDisplay');
+        display.textContent = '24';
+        display.className = 'result-display win-clean';
+    }
+
+    function clearWinState() {
+        const grid = document.getElementById('diamondGrid');
+        grid.classList.remove('win-hidden');
+        const display = document.getElementById('resultDisplay');
+        display.className = 'result-display';
+        display.textContent = '';
+    }
+
     function initPuzzle(puzzleNum, isArchive = false) {
         document.getElementById('successMessage').classList.remove('show');
         hideOperators();
         clearHintTimer();
+        clearWinState();
 
         currentPuzzle.puzzleNum = puzzleNum;
         currentPuzzle.numbers = generatePuzzle(puzzleNum);
@@ -1112,6 +1310,7 @@
 
             resetPlay();
             updateUI();
+            showCleanWinState();
 
             const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
             const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
@@ -1163,6 +1362,8 @@
         updateUI();
 
         if (alreadySolved && !isArchive) {
+            showCleanWinState();
+
             const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
             const isFast = isPerfect && history.solveTime && history.solveTime <= 60;
 
@@ -1192,7 +1393,6 @@
                 document.getElementById('successMessage').classList.add('show');
             }, 300);
         } else if (!alreadySolved) {
-            // Fresh puzzle — start hint timer
             startHintTimer();
         }
     }
@@ -1220,7 +1420,6 @@
         playState.startTime = null;
         playState.endTime = null;
 
-        // Reset hint display
         document.getElementById('hintDisplay').classList.remove('visible');
         document.getElementById('hintDisplay').textContent = '';
         document.getElementById('hintBtn').classList.remove('visible');
@@ -1229,7 +1428,6 @@
         hideOperators();
         updateResult();
 
-        // Start timer immediately when puzzle becomes visible
         if (!playState.completed) {
             playState.startTime = Date.now();
         }
@@ -1303,9 +1501,8 @@
                 break;
         }
 
-        if (!playState.startTime) playState.startTime = Date.now(); // fallback safety
+        if (!playState.startTime) playState.startTime = Date.now();
 
-        // Hide hint once player makes a move
         document.getElementById('hintDisplay').classList.remove('visible');
         document.getElementById('hintBtn').classList.remove('visible');
         clearHintTimer();
@@ -1391,7 +1588,6 @@
         const solveTime = playState.startTime ?
             Math.round((playState.endTime - playState.startTime) / 1000) : 0;
 
-        // Hint disqualifies perfect status
         const isPerfect = playState.moves === PERFECT_MOVES && playState.undoCount === 0 && !playState.hinted;
         const isFast = isPerfect && solveTime <= 60;
 
@@ -1415,6 +1611,9 @@
         updateMoveDots();
         showConfetti();
 
+        // Clean win: fade cards, show big 24
+        showCleanWinState();
+
         const title = document.getElementById('successTitle');
         const subtitle = document.getElementById('successSubtitle');
         const stats = document.getElementById('successStats');
@@ -1434,8 +1633,6 @@
         }
 
         stats.innerHTML = playState.hinted ? `Moves: ${playState.moves} (with hint)` : `Moves: ${playState.moves}`;
-
-        // Show difficulty badge after solving
         showDifficultyBadge(currentPuzzle.puzzleNum);
 
         document.getElementById('percentileDisplay').textContent = 'Loading...';
@@ -1446,6 +1643,9 @@
 
         const percentileData = await trackPlay(true);
         displayPercentile(percentileData);
+
+        // Gentle nudge at streak milestones (if not signed in)
+        maybeShowSyncNudge();
     }
 
     function handleWrongAnswer() {
@@ -1517,7 +1717,7 @@
         if (isFast) text += `⚡ Perfect + Fast!\n`;
         else if (isPerfect) text += `⭐ Perfect!\n`;
         text += `🔥 ${gameState.streak}\n`;
-        text += `kapework.com/apps/make24`;
+        text += `${APP_CONFIG.publicUrl}`;
         return text;
     }
 
@@ -1525,9 +1725,7 @@
         const text = generateShareText();
         if (navigator.share) {
             navigator.share({ text }).catch(() => copyToClipboard(text));
-        } else {
-            copyToClipboard(text);
-        }
+        } else { copyToClipboard(text); }
     }
 
     function copyToClipboard(text) {
@@ -1726,6 +1924,13 @@
     document.getElementById('undoBtn').addEventListener('click', undo);
     document.getElementById('hintBtn').addEventListener('click', useHint);
 
+    // Sync nudge toast handlers
+    document.getElementById('syncNudgeLink').addEventListener('click', () => {
+        dismissSyncNudge();
+        promptSignIn();
+    });
+    document.getElementById('syncNudgeDismiss').addEventListener('click', dismissSyncNudge);
+
     document.getElementById('operatorsOverlay').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) {
             playState.selected = [];
@@ -1751,10 +1956,24 @@
         if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
     });
 
-    // Initialize
-    loadState();
-    updateStreak();
-    initPuzzle(getTodayPuzzleNumber(), false);
+    // ============================================================
+    // BOOT (async to support auth)
+    // ============================================================
+    async function boot() {
+        loadState();
+        await updateSyncUI();
+
+        const { data: { session } } = await sb.auth.getSession();
+        if (session) {
+            await ensureCanonicalDeviceId();
+        }
+
+        await syncFromSupabase();
+        updateStreak();
+        initPuzzle(getTodayPuzzleNumber(), false);
+    }
+
+    boot();
 
     if (!('ontouchstart' in window)) {
         if ('DeviceMotionEvent' in window && typeof DeviceMotionEvent.requestPermission !== 'function') {
@@ -1763,7 +1982,6 @@
         }
     }
 </script>
-
 
 </body>
 </html>
