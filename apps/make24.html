@@ -153,10 +153,10 @@ body {
     50% { opacity: 0.65; }
 }
 
-/* Sync link in archive modal */
+/* Sync section in archive modal */
 .sync-section {
     margin-top: 12px;
-    padding: 10px;
+    padding: 12px;
     background: rgba(34, 211, 238, 0.05);
     border: 1px solid #334155;
     border-radius: 8px;
@@ -170,24 +170,189 @@ body {
 .sync-label {
     font-size: 0.75rem;
     color: #64748b;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
-.sync-btn {
-    background: none;
-    border: none;
-    color: #22d3ee;
+.sync-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
     font-family: 'DM Sans', sans-serif;
     font-size: 0.8125rem;
     font-weight: 600;
+    color: #3c4043;
     cursor: pointer;
-    padding: 4px 8px;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+
+.google-btn:hover {
+    background: #f7f8f8;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.google-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.sync-divider {
+    font-size: 0.6875rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.sync-divider::before,
+.sync-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #334155;
+}
+
+.email-otp-row {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+}
+
+.email-otp-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
     border-radius: 6px;
+    color: #f1f5f9;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.email-otp-input:focus {
+    border-color: #22d3ee;
+}
+
+.email-otp-input::placeholder {
+    color: #475569;
+}
+
+.email-send-btn {
+    padding: 8px 12px;
+    background: rgba(34, 211, 238, 0.15);
+    border: 1px solid #22d3ee;
+    border-radius: 6px;
+    color: #22d3ee;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
     transition: background 0.15s;
 }
 
-.sync-btn:hover {
-    background: rgba(34, 211, 238, 0.1);
+.email-send-btn:hover {
+    background: rgba(34, 211, 238, 0.25);
+}
+
+.email-send-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* OTP code entry (hidden until email sent) */
+.otp-verify-row {
+    display: none;
+    gap: 6px;
+    width: 100%;
+}
+
+.otp-verify-row.visible {
+    display: flex;
+}
+
+.otp-code-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #f1f5f9;
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.otp-code-input:focus {
+    border-color: #22d3ee;
+}
+
+.otp-code-input::placeholder {
+    color: #475569;
+    letter-spacing: 0.1em;
+    font-size: 0.8125rem;
+}
+
+.otp-verify-btn {
+    padding: 8px 14px;
+    background: #22d3ee;
+    border: none;
+    border-radius: 6px;
+    color: #0f172a;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.otp-verify-btn:hover {
+    background: #0891b2;
+}
+
+.sync-status {
+    font-size: 0.6875rem;
+    color: #64748b;
+    min-height: 1em;
+    margin-top: 4px;
+}
+
+.sync-status.error { color: #ef4444; }
+.sync-status.success { color: #10b981; }
+
+.sync-signout {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color 0.15s;
+}
+
+.sync-signout:hover {
+    color: #94a3b8;
 }
 
 /* Streak milestone nudge toast */
@@ -640,7 +805,25 @@ body {
         <button class="share-history-btn" id="shareHistoryBtn">📊 Share My Last 24 Days</button>
         <div class="sync-section" id="syncSection">
             <div class="sync-label" id="syncLabel">Keep your streak across devices</div>
-            <button class="sync-btn" id="syncBtn">Sign in to sync</button>
+            <div class="sync-methods" id="syncMethods">
+                <button class="google-btn" id="googleSignInBtn">
+                    <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                    Continue with Google
+                </button>
+                <div class="sync-divider">or use email code</div>
+                <div class="email-otp-row" id="emailOtpRow">
+                    <input type="email" class="email-otp-input" id="otpEmailInput" placeholder="your@email.com" autocomplete="email" autocapitalize="off">
+                    <button class="email-send-btn" id="otpSendBtn">Send code</button>
+                </div>
+                <div class="otp-verify-row" id="otpVerifyRow">
+                    <input type="text" class="otp-code-input" id="otpCodeInput" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+                    <button class="otp-verify-btn" id="otpVerifyBtn">Verify</button>
+                </div>
+                <div class="sync-status" id="syncStatus"></div>
+            </div>
+            <div id="syncSignedInView" style="display:none;">
+                <button class="sync-signout" id="syncSignOutBtn">Sign out</button>
+            </div>
         </div>
         <button class="modal-close" id="closeArchive">Close</button>
     </div>
@@ -887,15 +1070,18 @@ body {
     }
 
     // ============================================================
-    // AUTH — background-only, guest-first
+    // AUTH — guest-first, Google + email OTP code
     // ============================================================
     const NUDGE_DISMISSED_KEY = 'make24_sync_nudge_dismissed';
     const STREAK_NUDGE_MILESTONES = [3, 7, 14];
+    let pendingOtpEmail = null;
 
     async function updateSyncUI() {
         const syncSection = document.getElementById('syncSection');
         const syncLabel = document.getElementById('syncLabel');
-        const syncBtnEl = document.getElementById('syncBtn');
+        const syncMethods = document.getElementById('syncMethods');
+        const signedInView = document.getElementById('syncSignedInView');
+        const syncStatus = document.getElementById('syncStatus');
         if (!syncSection) return;
 
         const { data: { session } } = await sb.auth.getSession();
@@ -904,28 +1090,129 @@ body {
         if (email) {
             syncSection.classList.add('signed-in');
             syncLabel.textContent = `Synced as ${email}`;
-            syncBtnEl.textContent = 'Sign out';
-            syncBtnEl.onclick = promptSignOut;
+            syncMethods.style.display = 'none';
+            signedInView.style.display = 'block';
+            syncStatus.textContent = '';
+            syncStatus.className = 'sync-status';
         } else {
             syncSection.classList.remove('signed-in');
             syncLabel.textContent = 'Keep your streak across devices';
-            syncBtnEl.textContent = 'Sign in to sync';
-            syncBtnEl.onclick = promptSignIn;
+            syncMethods.style.display = 'flex';
+            signedInView.style.display = 'none';
+            // Reset OTP UI
+            document.getElementById('emailOtpRow').style.display = 'flex';
+            document.getElementById('otpVerifyRow').classList.remove('visible');
+            document.getElementById('otpEmailInput').value = '';
+            document.getElementById('otpCodeInput').value = '';
+            pendingOtpEmail = null;
         }
     }
 
-    async function promptSignIn() {
-        const email = prompt('Enter your email to sync your Make 24 streak.\nWe only use it for sign-in — no spam, ever.');
-        if (!email) return;
+    // Google sign-in via popup (stays in PWA context)
+    async function signInWithGoogle() {
+        const status = document.getElementById('syncStatus');
+        status.textContent = 'Opening Google sign-in...';
+        status.className = 'sync-status';
+
+        const { error } = await sb.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.href,
+                queryParams: { prompt: 'select_account' }
+            }
+        });
+
+        if (error) {
+            status.textContent = error.message;
+            status.className = 'sync-status error';
+        }
+    }
+
+    // Email OTP: send code
+    async function sendOtpCode() {
+        const emailInput = document.getElementById('otpEmailInput');
+        const email = emailInput.value.trim();
+        if (!email || !email.includes('@')) {
+            const status = document.getElementById('syncStatus');
+            status.textContent = 'Please enter a valid email.';
+            status.className = 'sync-status error';
+            return;
+        }
+
+        const sendBtn = document.getElementById('otpSendBtn');
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending...';
+
+        const status = document.getElementById('syncStatus');
+        status.textContent = '';
+        status.className = 'sync-status';
+
         const { error } = await sb.auth.signInWithOtp({
             email,
-            options: { emailRedirectTo: window.location.href }
+            options: {
+                shouldCreateUser: true
+            }
         });
+
         if (error) {
-            alert('Sign-in failed: ' + error.message);
-        } else {
-            alert('Check your email for the sign-in link.');
+            status.textContent = error.message;
+            status.className = 'sync-status error';
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Send code';
+            return;
         }
+
+        pendingOtpEmail = email;
+        status.textContent = 'Code sent! Check your email (and spam).';
+        status.className = 'sync-status success';
+
+        // Show code entry row, hide email row
+        document.getElementById('emailOtpRow').style.display = 'none';
+        document.getElementById('otpVerifyRow').classList.add('visible');
+        document.getElementById('otpCodeInput').focus();
+
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send code';
+    }
+
+    // Email OTP: verify code
+    async function verifyOtpCode() {
+        const codeInput = document.getElementById('otpCodeInput');
+        const code = codeInput.value.trim();
+        const status = document.getElementById('syncStatus');
+
+        if (!code || code.length < 6) {
+            status.textContent = 'Enter the 6-digit code from your email.';
+            status.className = 'sync-status error';
+            return;
+        }
+
+        if (!pendingOtpEmail) {
+            status.textContent = 'Session expired. Please send a new code.';
+            status.className = 'sync-status error';
+            document.getElementById('emailOtpRow').style.display = 'flex';
+            document.getElementById('otpVerifyRow').classList.remove('visible');
+            return;
+        }
+
+        const verifyBtn = document.getElementById('otpVerifyBtn');
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = '...';
+
+        const { error } = await sb.auth.verifyOtp({
+            email: pendingOtpEmail,
+            token: code,
+            type: 'email'
+        });
+
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify';
+
+        if (error) {
+            status.textContent = error.message;
+            status.className = 'sync-status error';
+        }
+        // Success is handled by onAuthStateChange listener
     }
 
     async function promptSignOut() {
@@ -936,10 +1223,10 @@ body {
         await updateSyncUI();
     }
 
-    // Show a gentle nudge toast at streak milestones (once per milestone, dismissable forever)
+    // Nudge: gentle toast at streak milestones
     async function maybeShowSyncNudge() {
         const { data: { session } } = await sb.auth.getSession();
-        if (session) return; // already signed in
+        if (session) return;
 
         const dismissed = localStorage.getItem(NUDGE_DISMISSED_KEY);
         if (dismissed === 'forever') return;
@@ -947,7 +1234,6 @@ body {
         const streak = gameState.streak;
         if (!STREAK_NUDGE_MILESTONES.includes(streak)) return;
 
-        // Only show once per milestone
         const shownKey = `make24_nudge_shown_${streak}`;
         if (localStorage.getItem(shownKey)) return;
         localStorage.setItem(shownKey, '1');
@@ -961,6 +1247,17 @@ body {
         const nudge = document.getElementById('syncNudge');
         nudge.classList.remove('visible');
         localStorage.setItem(NUDGE_DISMISSED_KEY, 'forever');
+    }
+
+    // Nudge link opens the archive modal (where the sign-in lives)
+    function nudgeOpenSignIn() {
+        dismissSyncNudge();
+        showArchive();
+        // Scroll sync section into view after modal opens
+        setTimeout(() => {
+            const syncSection = document.getElementById('syncSection');
+            if (syncSection) syncSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
     }
 
     async function ensureCanonicalDeviceId() {
@@ -1925,11 +2222,22 @@ body {
     document.getElementById('hintBtn').addEventListener('click', useHint);
 
     // Sync nudge toast handlers
-    document.getElementById('syncNudgeLink').addEventListener('click', () => {
-        dismissSyncNudge();
-        promptSignIn();
-    });
+    document.getElementById('syncNudgeLink').addEventListener('click', nudgeOpenSignIn);
     document.getElementById('syncNudgeDismiss').addEventListener('click', dismissSyncNudge);
+
+    // Auth: Google + OTP handlers
+    document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
+    document.getElementById('otpSendBtn').addEventListener('click', sendOtpCode);
+    document.getElementById('otpVerifyBtn').addEventListener('click', verifyOtpCode);
+    document.getElementById('syncSignOutBtn').addEventListener('click', promptSignOut);
+
+    // Allow Enter key in OTP inputs
+    document.getElementById('otpEmailInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendOtpCode();
+    });
+    document.getElementById('otpCodeInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') verifyOtpCode();
+    });
 
     document.getElementById('operatorsOverlay').addEventListener('click', (e) => {
         if (e.target === e.currentTarget) {
