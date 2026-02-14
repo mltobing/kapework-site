@@ -1307,7 +1307,21 @@ body {
 
     async function syncHistoryFromSupabase() {
         try {
-            const url = `${SUPABASE_URL}/rest/v1/solves?device_id=eq.${encodeURIComponent(gameState.deviceId)}&solved=eq.true&select=puzzle_num,moves,solve_time,operators,undos&order=puzzle_num.desc&limit=500`;
+            // Step 1: Get player_id from device_id
+            const playerUrl = `${SUPABASE_URL}/rest/v1/players?device_id=eq.${encodeURIComponent(gameState.deviceId)}&select=id&limit=1`;
+            const playerRes = await fetch(playerUrl, {
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                }
+            });
+            if (!playerRes.ok) return;
+            const players = await playerRes.json();
+            if (!players || players.length === 0) return;
+            const playerId = players[0].id;
+
+            // Step 2: Get all solved puzzles from daily_results
+            const url = `${SUPABASE_URL}/rest/v1/daily_results?player_id=eq.${playerId}&solved=eq.true&select=puzzle_num,moves,solve_time_seconds,operators,undos,is_perfect,is_fast&order=puzzle_num.desc&limit=500`;
             const response = await fetch(url, {
                 headers: {
                     'apikey': SUPABASE_KEY,
@@ -1329,8 +1343,8 @@ body {
                         moves: row.moves || 0,
                         operators: row.operators || [],
                         undos: row.undos || 0,
-                        solveTime: row.solve_time || 0,
-                        hinted: false  // not tracked server-side; assume no hint
+                        solveTime: row.solve_time_seconds || 0,
+                        hinted: false
                     };
                     merged++;
                 }
