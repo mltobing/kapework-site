@@ -1301,11 +1301,49 @@ body {
         } catch (e) { console.log('syncFromSupabase skipped:', e?.message || e); }
     }
 
+    async function syncHistoryFromSupabase() {
+        try {
+            const url = `${SUPABASE_URL}/rest/v1/solves?device_id=eq.${encodeURIComponent(gameState.deviceId)}&solved=eq.true&select=puzzle_num,moves,solve_time,operators,undos&order=puzzle_num.desc&limit=500`;
+            const response = await fetch(url, {
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                }
+            });
+            if (!response.ok) return;
+            const rows = await response.json();
+            if (!rows || rows.length === 0) return;
+
+            let merged = 0;
+            for (const row of rows) {
+                const num = row.puzzle_num;
+                const existing = gameState.history[num];
+                // Only fill in missing history — never overwrite local data
+                if (!existing || !existing.completed) {
+                    gameState.history[num] = {
+                        completed: true,
+                        moves: row.moves || 0,
+                        operators: row.operators || [],
+                        undos: row.undos || 0,
+                        solveTime: row.solve_time || 0,
+                        hinted: false  // not tracked server-side; assume no hint
+                    };
+                    merged++;
+                }
+            }
+            if (merged > 0) {
+                saveState();
+                console.log(`History sync: merged ${merged} solves from server`);
+            }
+        } catch (e) { console.log('syncHistoryFromSupabase skipped:', e?.message || e); }
+    }
+
     sb.auth.onAuthStateChange(async (_event, session) => {
         await updateSyncUI();
         if (session) {
             await ensureCanonicalDeviceId();
             await syncFromSupabase();
+            await syncHistoryFromSupabase();
             updateStreakDisplay();
         }
     });
@@ -2277,6 +2315,7 @@ body {
         }
 
         await syncFromSupabase();
+        await syncHistoryFromSupabase();
         updateStreak();
         initPuzzle(getTodayPuzzleNumber(), false);
     }
