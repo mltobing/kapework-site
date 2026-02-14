@@ -289,6 +289,7 @@ body {
 
 .otp-code-input {
     flex: 1;
+    min-width: 0;
     padding: 8px 10px;
     background: #0f172a;
     border: 1px solid #334155;
@@ -296,7 +297,7 @@ body {
     color: #f1f5f9;
     font-family: 'Space Mono', monospace;
     font-size: 1rem;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.15em;
     text-align: center;
     outline: none;
     transition: border-color 0.15s;
@@ -313,16 +314,19 @@ body {
 }
 
 .otp-verify-btn {
-    padding: 8px 14px;
+    padding: 8px 16px;
     background: #22d3ee;
     border: none;
     border-radius: 6px;
     color: #0f172a;
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 700;
     cursor: pointer;
     transition: background 0.15s;
+    white-space: nowrap;
+    min-width: 64px;
+    flex-shrink: 0;
 }
 
 .otp-verify-btn:hover {
