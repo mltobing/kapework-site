@@ -57,7 +57,7 @@
 {
   "slug": "make24",
   "name": "Make 24",
-  "url": "apps/make24/",
+  "url": "https://make24.app",
   "released_at": "2025-09-27",
   "tags": ["math","logic","24"],
   "blurb": "Use each number once. Tap two cards, then an operator, to make 24.",
