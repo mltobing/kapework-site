@@ -62,5 +62,14 @@
   "tags": ["math","logic","24"],
   "blurb": "Use each number once. Tap two cards, then an operator, to make 24.",
   "cover_emoji": "➗"
+},
+{
+  "slug": "letterhunt",
+  "name": "Letter Hunt",
+  "url": "apps/letterhunt/letterhunt.html",
+  "released_at": "2026-02-19",
+  "tags": ["phonics","kids","reading"],
+  "blurb": "Find pictures that start with the target sound. OG-aligned daily reading practice.",
+  "cover_emoji": "🔍"
 }
 ]
