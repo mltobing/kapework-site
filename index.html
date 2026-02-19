@@ -3,249 +3,663 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Kapework Arcade</title>
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0a1628" />
+<title>Kapework</title>
 <style>
-  :root { --bd:#e5e7eb; --muted:#6b7280; }
-  *{box-sizing:border-box}
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto;max-width:960px;margin:0 auto;padding:16px}
-  header{display:flex;gap:12px;align-items:center;justify-content:space-between}
-  .sorter{display:flex;gap:8px;align-items:center}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px}
+/* ─── Reset & tokens ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* Card is a link so navigation is instant; heart stops it with preventDefault */
-  a.card{
-    position:relative; display:block; text-decoration:none; color:inherit;
-    border:1px solid var(--bd); border-radius:16px; padding:14px 14px 42px;
-    box-shadow:0 1px 3px rgba(0,0,0,.05); background:#fff; cursor:pointer;
-  }
-  .title{display:flex;gap:10px;align-items:center}
-  .emoji{font-size:1.3rem}
-  .name{font-weight:700}
-  .badge{position:absolute;bottom:10px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff}
-  .playbadge{left:10px}
-  button.like{right:10px;position:absolute;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:#fff;cursor:pointer}
-  button.like.liked{background:#f9fafb}
+:root {
+  --bg:       #0a1628;
+  --surface:  #121e33;
+  --surface2: #1a2a44;
+  --border:   rgba(232,237,245,0.07);
+  --border-hover: rgba(232,237,245,0.14);
+  --cyan:     #00e5cc;
+  --cyan-dim: rgba(0,229,204,0.10);
+  --gold:     #ffd700;
+  --text:     #e8edf5;
+  --muted:    rgba(232,237,245,0.45);
+  --success:  #4ade80;
+  --tag-bg:   rgba(232,237,245,0.06);
+}
 
-  .feedback{margin-top:32px;border-top:1px solid var(--bd);padding-top:16px;display:grid;gap:10px}
-  textarea,button,select{font:inherit}
-  textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px}
-  .ok{color:#065f46}
-  .err{color:#7f1d1d}
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+button, select, textarea { font: inherit; }
+
+/* ─── Layout ───────────────────────────────────────────────────── */
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+/* ─── Header ───────────────────────────────────────────────────── */
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.wordmark-text {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.wordmark-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  margin-left: 2px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Sort control */
+.sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e8edf5' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  transition: border-color 0.15s;
+}
+select:hover { border-color: var(--border-hover); }
+select:focus { outline: none; border-color: var(--cyan); }
+
+/* ─── Section heading ──────────────────────────────────────────── */
+.section-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.section-count {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ─── Game grid ────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+/* ─── Game card ────────────────────────────────────────────────── */
+a.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+a.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at top left, var(--cyan-dim) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+
+a.card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+a.card:hover::before { opacity: 1; }
+a.card:active { transform: translateY(0) scale(0.99); }
+
+/* Card top row */
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+/* Like button */
+button.like {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+button.like:hover { color: var(--text); border-color: var(--border-hover); }
+button.like.liked { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
+
+/* Card body */
+.card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.card-blurb {
+  font-size: 0.83rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Tags */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  letter-spacing: 0.2px;
+}
+
+/* Card footer */
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.play-count {
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.play-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0,229,204,0.25);
+  border-radius: 50%;
+  color: var(--cyan);
+  font-size: 0.7rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+a.card:hover .play-arrow {
+  background: rgba(0,229,204,0.2);
+  border-color: var(--cyan);
+}
+
+/* ─── Empty / error state ──────────────────────────────────────── */
+.state-msg {
+  grid-column: 1 / -1;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ─── Divider ──────────────────────────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 48px 0 36px;
+}
+
+/* ─── Feedback section ─────────────────────────────────────────── */
+.feedback-section {
+  max-width: 560px;
+}
+
+.feedback-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.feedback-sub {
+  font-size: 0.83rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.feedback-attached {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.feedback-attached span {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.15s;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+textarea::placeholder { color: var(--muted); }
+textarea:focus { outline: none; border-color: var(--cyan); }
+
+.feedback-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.feedback-status {
+  font-size: 0.82rem;
+  flex: 1;
+}
+.feedback-status.ok  { color: var(--success); }
+.feedback-status.err { color: #f87171; }
+
+.btn-send {
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+.btn-send:hover   { opacity: 0.9; }
+.btn-send:active  { transform: scale(0.97); }
+.btn-send:disabled { opacity: 0.4; cursor: default; }
+
+/* ─── Footer ───────────────────────────────────────────────────── */
+.site-footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
 </style>
 </head>
 <body>
-  <header>
-    <h1>Kapework Arcade</h1>
-    <div class="sorter">
-      <label for="sort">Sort:</label>
-      <select id="sort" aria-label="Sort games">
-        <option value="newest">Newest</option>
-        <option value="name">Name (A–Z)</option>
-        <option value="likes">Most Liked</option>
-        <option value="plays">Most Played</option>
-      </select>
+<div class="page">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="wordmark">
+      <span class="wordmark-text">Kapework</span>
+      <div class="wordmark-dot"></div>
+    </div>
+    <div class="header-right">
+      <div class="sort-wrap">
+        <span class="sort-label">Sort</span>
+        <select id="sort" aria-label="Sort games">
+          <option value="newest">Newest</option>
+          <option value="name">A – Z</option>
+          <option value="likes">Most liked</option>
+          <option value="plays">Most played</option>
+        </select>
+      </div>
     </div>
   </header>
 
+  <!-- Grid -->
+  <div class="section-meta">
+    <span class="section-count" id="game-count"></span>
+  </div>
   <div id="grid" class="grid" aria-live="polite"></div>
 
-  <section class="feedback">
-    <h2>Quick feedback</h2>
-    <div class="meta">Attached to: <span id="fb-target">General</span></div>
-    <textarea id="fb-message" rows="3" placeholder="Tell me anything you liked or what to improve. (We’ll tag it to the last game you played.)"></textarea>
-    <div style="display:flex;justify-content:flex-end">
-      <button id="fb-send">Send</button>
+  <hr class="divider" />
+
+  <!-- Feedback -->
+  <section class="feedback-section">
+    <div class="feedback-title">Quick feedback</div>
+    <div class="feedback-sub">What's working? What could be better?</div>
+    <div class="feedback-attached">Game: <span id="fb-target">General</span></div>
+    <textarea id="fb-message" rows="3" placeholder="Tell us anything — a bug, an idea, a reaction."></textarea>
+    <div class="feedback-row">
+      <span class="feedback-status" id="fb-status"></span>
+      <button class="btn-send" id="fb-send">Send</button>
     </div>
-    <p id="fb-status" class="meta"></p>
   </section>
 
-  <!-- Supabase first -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <footer class="site-footer">
+    Kapework &mdash; small games, big ideas
+  </footer>
 
-  <script>
-    // === Supabase project (anon/public) ===
-    const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
-    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
-    let sb = null;
+</div>
 
-    // REST endpoints (used with keepalive for reliable writes on navigation)
-    const REST_PLAYS = `${SUPABASE_URL}/rest/v1/plays`;
-    const REST_LIKES = `${SUPABASE_URL}/rest/v1/likes`;
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
 
-    // DOM
-    const grid = document.getElementById("grid");
-    const sortSel = document.getElementById("sort");
-    const fbMsg = document.getElementById("fb-message");
-    const fbSend = document.getElementById("fb-send");
-    const fbStatus = document.getElementById("fb-status");
-    const fbTarget = document.getElementById("fb-target");
+/* ─── Supabase ─────────────────────────────────────────────────── */
+const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+const REST_PLAYS = `${SUPABASE_URL}/rest/v1/plays`;
+const REST_LIKES = `${SUPABASE_URL}/rest/v1/likes`;
+let sb = null;
 
-    // Local keys
-    const DID_KEY   = "kapework_did_v1";
-    const LIKED_KEY = "kapework_liked_by_me_v1";
-    const LAST_KEY  = "kapework_last_played_slug";
+/* ─── DOM refs ─────────────────────────────────────────────────── */
+const gridEl     = document.getElementById("grid");
+const sortSel    = document.getElementById("sort");
+const gameCount  = document.getElementById("game-count");
+const fbMsg      = document.getElementById("fb-message");
+const fbSend     = document.getElementById("fb-send");
+const fbStatus   = document.getElementById("fb-status");
+const fbTarget   = document.getElementById("fb-target");
 
-    // Device id + local liked
-    let deviceId = localStorage.getItem(DID_KEY);
-    if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
-    let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
+/* ─── Local state ──────────────────────────────────────────────── */
+const DID_KEY   = "kapework_did_v1";
+const LIKED_KEY = "kapework_liked_by_me_v1";
+const LAST_KEY  = "kapework_last_played_slug";
 
-    // Data
-    let games = [];
-    const bySlug = new Map();
-    let likeCounts = new Map(); // slug->int
-    let playCounts = new Map(); // slug->int
+let deviceId = localStorage.getItem(DID_KEY);
+if (!deviceId) {
+  deviceId = crypto?.randomUUID?.() || String(Math.random()).slice(2);
+  localStorage.setItem(DID_KEY, deviceId);
+}
+let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
 
-    function showError(msg){
-      const p=document.createElement("p"); p.className="meta err"; p.textContent=msg; grid.appendChild(p);
-    }
+let games      = [];
+const bySlug   = new Map();
+let likeCounts = new Map();
+let playCounts = new Map();
 
-    async function loadManifest(){
-      try{
-        const res = await fetch("manifest.json?v=" + Date.now());
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        if (!Array.isArray(data)) throw new Error("JSON not array");
-        games = data; games.forEach(g => bySlug.set(g.slug,g));
-      }catch(e){ showError("Could not load manifest.json: " + (e.message||e)); games=[]; }
-    }
+/* ─── Data loading ─────────────────────────────────────────────── */
+async function loadManifest() {
+  try {
+    const res  = await fetch("manifest.json?v=" + Date.now());
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error("not array");
+    games = data;
+    games.forEach(g => bySlug.set(g.slug, g));
+  } catch (e) {
+    gridEl.innerHTML = `<div class="state-msg">Could not load games: ${e.message}</div>`;
+  }
+}
 
-    async function loadCounts(){
-      if (!sb) return;
-      try{
-        const { data } = await sb.from("game_like_counts").select();
-        if (data) likeCounts = new Map(data.map(r=>[r.slug, r.likes]));
-      }catch(_){}
-      try{
-        const { data } = await sb.from("game_play_counts").select();
-        if (data) playCounts = new Map(data.map(r=>[r.slug, r.plays]));
-      }catch(_){}
-    }
+async function loadCounts() {
+  if (!sb) return;
+  try {
+    const { data } = await sb.from("game_like_counts").select();
+    if (data) likeCounts = new Map(data.map(r => [r.slug, r.likes]));
+  } catch (_) {}
+  try {
+    const { data } = await sb.from("game_play_counts").select();
+    if (data) playCounts = new Map(data.map(r => [r.slug, r.plays]));
+  } catch (_) {}
+}
 
-    function sortGames(list, mode){
-      if (mode === "name")  return [...list].sort((a,b)=>a.name.localeCompare(b.name));
-      if (mode === "likes") return [...list].sort((a,b)=>(likeCounts.get(b.slug)||0)-(likeCounts.get(a.slug)||0));
-      if (mode === "plays") return [...list].sort((a,b)=>(playCounts.get(b.slug)||0)-(playCounts.get(a.slug)||0));
-      return [...list].sort((a,b)=>new Date(b.released_at)-new Date(a.released_at)); // newest
-    }
+/* ─── Sorting ──────────────────────────────────────────────────── */
+function sortGames(list, mode) {
+  if (mode === "name")  return [...list].sort((a, b) => a.name.localeCompare(b.name));
+  if (mode === "likes") return [...list].sort((a, b) => (likeCounts.get(b.slug) || 0) - (likeCounts.get(a.slug) || 0));
+  if (mode === "plays") return [...list].sort((a, b) => (playCounts.get(b.slug) || 0) - (playCounts.get(a.slug) || 0));
+  return [...list].sort((a, b) => new Date(b.released_at) - new Date(a.released_at));
+}
 
-    function render(){
-      grid.innerHTML="";
-      const sorted = sortGames(games, sortSel.value);
-      sorted.forEach(g=>{
-        const liked = !!likedByMe[g.slug];
-        const likeNum = likeCounts.get(g.slug) ?? 0;
-        const playNum = playCounts.get(g.slug) ?? 0;
+/* ─── Render ───────────────────────────────────────────────────── */
+function render() {
+  gridEl.innerHTML = "";
+  if (!games.length) {
+    gridEl.innerHTML = `<div class="state-msg">No games yet.</div>`;
+    return;
+  }
 
-        // Whole card is a link for instant navigation
-        const card = document.createElement("a");
-        card.className = "card";
-        card.href = g.url;
-        card.target = "_blank";
-        card.setAttribute("aria-label", `Play ${g.name}`);
+  const sorted = sortGames(games, sortSel.value);
+  gameCount.textContent = `${sorted.length} game${sorted.length !== 1 ? "s" : ""}`;
 
-        card.innerHTML = `
-          <div class="title">
-            <span class="emoji">${g.cover_emoji || "🎮"}</span>
-            <div class="name">${g.name}</div>
-          </div>
-          <span class="badge playbadge" data-slug="${g.slug}">▶︎ ${playNum}</span>
-          <button type="button" class="like ${liked?"liked":""}" data-slug="${g.slug}" aria-pressed="${liked}">
-            ${liked ? "❤️" : "♡"} ${likeNum}
-          </button>
-        `;
+  sorted.forEach(g => {
+    const liked    = !!likedByMe[g.slug];
+    const likeNum  = likeCounts.get(g.slug) ?? 0;
+    const playNum  = playCounts.get(g.slug) ?? 0;
 
-        // Before navigation, record a play using keepalive fetch (survives unload)
-        card.addEventListener("click",(e)=>{
-          // If the heart was clicked, the button handler will preventDefault()
-          // For real card clicks, let the link navigate and fire this non-blocking request.
-          localStorage.setItem(LAST_KEY, g.slug);
-          const badge = card.querySelector(".playbadge");
-          playCounts.set(g.slug, (playCounts.get(g.slug)||0)+1);
-          if (badge) badge.textContent = `▶︎ ${playCounts.get(g.slug)}`;
-          if (sortSel.value === "plays") setTimeout(render, 0);
+    const card = document.createElement("a");
+    card.className = "card";
+    card.href      = g.url;
+    card.target    = "_blank";
+    card.rel       = "noopener";
+    card.setAttribute("aria-label", `Play ${g.name}`);
 
-          // Keepalive REST call (headers allowed; continues after unload)
-          fetch(REST_PLAYS, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "apikey": SUPABASE_ANON,
-              "Authorization": `Bearer ${SUPABASE_ANON}`,
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify({ slug: g.slug, device_id: deviceId }),
-            keepalive: true
-          }).catch(()=>{});
-        });
+    const tagsHtml = (g.tags || []).map(t => `<span class="tag">${t}</span>`).join("");
 
-        // Heart button: stop the link, like globally, update UI, re-sort if needed
-        const likeBtn = card.querySelector("button.like");
-        likeBtn.addEventListener("click", async (e)=>{
-          e.preventDefault(); e.stopPropagation();
-          const slug = e.currentTarget.dataset.slug;
-          if (likedByMe[slug]) return;
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="card-icon">${g.cover_emoji || "🎮"}</div>
+        <button type="button" class="like ${liked ? "liked" : ""}" data-slug="${g.slug}" aria-pressed="${liked}">
+          ${liked ? "❤️" : "♡"} <span class="like-num">${likeNum}</span>
+        </button>
+      </div>
+      <div class="card-name">${g.name}</div>
+      ${g.blurb ? `<div class="card-blurb">${g.blurb}</div>` : ""}
+      ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ""}
+      <div class="card-footer">
+        <span class="play-count">▶ ${playNum}</span>
+        <span class="play-arrow">→</span>
+      </div>
+    `;
 
-          likedByMe[slug] = true;
-          localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
-          likeCounts.set(slug, (likeCounts.get(slug)||0) + 1);
+    /* Track play on navigation */
+    card.addEventListener("click", e => {
+      localStorage.setItem(LAST_KEY, g.slug);
+      playCounts.set(g.slug, (playCounts.get(g.slug) || 0) + 1);
+      const pc = card.querySelector(".play-count");
+      if (pc) pc.textContent = `▶ ${playCounts.get(g.slug)}`;
+      if (sortSel.value === "plays") setTimeout(render, 0);
 
-          e.currentTarget.classList.add("liked");
-          e.currentTarget.setAttribute("aria-pressed","true");
-          e.currentTarget.textContent = `❤️ ${likeCounts.get(slug)}`;
-          if (sortSel.value === "likes") render();
-
-          // Write like via REST keepalive too (robust), but we can use SDK here as page stays
-          fetch(REST_LIKES, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "apikey": SUPABASE_ANON,
-              "Authorization": `Bearer ${SUPABASE_ANON}`,
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify({ slug, device_id: deviceId }),
-            keepalive: true
-          }).catch(()=>{});
-        });
-
-        grid.appendChild(card);
-      });
-    }
-
-    function refreshAttachLabel(){
-      const last = localStorage.getItem(LAST_KEY);
-      fbTarget.textContent = (last && bySlug.has(last)) ? `${bySlug.get(last).name} (last played)` : "General";
-    }
-
-    async function sendFeedback(){
-      const message = fbMsg.value.trim();
-      if (!message) { fbStatus.textContent="Please write a quick note."; fbStatus.className="meta err"; return; }
-      if (!sb) { fbStatus.textContent="Feedback service not ready. Reload and try again."; fbStatus.className="meta err"; return; }
-      const last = localStorage.getItem(LAST_KEY);
-      const slug = (last && bySlug.has(last)) ? last : "general";
-
-      fbSend.disabled = true; fbStatus.textContent="Sending…"; fbStatus.className="meta";
-      const { error } = await sb.from("feedback").insert({ slug, message });
-      if (error) { fbStatus.textContent="Could not send, please try again."; fbStatus.className="meta err"; }
-      else { fbStatus.textContent="Thank you! Saved."; fbStatus.className="meta ok"; fbMsg.value=""; }
-      fbSend.disabled = false;
-    }
-
-    sortSel.addEventListener("change", render);
-    fbSend.addEventListener("click", sendFeedback);
-    document.addEventListener("visibilitychange", async ()=>{
-      // When returning to this tab, refresh counts from the server
-      if (!document.hidden){ await loadCounts(); render(); refreshAttachLabel(); }
+      fetch(REST_PLAYS, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ slug: g.slug, device_id: deviceId }),
+        keepalive: true
+      }).catch(() => {});
     });
 
-    window.addEventListener("load", async ()=>{
-      try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch(e) {}
-      await loadManifest();
-      await loadCounts();
-      render();
-      refreshAttachLabel();
+    /* Like button */
+    card.querySelector("button.like").addEventListener("click", async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const slug = e.currentTarget.dataset.slug;
+      if (likedByMe[slug]) return;
+
+      likedByMe[slug] = true;
+      localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
+      likeCounts.set(slug, (likeCounts.get(slug) || 0) + 1);
+
+      const btn  = e.currentTarget;
+      const numEl = btn.querySelector(".like-num");
+      btn.classList.add("liked");
+      btn.setAttribute("aria-pressed", "true");
+      btn.firstChild.textContent = "❤️ ";
+      if (numEl) numEl.textContent = likeCounts.get(slug);
+      if (sortSel.value === "likes") render();
+
+      fetch(REST_LIKES, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${SUPABASE_ANON}`,
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ slug, device_id: deviceId }),
+        keepalive: true
+      }).catch(() => {});
     });
-  </script>
+
+    gridEl.appendChild(card);
+  });
+}
+
+/* ─── Feedback attachment label ────────────────────────────────── */
+function refreshAttachLabel() {
+  const last = localStorage.getItem(LAST_KEY);
+  fbTarget.textContent = (last && bySlug.has(last))
+    ? bySlug.get(last).name
+    : "General";
+}
+
+/* ─── Send feedback ────────────────────────────────────────────── */
+async function sendFeedback() {
+  const message = fbMsg.value.trim();
+  if (!message) {
+    fbStatus.textContent = "Please write something first.";
+    fbStatus.className   = "feedback-status err";
+    return;
+  }
+  if (!sb) {
+    fbStatus.textContent = "Feedback service unavailable — reload and try again.";
+    fbStatus.className   = "feedback-status err";
+    return;
+  }
+
+  const last = localStorage.getItem(LAST_KEY);
+  const slug = (last && bySlug.has(last)) ? last : "general";
+
+  fbSend.disabled      = true;
+  fbStatus.textContent = "Sending…";
+  fbStatus.className   = "feedback-status";
+
+  const { error } = await sb.from("feedback").insert({ slug, message });
+
+  if (error) {
+    fbStatus.textContent = "Could not send — please try again.";
+    fbStatus.className   = "feedback-status err";
+  } else {
+    fbStatus.textContent = "Sent! Thank you.";
+    fbStatus.className   = "feedback-status ok";
+    fbMsg.value          = "";
+  }
+  fbSend.disabled = false;
+}
+
+/* ─── Events ───────────────────────────────────────────────────── */
+sortSel.addEventListener("change", render);
+fbSend.addEventListener("click", sendFeedback);
+
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden) {
+    await loadCounts();
+    render();
+    refreshAttachLabel();
+  }
+});
+
+/* ─── Init ─────────────────────────────────────────────────────── */
+window.addEventListener("load", async () => {
+  try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch (e) {}
+  await loadManifest();
+  await loadCounts();
+  render();
+  refreshAttachLabel();
+});
+</script>
 </body>
 </html>
