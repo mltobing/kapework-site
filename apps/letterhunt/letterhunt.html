@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Letter Hunt | Kapework</title>
+<style>
+/* ─── Reset & Root ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:        #0a1628;
+  --surface:   #121e33;
+  --surface2:  #1a2a44;
+  --cyan:      #00e5cc;
+  --cyan-dim:  rgba(0,229,204,0.15);
+  --cyan-glow: rgba(0,229,204,0.35);
+  --success:   #4ade80;
+  --success-dim: rgba(74,222,128,0.15);
+  --gold:      #ffd700;
+  --fire:      #ff6b35;
+  --text:      #e8edf5;
+  --muted:     rgba(232,237,245,0.5);
+  --border:    rgba(232,237,245,0.08);
+  --shake-color: rgba(232,237,245,0.06);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+html { position: fixed; width: 100%; }
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ─── Screens ──────────────────────────────────────────────────── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 16px env(safe-area-inset-bottom, 16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ─── Home Screen ──────────────────────────────────────────────── */
+#home {
+  justify-content: flex-start;
+  gap: 20px;
+  padding-top: 32px;
+}
+
+.home-header {
+  text-align: center;
+}
+
+.home-logo {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.home-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-top: 8px;
+}
+
+.home-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Streak bar */
+.streak-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.streak-flame { font-size: 1.3rem; }
+.streak-count { color: var(--fire); font-size: 1.3rem; font-weight: 800; }
+.streak-label { color: var(--muted); font-size: 0.85rem; }
+
+/* Game mode cards */
+.mode-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.mode-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mode-card:hover { transform: translateY(-2px); }
+.mode-card:active { transform: scale(0.98); }
+
+.mode-card.ready { border-color: var(--cyan); box-shadow: 0 0 20px var(--cyan-dim); }
+.mode-card.done  { border-color: var(--success); box-shadow: 0 0 20px var(--success-dim); }
+
+.mode-icon { font-size: 2.5rem; flex-shrink: 0; }
+
+.mode-info { flex: 1; }
+.mode-name { font-size: 1.1rem; font-weight: 800; }
+.mode-desc { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+.mode-status {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.mode-status.play  { background: var(--cyan-dim); color: var(--cyan); border: 1px solid var(--cyan); }
+.mode-status.done  { background: var(--success-dim); color: var(--success); border: 1px solid var(--success); }
+.mode-status.stars { background: rgba(255,215,0,0.15); color: var(--gold); border: 1px solid var(--gold); }
+
+.home-footer {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+/* ─── Game Screen ──────────────────────────────────────────────── */
+#game {
+  justify-content: flex-start;
+  padding-top: 16px;
+  gap: 0;
+}
+
+/* Top bar */
+.top-bar {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.back-btn:hover { color: var(--text); }
+
+/* Round dots */
+.round-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  border: 1.5px solid var(--muted);
+  transition: background 0.3s, border-color 0.3s;
+}
+.dot.done { background: var(--cyan); border-color: var(--cyan); }
+.dot.current { background: var(--cyan-dim); border-color: var(--cyan); }
+
+/* Streak chip */
+.streak-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--fire);
+}
+
+/* Letter zone */
+.letter-zone {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.letter-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.letter-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.letter-chars {
+  font-size: 3.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--cyan);
+  letter-spacing: 8px;
+  /* OpenDyslexic-style: use a clear, weighted font */
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.letter-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.speaker-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--cyan-dim);
+  border: 2px solid var(--cyan);
+  color: var(--cyan);
+  font-size: 1.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.speaker-btn:hover { background: rgba(0,229,204,0.25); }
+.speaker-btn:active { transform: scale(0.92); }
+.speaker-btn.playing { animation: pulse-speaker 0.6s ease; }
+
+@keyframes pulse-speaker {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Round instruction */
+.round-instruction {
+  width: 100%;
+  max-width: 480px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+/* Picture grid */
+.picture-grid {
+  width: 100%;
+  max-width: 480px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  flex: 1;
+}
+
+/* Picture cards */
+.pic-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 8px;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    opacity 0.2s ease;
+  min-height: 110px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pic-card:active:not(.correct):not(.locked-out) { transform: scale(0.96); }
+
+.pic-card.correct {
+  background: var(--success-dim);
+  border-color: var(--success);
+  cursor: default;
+  animation: card-pop 0.35s ease;
+}
+
+@keyframes card-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.pic-card.shake {
+  animation: card-shake 0.35s ease;
+}
+
+@keyframes card-shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-5px); }
+  40%  { transform: translateX(5px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+.pic-card.locked-out {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+
+.pic-emoji {
+  font-size: 2.4rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+.pic-card.correct .pic-emoji { transform: scale(1.1); }
+
+.pic-word {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.3px;
+  transition: color 0.2s;
+}
+.pic-card.correct .pic-word { color: var(--success); }
+
+/* Initial letter highlight in word */
+.pic-word .initial {
+  color: var(--cyan);
+  font-size: 1em;
+}
+.pic-card.correct .pic-word .initial { color: var(--success); font-weight: 900; }
+
+/* Checkmark overlay */
+.pic-check {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.pic-card.correct .pic-check { opacity: 1; }
+
+/* ─── Summary Screen ───────────────────────────────────────────── */
+#summary {
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.summary-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.summary-date {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* Stars */
+.stars-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.star {
+  font-size: 3rem;
+  opacity: 0.2;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform: scale(0.8);
+}
+.star.earned {
+  opacity: 1;
+  transform: scale(1.1);
+  animation: star-pop 0.4s ease forwards;
+  filter: drop-shadow(0 0 8px var(--gold));
+}
+
+@keyframes star-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  60%  { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1.1); opacity: 1; }
+}
+
+.star-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+/* Collectible card */
+.card-reveal {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: card-flip 0.6s ease;
+}
+
+.card-reveal.rare {
+  border-color: var(--gold);
+  box-shadow: 0 0 30px rgba(255,215,0,0.3);
+}
+
+@keyframes card-flip {
+  0%   { transform: rotateY(90deg); opacity: 0; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+
+.card-emoji { font-size: 3.5rem; }
+.card-name  { font-size: 0.85rem; color: var(--muted); font-weight: 700; }
+.card-rarity { font-size: 0.75rem; color: var(--gold); }
+
+/* Streak summary */
+.summary-streak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* Share / Done buttons */
+.summary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.btn-primary {
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 800;
+  font-size: 1rem;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  width: 100%;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  width: 100%;
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+
+/* ─── Confetti ─────────────────────────────────────────────────── */
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  animation: confetti-fall 1.2s ease-in forwards;
+  opacity: 0;
+}
+
+@keyframes confetti-fall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── Round transition ─────────────────────────────────────────── */
+.picture-grid.slide-out {
+  animation: slide-out-left 0.25s ease forwards;
+}
+.picture-grid.slide-in {
+  animation: slide-in-right 0.25s ease;
+}
+@keyframes slide-out-left {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(-60px); opacity: 0; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(60px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* ─── Reduced motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Toast ────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Utilities ────────────────────────────────────────────────── */
+.w-full { width: 100%; }
+.max-w  { max-width: 480px; }
+</style>
+</head>
+<body>
+
+<!-- ─── Home Screen ──────────────────────────────────────── -->
+<div id="home" class="screen active">
+  <div class="home-header">
+    <div class="home-logo">🔤</div>
+    <h1 class="home-title">Letter Hunt</h1>
+    <p class="home-subtitle">Find the matching sounds</p>
+  </div>
+
+  <div class="streak-bar">
+    <span class="streak-flame">🔥</span>
+    <span class="streak-count" id="home-streak">0</span>
+    <span class="streak-label">day streak</span>
+  </div>
+
+  <div class="mode-cards">
+    <div id="lh-card" class="mode-card ready" onclick="startLetterHunt()">
+      <div class="mode-icon">🔍</div>
+      <div class="mode-info">
+        <div class="mode-name">Letter Hunt</div>
+        <div class="mode-desc">5 rounds · match sounds to pictures</div>
+      </div>
+      <div id="lh-status" class="mode-status play">Play</div>
+    </div>
+  </div>
+
+  <div class="home-footer">
+    Kapework · Letter Hunt v1 · Tier 1
+  </div>
+</div>
+
+<!-- ─── Game Screen ──────────────────────────────────────── -->
+<div id="game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="round-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="letter-zone w-full max-w">
+    <div class="letter-display">
+      <div class="letter-label">Find things that start with</div>
+      <div class="letter-chars" id="letter-chars">S s</div>
+      <div class="letter-hint" id="letter-hint">as in 🐍 snake</div>
+    </div>
+    <button class="speaker-btn" id="speaker-btn" onclick="playLetterSound()" aria-label="Hear the sound">🔊</button>
+  </div>
+
+  <div class="round-instruction" id="round-instruction">
+    Tap the 2 pictures that start with this sound
+  </div>
+
+  <div class="picture-grid" id="picture-grid"></div>
+</div>
+
+<!-- ─── Summary Screen ──────────────────────────────────── -->
+<div id="summary" class="screen">
+  <div>
+    <div class="summary-title" id="summary-title">Well done!</div>
+    <div class="summary-date" id="summary-date"></div>
+  </div>
+
+  <div class="stars-row" id="stars-row">
+    <div class="star" id="star1">⭐</div>
+    <div class="star" id="star2">⭐</div>
+    <div class="star" id="star3">⭐</div>
+  </div>
+  <div class="star-label" id="star-label">Great job!</div>
+
+  <div class="card-reveal" id="card-reveal">
+    <div class="card-emoji" id="card-emoji">🦁</div>
+    <div class="card-name" id="card-name">Lion</div>
+    <div class="card-rarity" id="card-rarity">Today's card</div>
+  </div>
+
+  <div class="summary-streak">
+    <span>🔥</span>
+    <span id="summary-streak-count">0</span>
+    <span style="color:var(--muted);font-size:0.9rem">day streak</span>
+  </div>
+
+  <div class="summary-actions">
+    <button class="btn-secondary" onclick="shareResult()" id="share-btn">Share result</button>
+    <button class="btn-primary" onclick="goHome()">Done!</button>
+  </div>
+</div>
+
+<!-- ─── Confetti container ───────────────────────────────── -->
+<div class="confetti-container" id="confetti"></div>
+
+<!-- ─── Toast ─────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   LETTER HUNT · Kapework
+   Phase 1: Tier 1 letters  (s, a, t, p, i, n)
+   Storage: localStorage only (Supabase to be added later)
+   ═══════════════════════════════════════════════════════════════ */
+
+'use strict';
+
+/* ─── Audio ────────────────────────────────────────────────────── */
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, duration, type = 'sine', gainVal = 0.4) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) { /* audio not available */ }
+}
+
+function playChord(freqs, duration) {
+  freqs.forEach((f, i) => {
+    setTimeout(() => playTone(f, duration, 'sine', 0.3), i * 60);
+  });
+}
+
+// Correct tap: bright chime
+function soundCorrect() {
+  playChord([523, 659, 784], 0.4);
+}
+
+// Incorrect tap: soft thud (low thump)
+function soundIncorrect() {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(120, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) {}
+}
+
+// Round complete: rising arp
+function soundRoundComplete() {
+  const notes = [392, 494, 587, 698, 784];
+  notes.forEach((f, i) => {
+    setTimeout(() => playTone(f, 0.3, 'sine', 0.25), i * 90);
+  });
+}
+
+// Session complete: full celebration
+function soundSessionComplete() {
+  const notes = [523, 659, 784, 1047, 1319];
+  notes.forEach((f, i) => {
+    setTimeout(() => playTone(f, 0.5, 'sine', 0.28), i * 100);
+  });
+  setTimeout(() => playChord([523, 659, 784], 0.8), 600);
+}
+
+// Letter sounds: synthesized using oscillator frequency patterns
+// These are rough phoneme approximations using tone + noise
+function playLetterPhoneme(letter) {
+  try {
+    const ctx = getAudioCtx();
+
+    const phonemes = {
+      's': () => playNoise(ctx, 0.4, 6000, 8000),          // sibilant /s/
+      'a': () => playVowelTone(ctx, 850, 1200, 0.4),       // /æ/ short a
+      't': () => { playNoise(ctx, 0.05, 4000, 8000); setTimeout(() => playTone(200, 0.08, 'square', 0.2), 60); }, // /t/
+      'p': () => { playTone(150, 0.05, 'square', 0.3); setTimeout(() => playNoise(ctx, 0.1, 2000, 5000), 50); },  // /p/
+      'i': () => playVowelTone(ctx, 400, 2300, 0.4),       // /ɪ/ short i
+      'n': () => playNasalTone(ctx, 250, 0.4),             // /n/ nasal
+    };
+
+    const fn = phonemes[letter];
+    if (fn) fn();
+    else playTone(440, 0.3);
+  } catch (e) {}
+}
+
+function playNoise(ctx, duration, freqLow, freqHigh) {
+  const bufferSize = ctx.sampleRate * duration;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(freqLow + (freqHigh - freqLow) / 2, ctx.currentTime);
+  filter.Q.setValueAtTime(0.5, ctx.currentTime);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  source.start(ctx.currentTime);
+  source.stop(ctx.currentTime + duration);
+}
+
+function playVowelTone(ctx, f1, f2, duration) {
+  [f1, f2].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(i === 0 ? 0.3 : 0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  });
+}
+
+function playNasalTone(ctx, freq, duration) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(250, ctx.currentTime);
+  filter.Q.setValueAtTime(5, ctx.currentTime);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(freq, ctx.currentTime);
+  gain.gain.setValueAtTime(0.25, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
+
+
+/* ─── Content Data ─────────────────────────────────────────────── */
+
+// Tier 1 letters with keyword hints and image sets
+// Each item: { word, emoji, startsWith letter }
+const TIER1 = {
+  s: {
+    hint: '🐍 snake',
+    items: [
+      { word: 'sun',    emoji: '☀️',  correct: true  },
+      { word: 'sock',   emoji: '🧦',  correct: true  },
+      { word: 'dog',    emoji: '🐕',  correct: false },
+      { word: 'moon',   emoji: '🌙',  correct: false },
+      { word: 'bird',   emoji: '🐦',  correct: false },
+      { word: 'train',  emoji: '🚂',  correct: false },
+      { word: 'star',   emoji: '⭐',  correct: true  }, // extra, not always shown
+      { word: 'sheep',  emoji: '🐑',  correct: true  }, // extra
+    ]
+  },
+  a: {
+    hint: '🍎 apple',
+    items: [
+      { word: 'ant',    emoji: '🐜',  correct: true  },
+      { word: 'apple',  emoji: '🍎',  correct: true  },
+      { word: 'cat',    emoji: '🐱',  correct: false },
+      { word: 'ball',   emoji: '⚽',  correct: false },
+      { word: 'fish',   emoji: '🐟',  correct: false },
+      { word: 'moon',   emoji: '🌙',  correct: false },
+      { word: 'anchor', emoji: '⚓',  correct: true  }, // extra
+      { word: 'arrow',  emoji: '🏹',  correct: true  }, // extra
+    ]
+  },
+  t: {
+    hint: '🐯 tiger',
+    items: [
+      { word: 'tiger',  emoji: '🐯',  correct: true  },
+      { word: 'turtle', emoji: '🐢',  correct: true  },
+      { word: 'bike',   emoji: '🚲',  correct: false },
+      { word: 'cup',    emoji: '☕',  correct: false },
+      { word: 'rain',   emoji: '🌧️',  correct: false },
+      { word: 'star',   emoji: '⭐',  correct: false },
+      { word: 'truck',  emoji: '🚚',  correct: true  }, // extra
+      { word: 'tree',   emoji: '🌳',  correct: true  }, // extra
+    ]
+  },
+  p: {
+    hint: '🐧 penguin',
+    items: [
+      { word: 'pig',    emoji: '🐷',  correct: true  },
+      { word: 'pizza',  emoji: '🍕',  correct: true  },
+      { word: 'dog',    emoji: '🐕',  correct: false },
+      { word: 'tree',   emoji: '🌳',  correct: false },
+      { word: 'cup',    emoji: '☕',  correct: false },
+      { word: 'fish',   emoji: '🐟',  correct: false },
+      { word: 'pear',   emoji: '🍐',  correct: true  }, // extra
+      { word: 'parrot', emoji: '🦜',  correct: true  }, // extra
+    ]
+  },
+  i: {
+    hint: '🦋 insect',
+    items: [
+      { word: 'igloo',  emoji: '🏔️',  correct: true  },
+      { word: 'insect', emoji: '🐛',  correct: true  },
+      { word: 'dog',    emoji: '🐕',  correct: false },
+      { word: 'train',  emoji: '🚂',  correct: false },
+      { word: 'moon',   emoji: '🌙',  correct: false },
+      { word: 'ball',   emoji: '⚽',  correct: false },
+      { word: 'iron',   emoji: '🔧',  correct: true  }, // extra
+      { word: 'ink',    emoji: '🖊️',  correct: true  }, // extra
+    ]
+  },
+  n: {
+    hint: '🌙 night',
+    items: [
+      { word: 'net',    emoji: '🕸️',  correct: true  },
+      { word: 'nose',   emoji: '👃',  correct: true  },
+      { word: 'dog',    emoji: '🐕',  correct: false },
+      { word: 'apple',  emoji: '🍎',  correct: false },
+      { word: 'sun',    emoji: '☀️',  correct: false },
+      { word: 'ball',   emoji: '⚽',  correct: false },
+      { word: 'nest',   emoji: '🪺',  correct: true  }, // extra
+      { word: 'nut',    emoji: '🥜',  correct: true  }, // extra
+    ]
+  }
+};
+
+// Collectible cards pool
+const CARDS = [
+  { emoji: '🦁', name: 'Lion',      rarity: 'standard' },
+  { emoji: '🐘', name: 'Elephant',  rarity: 'standard' },
+  { emoji: '🦊', name: 'Fox',       rarity: 'standard' },
+  { emoji: '🐬', name: 'Dolphin',   rarity: 'standard' },
+  { emoji: '🦒', name: 'Giraffe',   rarity: 'standard' },
+  { emoji: '🐧', name: 'Penguin',   rarity: 'standard' },
+  { emoji: '🦜', name: 'Parrot',    rarity: 'standard' },
+  { emoji: '🐯', name: 'Tiger',     rarity: 'standard' },
+  { emoji: '🦋', name: 'Butterfly', rarity: 'standard' },
+  { emoji: '🐺', name: 'Wolf',      rarity: 'standard' },
+  { emoji: '🦅', name: 'Eagle',     rarity: 'rare'     },
+  { emoji: '🦄', name: 'Unicorn',   rarity: 'rare'     },
+  { emoji: '🐉', name: 'Dragon',    rarity: 'rare'     },
+  { emoji: '🦚', name: 'Peacock',   rarity: 'rare'     },
+];
+
+/* ─── State ────────────────────────────────────────────────────── */
+const ROUNDS_PER_SESSION = 5;
+
+let state = {
+  // Session
+  currentRound: 0,          // 0-indexed
+  rounds: [],               // built at session start
+  totalIncorrect: 0,
+  sessionStartTime: null,
+  // Round
+  foundCorrect: 0,
+  roundIncorrect: 0,
+  tapCounts: {},            // itemWord -> tap count
+  // Progress (from localStorage)
+  streak: 0,
+  lastPlayDate: null,
+  todayDone: false,
+  todayStars: 0,
+  earnedCard: null,
+};
+
+/* ─── LocalStorage helpers ─────────────────────────────────────── */
+const LS_KEY = 'kapework_lh_v1';
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    state.streak         = data.streak ?? 0;
+    state.lastPlayDate   = data.lastPlayDate ?? null;
+    state.todayDone      = data.todayDone ?? false;
+    state.todayStars     = data.todayStars ?? 0;
+    state.earnedCard     = data.earnedCard ?? null;
+    // Check if "today" in stored data is still today
+    const today = getTodayStr();
+    if (data.lastPlayDate !== today) {
+      state.todayDone  = false;
+      state.todayStars = 0;
+      state.earnedCard = null;
+    }
+    // Streak: if last played was >1 day ago, and no shield, reset
+    if (state.lastPlayDate) {
+      const daysSince = daysBetween(state.lastPlayDate, today);
+      if (daysSince > 1) {
+        state.streak = 0;
+      }
+    }
+  } catch (e) { /* corrupt storage, ignore */ }
+}
+
+function saveProgress() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      streak:       state.streak,
+      lastPlayDate: state.lastPlayDate,
+      todayDone:    state.todayDone,
+      todayStars:   state.todayStars,
+      earnedCard:   state.earnedCard,
+    }));
+  } catch (e) {}
+}
+
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function daysBetween(a, b) {
+  const msPerDay = 86400000;
+  const dateA = new Date(a);
+  const dateB = new Date(b);
+  return Math.round(Math.abs(dateB - dateA) / msPerDay);
+}
+
+function formatDate(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+/* ─── Session builder ──────────────────────────────────────────── */
+function buildSession() {
+  // Pick 5 letters from Tier 1 for this session, seeded by date
+  const letters = Object.keys(TIER1); // s,a,t,p,i,n
+  const today = getTodayStr();
+  const seed  = dateHash(today);
+
+  // Shuffle letters using seed, take first ROUNDS_PER_SESSION
+  const shuffled = seededShuffle([...letters], seed);
+  const chosen   = shuffled.slice(0, ROUNDS_PER_SESSION);
+
+  return chosen.map(letter => {
+    const data    = TIER1[letter];
+    const correct = data.items.filter(i => i.correct);
+    const wrong   = data.items.filter(i => !i.correct);
+
+    // Pick 2 correct items
+    const corrItems = seededShuffle(correct, seed + letter.charCodeAt(0)).slice(0, 2);
+    // Pick 4 wrong items
+    const wronItems = seededShuffle(wrong,   seed + letter.charCodeAt(0) + 7).slice(0, 4);
+
+    // Merge and shuffle
+    const all = seededShuffle([...corrItems, ...wronItems], seed + letter.charCodeAt(0) + 13);
+
+    return { letter, hint: data.hint, items: all };
+  });
+}
+
+function dateHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function seededShuffle(arr, seed) {
+  const a = [...arr];
+  let s = seed;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    const j = s % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ─── Navigation ───────────────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  updateHomeUI();
+  showScreen('home');
+}
+
+function updateHomeUI() {
+  document.getElementById('home-streak').textContent = state.streak;
+
+  const lhCard    = document.getElementById('lh-card');
+  const lhStatus  = document.getElementById('lh-status');
+
+  if (state.todayDone) {
+    lhCard.classList.remove('ready');
+    lhCard.classList.add('done');
+    lhStatus.className = 'mode-status stars';
+    lhStatus.textContent = '⭐'.repeat(state.todayStars) || '✓';
+    lhCard.onclick = () => showTodaySummary();
+  } else {
+    lhCard.classList.add('ready');
+    lhCard.classList.remove('done');
+    lhStatus.className = 'mode-status play';
+    lhStatus.textContent = 'Play';
+    lhCard.onclick = startLetterHunt;
+  }
+}
+
+/* ─── Letter Hunt ──────────────────────────────────────────────── */
+function startLetterHunt() {
+  if (state.todayDone) { showTodaySummary(); return; }
+
+  // Unlock audio on iOS (needs user gesture)
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+  // Build rounds
+  state.rounds            = buildSession();
+  state.currentRound      = 0;
+  state.totalIncorrect    = 0;
+  state.sessionStartTime  = Date.now();
+
+  showScreen('game');
+  document.getElementById('game-streak').textContent = state.streak;
+
+  loadRound(0);
+}
+
+function loadRound(index, animate = false) {
+  const round = state.rounds[index];
+  if (!round) return;
+
+  // Reset round state
+  state.foundCorrect  = 0;
+  state.roundIncorrect = 0;
+  state.tapCounts     = {};
+
+  // Round dots
+  buildRoundDots(index);
+
+  // Letter zone
+  document.getElementById('letter-chars').textContent = `${round.letter.toUpperCase()} ${round.letter}`;
+  document.getElementById('letter-hint').textContent   = round.hint;
+
+  // Grid (with animation)
+  const grid = document.getElementById('picture-grid');
+
+  const renderGrid = () => {
+    grid.innerHTML = '';
+    round.items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'pic-card';
+      card.dataset.word   = item.word;
+      card.dataset.correct = item.correct ? '1' : '0';
+
+      const initial = item.word[0].toUpperCase();
+      const rest    = item.word.slice(1);
+
+      card.innerHTML = `
+        <span class="pic-emoji">${item.emoji}</span>
+        <span class="pic-word"><span class="initial">${initial}</span>${rest}</span>
+        <span class="pic-check">✓</span>
+      `;
+      card.addEventListener('click', () => onCardTap(card, item));
+      grid.appendChild(card);
+    });
+    if (animate) {
+      grid.classList.remove('slide-out');
+      grid.classList.add('slide-in');
+      grid.addEventListener('animationend', () => grid.classList.remove('slide-in'), { once: true });
+    }
+  };
+
+  if (animate) {
+    grid.classList.add('slide-out');
+    grid.addEventListener('animationend', () => { renderGrid(); }, { once: true });
+  } else {
+    renderGrid();
+  }
+
+  // Auto-play letter sound
+  setTimeout(() => playLetterSound(), 400);
+}
+
+function buildRoundDots(currentIndex) {
+  const container = document.getElementById('round-dots');
+  container.innerHTML = '';
+  for (let i = 0; i < ROUNDS_PER_SESSION; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' +
+      (i < currentIndex  ? ' done'    : '') +
+      (i === currentIndex ? ' current' : '');
+    container.appendChild(dot);
+  }
+}
+
+function onCardTap(card, item) {
+  if (card.classList.contains('correct') || card.classList.contains('locked-out')) return;
+
+  // Unlock AudioContext on first tap (iOS)
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+  } catch(e) {}
+
+  const word = item.word;
+  state.tapCounts[word] = (state.tapCounts[word] || 0) + 1;
+
+  if (item.correct) {
+    card.classList.add('correct');
+    soundCorrect();
+    state.foundCorrect++;
+
+    // Check round complete
+    if (state.foundCorrect === 2) {
+      setTimeout(() => onRoundComplete(), 600);
+    }
+  } else {
+    state.totalIncorrect++;
+    state.roundIncorrect++;
+    soundIncorrect();
+
+    card.classList.add('shake');
+    card.addEventListener('animationend', () => card.classList.remove('shake'), { once: true });
+
+    if (state.tapCounts[word] >= 2) {
+      card.classList.add('locked-out');
+    }
+  }
+}
+
+function playLetterSound() {
+  const btn = document.getElementById('speaker-btn');
+  btn.classList.add('playing');
+  btn.addEventListener('animationend', () => btn.classList.remove('playing'), { once: true });
+
+  const round = state.rounds[state.currentRound];
+  if (round) playLetterPhoneme(round.letter);
+}
+
+function onRoundComplete() {
+  soundRoundComplete();
+  spawnConfetti(8);
+
+  const next = state.currentRound + 1;
+
+  if (next >= ROUNDS_PER_SESSION) {
+    setTimeout(() => onSessionComplete(), 1200);
+  } else {
+    state.currentRound = next;
+    setTimeout(() => loadRound(next, true), 1000);
+  }
+}
+
+/* ─── Session complete ─────────────────────────────────────────── */
+function onSessionComplete() {
+  const duration = Math.round((Date.now() - state.sessionStartTime) / 1000);
+
+  // Calculate stars
+  let stars;
+  if (state.totalIncorrect === 0) {
+    stars = duration < 90 ? 3 : 2;  // fast = 3 stars, any time correct = 2
+  } else if (state.totalIncorrect <= 3) {
+    stars = 1;
+  } else {
+    stars = 0;
+  }
+
+  // Update streak
+  const today = getTodayStr();
+  if (state.lastPlayDate !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    if (state.lastPlayDate === yStr || !state.lastPlayDate) {
+      state.streak++;
+    } else {
+      state.streak = 1;
+    }
+    state.lastPlayDate = today;
+  }
+
+  // Pick collectible card (seeded by date + stars)
+  const seed = dateHash(today + stars);
+  const pool = stars >= 2
+    ? CARDS.filter(c => c.rarity === 'rare')
+    : CARDS.filter(c => c.rarity === 'standard');
+  const card = pool[seed % pool.length];
+
+  state.todayDone  = true;
+  state.todayStars = stars;
+  state.earnedCard = card;
+
+  saveProgress();
+  showSummary(stars, card);
+}
+
+/* ─── Summary screen ───────────────────────────────────────────── */
+function showSummary(stars, card) {
+  showScreen('summary');
+  soundSessionComplete();
+  spawnConfetti(25);
+
+  // Title / date
+  const titles = ['Keep practicing!', 'Great job!', 'Excellent!', 'Perfect!'];
+  document.getElementById('summary-title').textContent = titles[Math.min(stars, 3)];
+  document.getElementById('summary-date').textContent  = formatDate(getTodayStr());
+
+  // Stars (animate in sequence)
+  ['star1','star2','star3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('earned');
+    if (i < stars) {
+      setTimeout(() => el.classList.add('earned'), 300 + i * 250);
+    }
+  });
+
+  // Star label
+  const labels = ['Keep practicing! ✨', 'Great job! 🎉', 'Excellent! 🌟', 'Perfect! 🏆'];
+  document.getElementById('star-label').textContent = labels[Math.min(stars, 3)];
+
+  // Card
+  const cardEl = document.getElementById('card-reveal');
+  cardEl.className = 'card-reveal' + (card.rarity === 'rare' ? ' rare' : '');
+  document.getElementById('card-emoji').textContent = card.emoji;
+  document.getElementById('card-name').textContent  = card.name;
+  document.getElementById('card-rarity').textContent = card.rarity === 'rare' ? '✨ Rare card!' : "Today's card";
+
+  // Streak
+  document.getElementById('summary-streak-count').textContent = state.streak;
+}
+
+function showTodaySummary() {
+  const card = state.earnedCard || CARDS[0];
+  showSummary(state.todayStars, card);
+}
+
+/* ─── Share ────────────────────────────────────────────────────── */
+function shareResult() {
+  const stars    = '⭐'.repeat(state.todayStars) || '✓';
+  const date     = formatDate(getTodayStr());
+  const streak   = state.streak;
+  const text     = `${stars} Letter Hunt — ${date} — Streak: ${streak} 🔥\nKapework · letterhunt.kapework.com`;
+
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => copyToClipboard(text));
+  } else {
+    copyToClipboard(text);
+  }
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity  = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    showToast('Copied to clipboard!');
+  }
+}
+
+/* ─── Confetti ─────────────────────────────────────────────────── */
+const CONFETTI_COLORS = ['#00e5cc','#4ade80','#ffd700','#ff6b35','#e8edf5','#a78bfa'];
+
+function spawnConfetti(count) {
+  const container = document.getElementById('confetti');
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left            = `${10 + Math.random() * 80}%`;
+    el.style.top             = `${-10}px`;
+    el.style.backgroundColor = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    el.style.width           = `${6 + Math.random() * 8}px`;
+    el.style.height          = `${6 + Math.random() * 8}px`;
+    el.style.borderRadius    = Math.random() > 0.5 ? '50%' : '2px';
+    el.style.animationDelay  = `${Math.random() * 0.4}s`;
+    el.style.animationDuration = `${0.9 + Math.random() * 0.6}s`;
+    container.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+/* ─── Toast ────────────────────────────────────────────────────── */
+let toastTimer = null;
+
+function showToast(msg, duration = 2000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), duration);
+}
+
+/* ─── Init ─────────────────────────────────────────────────────── */
+function init() {
+  loadProgress();
+  updateHomeUI();
+}
+
+init();
+</script>
+</body>
+</html>
