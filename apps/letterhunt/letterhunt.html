@@ -639,59 +639,103 @@ body {
 }
 
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: 10px;
-  padding-top: 16px;
-  padding-bottom: 32px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 0 32px;
+  width: 100%;
 }
 
-/* Individual gallery card */
+/* Badge bounce */
+@keyframes badge-bounce {
+  0%   { transform: scale(1)    rotate(0deg); }
+  25%  { transform: scale(1.30) rotate(-9deg); }
+  55%  { transform: scale(0.90) rotate(5deg); }
+  80%  { transform: scale(1.07) rotate(-2deg); }
+  100% { transform: scale(1)    rotate(0deg); }
+}
+
+/* Rare badge shimmer sweep */
+@keyframes badge-shine {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Individual badge */
 .gc {
+  width: 90px;
+  height: 90px;
+  border-radius: 22px;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 12px 6px 10px;
+  border: 2px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 92px;
+  gap: 3px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.gc.bounce {
+  animation: badge-bounce 0.48s ease;
 }
 
 .gc.gc-rare {
   border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(255,215,0,0.18);
+  box-shadow: 0 0 16px rgba(255,215,0,0.30);
 }
 
-.gc.gc-locked {
-  background: var(--surface2);
+.gc.gc-rare::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(255,215,0,0.22) 50%,
+    transparent 62%
+  );
+  background-size: 200% 100%;
+  animation: badge-shine 3.2s ease infinite;
+  pointer-events: none;
 }
 
 .gc-emoji {
-  font-size: 2.2rem;
+  font-size: 2.8rem;
   line-height: 1;
 }
 
 .gc-name {
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  color: var(--text);
+  color: var(--muted);
   text-align: center;
   line-height: 1.2;
 }
 
-.gc-q {
-  font-size: 1.6rem;
-  color: var(--muted);
-  opacity: 0.45;
-  line-height: 1;
+/* Empty state */
+.gallery-empty {
+  width: 100%;
+  padding: 56px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
-.gc.gc-locked .gc-name {
+.gallery-empty-icon { font-size: 3.5rem; }
+
+.gallery-empty-text {
+  font-size: 0.95rem;
   color: var(--muted);
-  opacity: 0.5;
+  line-height: 1.6;
+  max-width: 240px;
 }
 
 /* ─── Sight Word Dash ──────────────────────────────────────────── */
@@ -796,7 +840,7 @@ body {
   </button>
 
   <div class="home-footer">
-    Kapework · Letter Hunt v1 · Tier 1
+    Kapework · Letter Hunt · Tiers 1–5
   </div>
 </div>
 
@@ -902,7 +946,7 @@ body {
 <script>
 /* ═══════════════════════════════════════════════════════════════
    LETTER HUNT · Kapework
-   Phase 1: Tier 1 letters  (s, a, t, p, i, n)
+   Tiers 1–5: single letters, digraphs, blends (OG scope & sequence)
    Storage: localStorage only (Supabase to be added later)
    ═══════════════════════════════════════════════════════════════ */
 
@@ -1221,6 +1265,489 @@ const TIER1 = {
   }
 };
 
+const TIER2 = {
+  m: {
+    hint: '🌙 moon',
+    items: [
+      { word: 'moon',   emoji: '🌙', correct: true  },
+      { word: 'milk',   emoji: '🥛', correct: true  },
+      { word: 'mouse',  emoji: '🐭', correct: true  },
+      { word: 'monkey', emoji: '🐒', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'bird',   emoji: '🐦', correct: false },
+    ]
+  },
+  d: {
+    hint: '🦆 duck',
+    items: [
+      { word: 'dog',    emoji: '🐕', correct: true  },
+      { word: 'duck',   emoji: '🦆', correct: true  },
+      { word: 'drum',   emoji: '🥁', correct: true  },
+      { word: 'door',   emoji: '🚪', correct: true  },
+      { word: 'cat',    emoji: '🐱', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+      { word: 'moon',   emoji: '🌙', correct: false },
+    ]
+  },
+  g: {
+    hint: '🍇 grapes',
+    items: [
+      { word: 'goat',   emoji: '🐐', correct: true  },
+      { word: 'grapes', emoji: '🍇', correct: true  },
+      { word: 'gift',   emoji: '🎁', correct: true  },
+      { word: 'guitar', emoji: '🎸', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+      { word: 'bird',   emoji: '🐦', correct: false },
+    ]
+  },
+  o: {
+    hint: '🐙 octopus',
+    items: [
+      { word: 'octopus',emoji: '🐙', correct: true  },
+      { word: 'orange', emoji: '🍊', correct: true  },
+      { word: 'otter',  emoji: '🦦', correct: true  },
+      { word: 'ox',     emoji: '🐂', correct: true  },
+      { word: 'cat',    emoji: '🐱', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+      { word: 'ball',   emoji: '⚽', correct: false },
+    ]
+  },
+  c: {
+    hint: '🐄 cow',
+    items: [
+      { word: 'car',    emoji: '🚗', correct: true  },
+      { word: 'cake',   emoji: '🎂', correct: true  },
+      { word: 'cow',    emoji: '🐄', correct: true  },
+      { word: 'camel',  emoji: '🐪', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'moon',   emoji: '🌙', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+    ]
+  },
+  k: {
+    hint: '🪁 kite',
+    items: [
+      { word: 'key',    emoji: '🗝️', correct: true  },
+      { word: 'king',   emoji: '👑', correct: true  },
+      { word: 'koala',  emoji: '🐨', correct: true  },
+      { word: 'kite',   emoji: '🪁', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+    ]
+  },
+  e: {
+    hint: '🥚 egg',
+    items: [
+      { word: 'egg',      emoji: '🥚', correct: true  },
+      { word: 'elephant', emoji: '🐘', correct: true  },
+      { word: 'envelope', emoji: '✉️', correct: true  },
+      { word: 'eagle',    emoji: '🦅', correct: true  },
+      { word: 'dog',      emoji: '🐕', correct: false },
+      { word: 'sun',      emoji: '☀️', correct: false },
+      { word: 'fish',     emoji: '🐟', correct: false },
+      { word: 'ball',     emoji: '⚽', correct: false },
+    ]
+  },
+  r: {
+    hint: '🌈 rainbow',
+    items: [
+      { word: 'rabbit',  emoji: '🐰', correct: true  },
+      { word: 'rainbow', emoji: '🌈', correct: true  },
+      { word: 'rocket',  emoji: '🚀', correct: true  },
+      { word: 'ring',    emoji: '💍', correct: true  },
+      { word: 'dog',     emoji: '🐕', correct: false },
+      { word: 'apple',   emoji: '🍎', correct: false },
+      { word: 'sun',     emoji: '☀️', correct: false },
+      { word: 'fish',    emoji: '🐟', correct: false },
+    ]
+  },
+  h: {
+    hint: '🏠 house',
+    items: [
+      { word: 'hat',   emoji: '🎩', correct: true  },
+      { word: 'horse', emoji: '🐴', correct: true  },
+      { word: 'heart', emoji: '❤️', correct: true  },
+      { word: 'house', emoji: '🏠', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+  b: {
+    hint: '🐻 bear',
+    items: [
+      { word: 'ball',  emoji: '⚽', correct: true  },
+      { word: 'bear',  emoji: '🐻', correct: true  },
+      { word: 'bee',   emoji: '🐝', correct: true  },
+      { word: 'boat',  emoji: '⛵', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+  u: {
+    hint: '☂️ umbrella',
+    items: [
+      { word: 'umbrella',  emoji: '🌂', correct: true  },
+      { word: 'up',        emoji: '⬆️', correct: true  },
+      { word: 'underwear', emoji: '🩲', correct: true  },
+      { word: 'unicycle',  emoji: '🚲', correct: true  },
+      { word: 'dog',       emoji: '🐕', correct: false },
+      { word: 'apple',     emoji: '🍎', correct: false },
+      { word: 'sun',       emoji: '☀️', correct: false },
+      { word: 'fish',      emoji: '🐟', correct: false },
+    ]
+  },
+  l: {
+    hint: '🦁 lion',
+    items: [
+      { word: 'lamp',  emoji: '🪔', correct: true  },
+      { word: 'lemon', emoji: '🍋', correct: true  },
+      { word: 'leaf',  emoji: '🍃', correct: true  },
+      { word: 'lion',  emoji: '🦁', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+  f: {
+    hint: '🐸 frog',
+    items: [
+      { word: 'fish',   emoji: '🐟', correct: true  },
+      { word: 'flower', emoji: '🌸', correct: true  },
+      { word: 'fire',   emoji: '🔥', correct: true  },
+      { word: 'frog',   emoji: '🐸', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'bird',   emoji: '🐦', correct: false },
+    ]
+  },
+};
+
+const TIER3 = {
+  j: {
+    hint: '🪼 jellyfish',
+    items: [
+      { word: 'jellyfish', emoji: '🪼', correct: true  },
+      { word: 'jar',       emoji: '🫙', correct: true  },
+      { word: 'juice',     emoji: '🧃', correct: true  },
+      { word: 'jet',       emoji: '✈️', correct: true  },
+      { word: 'dog',       emoji: '🐕', correct: false },
+      { word: 'apple',     emoji: '🍎', correct: false },
+      { word: 'sun',       emoji: '☀️', correct: false },
+      { word: 'fish',      emoji: '🐟', correct: false },
+    ]
+  },
+  w: {
+    hint: '🐋 whale',
+    items: [
+      { word: 'wolf',       emoji: '🐺', correct: true  },
+      { word: 'worm',       emoji: '🪱', correct: true  },
+      { word: 'watermelon', emoji: '🍉', correct: true  },
+      { word: 'watch',      emoji: '⌚', correct: true  },
+      { word: 'dog',        emoji: '🐕', correct: false },
+      { word: 'apple',      emoji: '🍎', correct: false },
+      { word: 'sun',        emoji: '☀️', correct: false },
+      { word: 'fish',       emoji: '🐟', correct: false },
+    ]
+  },
+  v: {
+    hint: '🌋 volcano',
+    items: [
+      { word: 'violin',  emoji: '🎻', correct: true  },
+      { word: 'volcano', emoji: '🌋', correct: true  },
+      { word: 'van',     emoji: '🚐', correct: true  },
+      { word: 'vampire', emoji: '🧛', correct: true  },
+      { word: 'dog',     emoji: '🐕', correct: false },
+      { word: 'apple',   emoji: '🍎', correct: false },
+      { word: 'sun',     emoji: '☀️', correct: false },
+      { word: 'fish',    emoji: '🐟', correct: false },
+    ]
+  },
+  y: {
+    hint: '🪀 yo-yo',
+    items: [
+      { word: 'yak',  emoji: '🦬', correct: true  },
+      { word: 'yo-yo',emoji: '🪀', correct: true  },
+      { word: 'yawn', emoji: '🥱', correct: true  },
+      { word: 'yacht',emoji: '⛵', correct: true  },
+      { word: 'dog',  emoji: '🐕', correct: false },
+      { word: 'apple',emoji: '🍎', correct: false },
+      { word: 'sun',  emoji: '☀️', correct: false },
+      { word: 'fish', emoji: '🐟', correct: false },
+    ]
+  },
+  z: {
+    hint: '🦓 zebra',
+    items: [
+      { word: 'zebra',    emoji: '🦓', correct: true  },
+      { word: 'zero',     emoji: '0️⃣', correct: true  },
+      { word: 'zombie',   emoji: '🧟', correct: true  },
+      { word: 'zucchini', emoji: '🥒', correct: true  },
+      { word: 'dog',      emoji: '🐕', correct: false },
+      { word: 'apple',    emoji: '🍎', correct: false },
+      { word: 'sun',      emoji: '☀️', correct: false },
+      { word: 'fish',     emoji: '🐟', correct: false },
+    ]
+  },
+  q: {
+    hint: '👸 queen',
+    items: [
+      { word: 'queen', emoji: '👸', correct: true  },
+      { word: 'quill', emoji: '✍️', correct: true  },
+      { word: 'quail', emoji: '🐦', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+      { word: 'moon',  emoji: '🌙', correct: false },
+    ]
+  },
+  x: {
+    hint: '🦴 x-ray',
+    items: [
+      { word: 'x-ray',    emoji: '🦴', correct: true  },
+      { word: 'xylophone',emoji: '🎵', correct: true  },
+      { word: 'dog',      emoji: '🐕', correct: false },
+      { word: 'apple',    emoji: '🍎', correct: false },
+      { word: 'sun',      emoji: '☀️', correct: false },
+      { word: 'fish',     emoji: '🐟', correct: false },
+      { word: 'bird',     emoji: '🐦', correct: false },
+      { word: 'moon',     emoji: '🌙', correct: false },
+    ]
+  },
+};
+
+const TIER4 = {
+  sh: {
+    hint: '🐑 sheep',
+    items: [
+      { word: 'sheep', emoji: '🐑', correct: true  },
+      { word: 'ship',  emoji: '🚢', correct: true  },
+      { word: 'shell', emoji: '🐚', correct: true  },
+      { word: 'shark', emoji: '🦈', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+  ch: {
+    hint: '🐔 chicken',
+    items: [
+      { word: 'cheese',  emoji: '🧀', correct: true  },
+      { word: 'cherry',  emoji: '🍒', correct: true  },
+      { word: 'chicken', emoji: '🐔', correct: true  },
+      { word: 'chair',   emoji: '🪑', correct: true  },
+      { word: 'dog',     emoji: '🐕', correct: false },
+      { word: 'apple',   emoji: '🍎', correct: false },
+      { word: 'sun',     emoji: '☀️', correct: false },
+      { word: 'fish',    emoji: '🐟', correct: false },
+    ]
+  },
+  th: {
+    hint: '👍 thumb',
+    items: [
+      { word: 'thumb',        emoji: '👍', correct: true  },
+      { word: 'thermometer',  emoji: '🌡️', correct: true  },
+      { word: 'thought',      emoji: '💭', correct: true  },
+      { word: 'three',        emoji: '3️⃣', correct: true  },
+      { word: 'dog',          emoji: '🐕', correct: false },
+      { word: 'apple',        emoji: '🍎', correct: false },
+      { word: 'sun',          emoji: '☀️', correct: false },
+      { word: 'fish',         emoji: '🐟', correct: false },
+    ]
+  },
+  wh: {
+    hint: '🐋 whale',
+    items: [
+      { word: 'whale',  emoji: '🐋', correct: true  },
+      { word: 'wheel',  emoji: '🎡', correct: true  },
+      { word: 'wheat',  emoji: '🌾', correct: true  },
+      { word: 'whistle',emoji: '📯', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+    ]
+  },
+};
+
+const TIER5 = {
+  bl: {
+    hint: '🫐 blueberry',
+    items: [
+      { word: 'blueberry', emoji: '🫐', correct: true  },
+      { word: 'blanket',   emoji: '🛏️', correct: true  },
+      { word: 'block',     emoji: '🧱', correct: true  },
+      { word: 'blade',     emoji: '🔪', correct: true  },
+      { word: 'dog',       emoji: '🐕', correct: false },
+      { word: 'apple',     emoji: '🍎', correct: false },
+      { word: 'sun',       emoji: '☀️', correct: false },
+      { word: 'fish',      emoji: '🐟', correct: false },
+    ]
+  },
+  cl: {
+    hint: '☁️ cloud',
+    items: [
+      { word: 'cloud', emoji: '☁️', correct: true  },
+      { word: 'clock', emoji: '🕐', correct: true  },
+      { word: 'clown', emoji: '🤡', correct: true  },
+      { word: 'clap',  emoji: '👏', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+  fl: {
+    hint: '🦩 flamingo',
+    items: [
+      { word: 'flower',   emoji: '🌸', correct: true  },
+      { word: 'flag',     emoji: '🚩', correct: true  },
+      { word: 'flamingo', emoji: '🦩', correct: true  },
+      { word: 'flash',    emoji: '⚡', correct: true  },
+      { word: 'dog',      emoji: '🐕', correct: false },
+      { word: 'apple',    emoji: '🍎', correct: false },
+      { word: 'sun',      emoji: '☀️', correct: false },
+      { word: 'fish',     emoji: '🐟', correct: false },
+    ]
+  },
+  br: {
+    hint: '🍞 bread',
+    items: [
+      { word: 'bread',  emoji: '🍞', correct: true  },
+      { word: 'broom',  emoji: '🧹', correct: true  },
+      { word: 'brain',  emoji: '🧠', correct: true  },
+      { word: 'bridge', emoji: '🌉', correct: true  },
+      { word: 'dog',    emoji: '🐕', correct: false },
+      { word: 'apple',  emoji: '🍎', correct: false },
+      { word: 'sun',    emoji: '☀️', correct: false },
+      { word: 'fish',   emoji: '🐟', correct: false },
+    ]
+  },
+  cr: {
+    hint: '🦀 crab',
+    items: [
+      { word: 'crab',       emoji: '🦀', correct: true  },
+      { word: 'crown',      emoji: '👑', correct: true  },
+      { word: 'crayon',     emoji: '🖍️', correct: true  },
+      { word: 'crocodile',  emoji: '🐊', correct: true  },
+      { word: 'dog',        emoji: '🐕', correct: false },
+      { word: 'apple',      emoji: '🍎', correct: false },
+      { word: 'sun',        emoji: '☀️', correct: false },
+      { word: 'fish',       emoji: '🐟', correct: false },
+    ]
+  },
+  fr: {
+    hint: '🐸 frog',
+    items: [
+      { word: 'frog',        emoji: '🐸', correct: true  },
+      { word: 'french fries',emoji: '🍟', correct: true  },
+      { word: 'frame',       emoji: '🖼️', correct: true  },
+      { word: 'fruit',       emoji: '🍓', correct: true  },
+      { word: 'dog',         emoji: '🐕', correct: false },
+      { word: 'apple',       emoji: '🍎', correct: false },
+      { word: 'sun',         emoji: '☀️', correct: false },
+      { word: 'fish',        emoji: '🐟', correct: false },
+    ]
+  },
+  st: {
+    hint: '⭐ star',
+    items: [
+      { word: 'star',       emoji: '⭐', correct: true  },
+      { word: 'strawberry', emoji: '🍓', correct: true  },
+      { word: 'stone',      emoji: '🪨', correct: true  },
+      { word: 'stamp',      emoji: '📮', correct: true  },
+      { word: 'dog',        emoji: '🐕', correct: false },
+      { word: 'apple',      emoji: '🍎', correct: false },
+      { word: 'moon',       emoji: '🌙', correct: false },
+      { word: 'fish',       emoji: '🐟', correct: false },
+    ]
+  },
+  sp: {
+    hint: '🕷️ spider',
+    items: [
+      { word: 'spider',    emoji: '🕷️', correct: true  },
+      { word: 'spoon',     emoji: '🥄', correct: true  },
+      { word: 'spaceship', emoji: '🚀', correct: true  },
+      { word: 'spaghetti', emoji: '🍝', correct: true  },
+      { word: 'dog',       emoji: '🐕', correct: false },
+      { word: 'apple',     emoji: '🍎', correct: false },
+      { word: 'sun',       emoji: '☀️', correct: false },
+      { word: 'fish',      emoji: '🐟', correct: false },
+    ]
+  },
+  tr: {
+    hint: '🌳 tree',
+    items: [
+      { word: 'truck',   emoji: '🚚', correct: true  },
+      { word: 'tree',    emoji: '🌳', correct: true  },
+      { word: 'train',   emoji: '🚂', correct: true  },
+      { word: 'trophy',  emoji: '🏆', correct: true  },
+      { word: 'dog',     emoji: '🐕', correct: false },
+      { word: 'apple',   emoji: '🍎', correct: false },
+      { word: 'sun',     emoji: '☀️', correct: false },
+      { word: 'fish',    emoji: '🐟', correct: false },
+    ]
+  },
+  dr: {
+    hint: '🥁 drum',
+    items: [
+      { word: 'drum',       emoji: '🥁', correct: true  },
+      { word: 'dragon',     emoji: '🐉', correct: true  },
+      { word: 'dress',      emoji: '👗', correct: true  },
+      { word: 'dragonfly',  emoji: '🪲', correct: true  },
+      { word: 'dog',        emoji: '🐕', correct: false },
+      { word: 'apple',      emoji: '🍎', correct: false },
+      { word: 'sun',        emoji: '☀️', correct: false },
+      { word: 'fish',       emoji: '🐟', correct: false },
+    ]
+  },
+  gr: {
+    hint: '🍇 grapes',
+    items: [
+      { word: 'grapes',    emoji: '🍇', correct: true  },
+      { word: 'grass',     emoji: '🌿', correct: true  },
+      { word: 'grandma',   emoji: '👵', correct: true  },
+      { word: 'grapefruit',emoji: '🍊', correct: true  },
+      { word: 'dog',       emoji: '🐕', correct: false },
+      { word: 'apple',     emoji: '🍎', correct: false },
+      { word: 'sun',       emoji: '☀️', correct: false },
+      { word: 'fish',      emoji: '🐟', correct: false },
+    ]
+  },
+  pl: {
+    hint: '✈️ plane',
+    items: [
+      { word: 'plane', emoji: '✈️', correct: true  },
+      { word: 'plant', emoji: '🌱', correct: true  },
+      { word: 'plate', emoji: '🍽️', correct: true  },
+      { word: 'plum',  emoji: '🫐', correct: true  },
+      { word: 'dog',   emoji: '🐕', correct: false },
+      { word: 'apple', emoji: '🍎', correct: false },
+      { word: 'sun',   emoji: '☀️', correct: false },
+      { word: 'fish',  emoji: '🐟', correct: false },
+    ]
+  },
+};
+
+// All tiers merged — session builder draws from this flat pool
+const ALL_LETTERS = { ...TIER1, ...TIER2, ...TIER3, ...TIER4, ...TIER5 };
+
 // Collectible cards pool
 const CARDS = [
   { emoji: '🦁', name: 'Lion',      rarity: 'standard' },
@@ -1342,8 +1869,8 @@ function formatDate(str) {
 
 /* ─── Session builder ──────────────────────────────────────────── */
 function buildSession() {
-  // Pick 5 letters from Tier 1 for this session, seeded by date
-  const letters = Object.keys(TIER1); // s,a,t,p,i,n
+  // Pick 5 letters/digraphs/blends from all tiers, seeded by date
+  const letters = Object.keys(ALL_LETTERS);
   const today = getTodayStr();
   const seed  = dateHash(today);
 
@@ -1352,7 +1879,7 @@ function buildSession() {
   const chosen   = shuffled.slice(0, ROUNDS_PER_SESSION);
 
   return chosen.map(letter => {
-    const data    = TIER1[letter];
+    const data    = ALL_LETTERS[letter];
     const correct = data.items.filter(i => i.correct);
     const wrong   = data.items.filter(i => !i.correct);
 
@@ -2019,35 +2546,41 @@ function openGallery() {
 }
 
 function renderGallery() {
-  const grid = document.getElementById('gallery-grid');
+  const grid    = document.getElementById('gallery-grid');
   const countEl = document.getElementById('gallery-count');
   grid.innerHTML = '';
 
-  let earnedCount = 0;
-  CARDS.forEach(card => {
-    const isEarned = state.earnedCards.includes(card.name);
-    if (isEarned) earnedCount++;
+  const earned = CARDS.filter(c => state.earnedCards.includes(c.name));
+  countEl.textContent = earned.length === 0 ? '' : `${earned.length} badge${earned.length !== 1 ? 's' : ''}`;
 
+  if (earned.length === 0) {
+    grid.innerHTML = `
+      <div class="gallery-empty">
+        <div class="gallery-empty-icon">🐾</div>
+        <div class="gallery-empty-text">Play Letter Hunt or Sight Word Dash to earn your first animal badge!</div>
+      </div>
+    `;
+    return;
+  }
+
+  earned.forEach(card => {
     const el = document.createElement('div');
-    el.className = 'gc' +
-      (isEarned && card.rarity === 'rare' ? ' gc-rare' : '') +
-      (!isEarned ? ' gc-locked' : '');
-
-    if (isEarned) {
-      el.innerHTML = `
-        <div class="gc-emoji">${card.emoji}</div>
-        <div class="gc-name">${card.name}</div>
-      `;
-    } else {
-      el.innerHTML = `
-        <div class="gc-q">?</div>
-        <div class="gc-name">???</div>
-      `;
-    }
+    el.className = 'gc' + (card.rarity === 'rare' ? ' gc-rare' : '');
+    el.innerHTML = `<div class="gc-emoji">${card.emoji}</div><div class="gc-name">${card.name}</div>`;
+    el.addEventListener('click', () => onBadgeTap(el, card));
     grid.appendChild(el);
   });
+}
 
-  countEl.textContent = `${earnedCount} / ${CARDS.length}`;
+function onBadgeTap(el, card) {
+  // Restart bounce animation on every tap
+  el.classList.remove('bounce');
+  void el.offsetWidth; // force reflow so animation replays
+  el.classList.add('bounce');
+  el.addEventListener('animationend', () => el.classList.remove('bounce'), { once: true });
+  // Play win chime + speak the animal name
+  soundRoundComplete();
+  tts.sayWord(card.name);
 }
 
 /* ─── Init ─────────────────────────────────────────────────────── */
