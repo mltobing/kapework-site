@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0a1628" />
 <title>Kapework</title>
 <style>
-/* ─── Reset & tokens ───────────────────────────────────────────── */
+/* ─── Reset & tokens ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -15,271 +15,239 @@
   --surface:  #121e33;
   --surface2: #1a2a44;
   --border:   rgba(232,237,245,0.07);
-  --border-hover: rgba(232,237,245,0.14);
+  --border-h: rgba(232,237,245,0.14);
   --cyan:     #00e5cc;
   --cyan-dim: rgba(0,229,204,0.10);
-  --gold:     #ffd700;
   --text:     #e8edf5;
   --muted:    rgba(232,237,245,0.45);
   --success:  #4ade80;
-  --tag-bg:   rgba(232,237,245,0.06);
+  --danger:   #f87171;
 }
 
-html, body {
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-}
-
-body {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
+html, body { min-height: 100%; background: var(--bg); color: var(--text); }
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, select, textarea { font: inherit; }
 
-/* ─── Layout ───────────────────────────────────────────────────── */
+/* ─── Page shell ─────────────────────────────────────────────── */
 .page {
-  max-width: 960px;
+  max-width: 840px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 28px 20px 80px;
 }
 
-/* ─── Header ───────────────────────────────────────────────────── */
+/* ─── Header ─────────────────────────────────────────────────── */
 .site-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 32px;
+  padding-bottom: 28px;
+  margin-bottom: 28px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 32px;
 }
 
 .wordmark {
   display: flex;
   align-items: baseline;
-  gap: 2px;
+  gap: 3px;
+  cursor: default;
 }
-
 .wordmark-text {
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: var(--text);
 }
-
 .wordmark-dot {
-  width: 6px;
-  height: 6px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: var(--cyan);
-  margin-left: 2px;
+  margin-left: 1px;
   margin-bottom: 2px;
   flex-shrink: 0;
 }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* ─── Menu button + dropdown ─────────────────────────────────── */
+.menu-wrap {
+  position: relative;
 }
 
-/* Sort control */
-.sort-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-label {
-  font-size: 0.8rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-select {
+.menu-btn {
   background: var(--surface);
-  color: var(--text);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 7px 12px;
-  font-size: 0.85rem;
+  color: var(--muted);
+  width: 38px;
+  height: 38px;
   cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e8edf5' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-  transition: border-color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 1;
 }
-select:hover { border-color: var(--border-hover); }
-select:focus { outline: none; border-color: var(--cyan); }
+.menu-btn:hover { color: var(--text); border-color: var(--border-h); }
+.menu-btn.open  { color: var(--cyan); border-color: var(--cyan); }
 
-/* ─── Section heading ──────────────────────────────────────────── */
-.section-meta {
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border-h);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  padding: 6px;
+  z-index: 200;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.dropdown-section {
+  padding: 4px 6px 2px;
+}
+.dropdown-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 6px 8px 4px;
+}
+.dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+.sort-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 8px;
+  padding: 6px 8px;
 }
-
-.section-count {
-  font-size: 0.8rem;
+.sort-row span {
+  font-size: 0.85rem;
   color: var(--muted);
 }
+select.inline-sort {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 26px 4px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23e8edf5' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+select.inline-sort:focus { outline: none; border-color: var(--cyan); }
 
-/* ─── Game grid ────────────────────────────────────────────────── */
-.grid {
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.dropdown-item:hover { background: var(--surface2); }
+.dropdown-item .di-icon { font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; }
+
+/* ─── Game grid ──────────────────────────────────────────────── */
+#grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
 }
 
-/* ─── Game card ────────────────────────────────────────────────── */
+/* ─── Game card ──────────────────────────────────────────────── */
+.card-wrap {
+  position: relative;
+}
+
 a.card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 18px;
+  padding: 22px 14px 14px;
   cursor: pointer;
-  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
   position: relative;
   overflow: hidden;
+  width: 100%;
 }
-
 a.card::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at top left, var(--cyan-dim) 0%, transparent 60%);
+  background: radial-gradient(ellipse at 50% 0%, var(--cyan-dim) 0%, transparent 70%);
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.25s;
   pointer-events: none;
 }
-
-a.card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
+a.card:hover { border-color: var(--border-h); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
 a.card:hover::before { opacity: 1; }
-a.card:active { transform: translateY(0) scale(0.99); }
-
-/* Card top row */
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
+a.card:active { transform: scale(0.97); }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
+  font-size: 3rem;
+  line-height: 1;
+  user-select: none;
 }
 
-/* Like button */
-button.like {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 6px 10px;
-  color: var(--muted);
-  font-size: 0.8rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-button.like:hover { color: var(--text); border-color: var(--border-hover); }
-button.like.liked { color: #f87171; border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.08); }
-
-/* Card body */
 .card-name {
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text);
+  text-align: center;
   line-height: 1.2;
 }
 
-.card-blurb {
-  font-size: 0.83rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-/* Tags */
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: auto;
-}
-
-.tag {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--muted);
-  background: var(--tag-bg);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px 9px;
-  letter-spacing: 0.2px;
-}
-
-/* Card footer */
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.play-count {
-  font-size: 0.8rem;
-  color: var(--muted);
+/* Like button — sits below name, not a nav trigger */
+.card-like {
   display: flex;
   align-items: center;
   gap: 5px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
 }
+.card-like:hover { color: var(--text); border-color: var(--border-h); }
+.card-like.liked { color: var(--danger); border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.07); }
 
-.play-arrow {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: var(--cyan-dim);
-  border: 1px solid rgba(0,229,204,0.25);
-  border-radius: 50%;
-  color: var(--cyan);
-  font-size: 0.7rem;
-  transition: background 0.15s, border-color 0.15s;
-}
-a.card:hover .play-arrow {
-  background: rgba(0,229,204,0.2);
-  border-color: var(--cyan);
-}
-
-/* ─── Empty / error state ──────────────────────────────────────── */
+/* ─── Empty / error ──────────────────────────────────────────── */
 .state-msg {
   grid-column: 1 / -1;
   padding: 48px 24px;
@@ -288,72 +256,136 @@ a.card:hover .play-arrow {
   font-size: 0.9rem;
 }
 
-/* ─── Divider ──────────────────────────────────────────────────── */
-.divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 48px 0 36px;
+/* ─── Modal backdrop ─────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,22,40,0.75);
+  backdrop-filter: blur(3px);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
 }
+.modal-backdrop.open { opacity: 1; pointer-events: all; }
 
-/* ─── Feedback section ─────────────────────────────────────────── */
-.feedback-section {
-  max-width: 560px;
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-h);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  transform: translateY(12px);
+  transition: transform 0.2s;
 }
+.modal-backdrop.open .modal { transform: translateY(0); }
 
-.feedback-title {
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-title {
   font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 4px;
+  font-weight: 800;
 }
+.modal-close {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  width: 32px; height: 32px;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px; }
 
+/* ─── Stats table ────────────────────────────────────────────── */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.stats-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0 10px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.stats-table th:not(:first-child) { text-align: right; }
+.stats-table td {
+  padding: 10px 10px 10px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.stats-table tr:last-child td { border-bottom: none; }
+.stats-table td:not(:first-child) { text-align: right; color: var(--muted); }
+.stats-table .game-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stats-table .game-emoji { font-size: 1.1rem; flex-shrink: 0; }
+.stats-table .game-label { font-weight: 600; }
+.stats-val { font-variant-numeric: tabular-nums; }
+
+/* ─── Feedback form (in modal) ───────────────────────────────── */
 .feedback-sub {
   font-size: 0.83rem;
   color: var(--muted);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  line-height: 1.5;
 }
-
 .feedback-attached {
   font-size: 0.78rem;
   color: var(--muted);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
-
-.feedback-attached span {
-  color: var(--cyan);
-  font-weight: 600;
-}
-
+.feedback-attached span { color: var(--cyan); font-weight: 600; }
 textarea {
   width: 100%;
-  background: var(--surface);
+  background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--text);
   padding: 12px 14px;
   resize: vertical;
   min-height: 80px;
-  transition: border-color 0.15s;
+  font: inherit;
   font-size: 0.88rem;
   line-height: 1.5;
+  transition: border-color 0.15s;
 }
 textarea::placeholder { color: var(--muted); }
 textarea:focus { outline: none; border-color: var(--cyan); }
-
 .feedback-row {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 12px;
+  justify-content: flex-end;
 }
-
-.feedback-status {
-  font-size: 0.82rem;
-  flex: 1;
-}
+.feedback-status { font-size: 0.82rem; flex: 1; }
 .feedback-status.ok  { color: var(--success); }
-.feedback-status.err { color: #f87171; }
-
+.feedback-status.err { color: var(--danger); }
 .btn-send {
   background: var(--cyan);
   color: #0a1628;
@@ -363,19 +395,18 @@ textarea:focus { outline: none; border-color: var(--cyan); }
   border-radius: 10px;
   padding: 10px 20px;
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.15s;
   white-space: nowrap;
 }
 .btn-send:hover   { opacity: 0.9; }
-.btn-send:active  { transform: scale(0.97); }
 .btn-send:disabled { opacity: 0.4; cursor: default; }
 
-/* ─── Footer ───────────────────────────────────────────────────── */
+/* ─── Footer ─────────────────────────────────────────────────── */
 .site-footer {
   margin-top: 64px;
-  padding-top: 24px;
+  padding-top: 20px;
   border-top: 1px solid var(--border);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--muted);
   text-align: center;
 }
@@ -390,66 +421,87 @@ textarea:focus { outline: none; border-color: var(--cyan); }
       <span class="wordmark-text">Kapework</span>
       <div class="wordmark-dot"></div>
     </div>
-    <div class="header-right">
-      <div class="sort-wrap">
-        <span class="sort-label">Sort</span>
-        <select id="sort" aria-label="Sort games">
-          <option value="newest">Newest</option>
-          <option value="name">A – Z</option>
-          <option value="likes">Most liked</option>
-          <option value="plays">Most played</option>
-        </select>
+
+    <div class="menu-wrap">
+      <button class="menu-btn" id="menu-btn" aria-label="Menu" aria-expanded="false">···</button>
+      <div class="dropdown" id="dropdown" role="menu">
+        <div class="sort-row">
+          <span>Sort</span>
+          <select class="inline-sort" id="sort" aria-label="Sort games">
+            <option value="newest">Newest</option>
+            <option value="name">A – Z</option>
+            <option value="likes">Most liked</option>
+            <option value="plays">Most played</option>
+          </select>
+        </div>
+        <hr class="dropdown-divider" />
+        <button class="dropdown-item" id="open-stats">
+          <span class="di-icon">📊</span> Stats &amp; plays
+        </button>
+        <button class="dropdown-item" id="open-feedback">
+          <span class="di-icon">💬</span> Send feedback
+        </button>
       </div>
     </div>
   </header>
 
-  <!-- Grid -->
-  <div class="section-meta">
-    <span class="section-count" id="game-count"></span>
-  </div>
-  <div id="grid" class="grid" aria-live="polite"></div>
+  <!-- Game grid -->
+  <div id="grid" aria-live="polite"></div>
 
-  <hr class="divider" />
+  <footer class="site-footer">Kapework &mdash; small games, big ideas</footer>
+</div>
 
-  <!-- Feedback -->
-  <section class="feedback-section">
-    <div class="feedback-title">Quick feedback</div>
-    <div class="feedback-sub">What's working? What could be better?</div>
-    <div class="feedback-attached">Game: <span id="fb-target">General</span></div>
-    <textarea id="fb-message" rows="3" placeholder="Tell us anything — a bug, an idea, a reaction."></textarea>
-    <div class="feedback-row">
-      <span class="feedback-status" id="fb-status"></span>
-      <button class="btn-send" id="fb-send">Send</button>
+<!-- Stats modal -->
+<div class="modal-backdrop" id="stats-modal" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="stats-title">Stats &amp; plays</div>
+      <button class="modal-close" id="stats-close" aria-label="Close">✕</button>
     </div>
-  </section>
+    <div class="modal-body">
+      <table class="stats-table" id="stats-table">
+        <thead>
+          <tr>
+            <th>Game</th>
+            <th>Plays</th>
+            <th>Likes</th>
+          </tr>
+        </thead>
+        <tbody id="stats-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-  <footer class="site-footer">
-    Kapework &mdash; small games, big ideas
-  </footer>
-
+<!-- Feedback modal -->
+<div class="modal-backdrop" id="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="fb-title">Quick feedback</div>
+      <button class="modal-close" id="fb-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="feedback-sub">What's working? What could be better?</div>
+      <div class="feedback-attached">About: <span id="fb-target">General</span></div>
+      <textarea id="fb-message" rows="3" placeholder="Tell us anything — a bug, an idea, a reaction."></textarea>
+      <div class="feedback-row">
+        <span class="feedback-status" id="fb-status"></span>
+        <button class="btn-send" id="fb-send">Send</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
 
-/* ─── Supabase ─────────────────────────────────────────────────── */
+/* ─── Supabase ──────────────────────────────────────────────── */
 const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
-const REST_PLAYS = `${SUPABASE_URL}/rest/v1/plays`;
-const REST_LIKES = `${SUPABASE_URL}/rest/v1/likes`;
 let sb = null;
 
-/* ─── DOM refs ─────────────────────────────────────────────────── */
-const gridEl     = document.getElementById("grid");
-const sortSel    = document.getElementById("sort");
-const gameCount  = document.getElementById("game-count");
-const fbMsg      = document.getElementById("fb-message");
-const fbSend     = document.getElementById("fb-send");
-const fbStatus   = document.getElementById("fb-status");
-const fbTarget   = document.getElementById("fb-target");
-
-/* ─── Local state ──────────────────────────────────────────────── */
+/* ─── Local state ───────────────────────────────────────────── */
 const DID_KEY   = "kapework_did_v1";
 const LIKED_KEY = "kapework_liked_by_me_v1";
 const LAST_KEY  = "kapework_last_played_slug";
@@ -459,14 +511,66 @@ if (!deviceId) {
   deviceId = crypto?.randomUUID?.() || String(Math.random()).slice(2);
   localStorage.setItem(DID_KEY, deviceId);
 }
-let likedByMe = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
+let likedByMe  = JSON.parse(localStorage.getItem(LIKED_KEY) || "{}");
 
 let games      = [];
 const bySlug   = new Map();
 let likeCounts = new Map();
 let playCounts = new Map();
 
-/* ─── Data loading ─────────────────────────────────────────────── */
+/* ─── DOM refs ──────────────────────────────────────────────── */
+const gridEl      = document.getElementById("grid");
+const sortSel     = document.getElementById("sort");
+const menuBtn     = document.getElementById("menu-btn");
+const dropdown    = document.getElementById("dropdown");
+const statsModal  = document.getElementById("stats-modal");
+const statsTbody  = document.getElementById("stats-tbody");
+const fbModal     = document.getElementById("feedback-modal");
+const fbTarget    = document.getElementById("fb-target");
+const fbMsg       = document.getElementById("fb-message");
+const fbSend      = document.getElementById("fb-send");
+const fbStatus    = document.getElementById("fb-status");
+
+/* ─── Dropdown menu ─────────────────────────────────────────── */
+function toggleDropdown(force) {
+  const open = force !== undefined ? force : !dropdown.classList.contains("open");
+  dropdown.classList.toggle("open", open);
+  menuBtn.classList.toggle("open", open);
+  menuBtn.setAttribute("aria-expanded", String(open));
+}
+
+menuBtn.addEventListener("click", e => { e.stopPropagation(); toggleDropdown(); });
+document.addEventListener("click", () => toggleDropdown(false));
+dropdown.addEventListener("click", e => e.stopPropagation());
+
+/* ─── Modals ────────────────────────────────────────────────── */
+function openModal(el) {
+  el.classList.add("open");
+  el.addEventListener("click", function onBd(e) {
+    if (e.target === el) { closeModal(el); el.removeEventListener("click", onBd); }
+  });
+}
+function closeModal(el) { el.classList.remove("open"); }
+
+document.getElementById("open-stats").addEventListener("click", () => {
+  toggleDropdown(false);
+  renderStats();
+  openModal(statsModal);
+});
+document.getElementById("stats-close").addEventListener("click", () => closeModal(statsModal));
+
+document.getElementById("open-feedback").addEventListener("click", () => {
+  toggleDropdown(false);
+  refreshFbTarget();
+  openModal(fbModal);
+});
+document.getElementById("fb-close").addEventListener("click", () => closeModal(fbModal));
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeModal(statsModal); closeModal(fbModal); toggleDropdown(false); }
+});
+
+/* ─── Data loading ──────────────────────────────────────────── */
 async function loadManifest() {
   try {
     const res  = await fetch("manifest.json?v=" + Date.now());
@@ -483,16 +587,16 @@ async function loadManifest() {
 async function loadCounts() {
   if (!sb) return;
   try {
-    const { data } = await sb.from("game_like_counts").select();
-    if (data) likeCounts = new Map(data.map(r => [r.slug, r.likes]));
+    const { data, error } = await sb.from("game_like_counts").select("slug,likes");
+    if (!error && data) likeCounts = new Map(data.map(r => [r.slug, Number(r.likes) || 0]));
   } catch (_) {}
   try {
-    const { data } = await sb.from("game_play_counts").select();
-    if (data) playCounts = new Map(data.map(r => [r.slug, r.plays]));
+    const { data, error } = await sb.from("game_play_counts").select("slug,plays");
+    if (!error && data) playCounts = new Map(data.map(r => [r.slug, Number(r.plays) || 0]));
   } catch (_) {}
 }
 
-/* ─── Sorting ──────────────────────────────────────────────────── */
+/* ─── Sorting ───────────────────────────────────────────────── */
 function sortGames(list, mode) {
   if (mode === "name")  return [...list].sort((a, b) => a.name.localeCompare(b.name));
   if (mode === "likes") return [...list].sort((a, b) => (likeCounts.get(b.slug) || 0) - (likeCounts.get(a.slug) || 0));
@@ -500,7 +604,7 @@ function sortGames(list, mode) {
   return [...list].sort((a, b) => new Date(b.released_at) - new Date(a.released_at));
 }
 
-/* ─── Render ───────────────────────────────────────────────────── */
+/* ─── Render grid ───────────────────────────────────────────── */
 function render() {
   gridEl.innerHTML = "";
   if (!games.length) {
@@ -509,12 +613,13 @@ function render() {
   }
 
   const sorted = sortGames(games, sortSel.value);
-  gameCount.textContent = `${sorted.length} game${sorted.length !== 1 ? "s" : ""}`;
 
   sorted.forEach(g => {
-    const liked    = !!likedByMe[g.slug];
-    const likeNum  = likeCounts.get(g.slug) ?? 0;
-    const playNum  = playCounts.get(g.slug) ?? 0;
+    const liked   = !!likedByMe[g.slug];
+    const likeNum = likeCounts.get(g.slug) ?? 0;
+
+    const wrap = document.createElement("div");
+    wrap.className = "card-wrap";
 
     const card = document.createElement("a");
     card.className = "card";
@@ -522,92 +627,99 @@ function render() {
     card.target    = "_blank";
     card.rel       = "noopener";
     card.setAttribute("aria-label", `Play ${g.name}`);
-
-    const tagsHtml = (g.tags || []).map(t => `<span class="tag">${t}</span>`).join("");
-
     card.innerHTML = `
-      <div class="card-top">
-        <div class="card-icon">${g.cover_emoji || "🎮"}</div>
-        <button type="button" class="like ${liked ? "liked" : ""}" data-slug="${g.slug}" aria-pressed="${liked}">
-          ${liked ? "❤️" : "♡"} <span class="like-num">${likeNum}</span>
-        </button>
-      </div>
+      <div class="card-icon">${g.cover_emoji || "🎮"}</div>
       <div class="card-name">${g.name}</div>
-      ${g.blurb ? `<div class="card-blurb">${g.blurb}</div>` : ""}
-      ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ""}
-      <div class="card-footer">
-        <span class="play-count">▶ ${playNum}</span>
-        <span class="play-arrow">→</span>
-      </div>
     `;
+
+    const likeBtn = document.createElement("button");
+    likeBtn.type      = "button";
+    likeBtn.className = "card-like" + (liked ? " liked" : "");
+    likeBtn.setAttribute("aria-pressed", String(liked));
+    likeBtn.setAttribute("aria-label",   `Like ${g.name}`);
+    likeBtn.dataset.slug = g.slug;
+    likeBtn.innerHTML = `<span class="lheart">${liked ? "❤️" : "♡"}</span><span class="lnum">${likeNum || ""}</span>`;
+
+    card.appendChild(likeBtn);
+    wrap.appendChild(card);
+    gridEl.appendChild(wrap);
 
     /* Track play on navigation */
     card.addEventListener("click", e => {
-      localStorage.setItem(LAST_KEY, g.slug);
-      playCounts.set(g.slug, (playCounts.get(g.slug) || 0) + 1);
-      const pc = card.querySelector(".play-count");
-      if (pc) pc.textContent = `▶ ${playCounts.get(g.slug)}`;
-      if (sortSel.value === "plays") setTimeout(render, 0);
-
-      fetch(REST_PLAYS, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify({ slug: g.slug, device_id: deviceId }),
-        keepalive: true
-      }).catch(() => {});
+      if (e.target.closest(".card-like")) return; // like button handles its own click
+      recordPlay(g.slug);
     });
 
-    /* Like button */
-    card.querySelector("button.like").addEventListener("click", async e => {
+    /* Like */
+    likeBtn.addEventListener("click", e => {
       e.preventDefault();
       e.stopPropagation();
-      const slug = e.currentTarget.dataset.slug;
-      if (likedByMe[slug]) return;
-
-      likedByMe[slug] = true;
-      localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
-      likeCounts.set(slug, (likeCounts.get(slug) || 0) + 1);
-
-      const btn  = e.currentTarget;
-      const numEl = btn.querySelector(".like-num");
-      btn.classList.add("liked");
-      btn.setAttribute("aria-pressed", "true");
-      btn.firstChild.textContent = "❤️ ";
-      if (numEl) numEl.textContent = likeCounts.get(slug);
-      if (sortSel.value === "likes") render();
-
-      fetch(REST_LIKES, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": SUPABASE_ANON,
-          "Authorization": `Bearer ${SUPABASE_ANON}`,
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify({ slug, device_id: deviceId }),
-        keepalive: true
-      }).catch(() => {});
+      if (likedByMe[g.slug]) return;
+      recordLike(g.slug, likeBtn);
     });
-
-    gridEl.appendChild(card);
   });
 }
 
-/* ─── Feedback attachment label ────────────────────────────────── */
-function refreshAttachLabel() {
-  const last = localStorage.getItem(LAST_KEY);
-  fbTarget.textContent = (last && bySlug.has(last))
-    ? bySlug.get(last).name
-    : "General";
+/* ─── Play tracking ─────────────────────────────────────────── */
+function recordPlay(slug) {
+  localStorage.setItem(LAST_KEY, slug);
+  // Optimistic local increment
+  playCounts.set(slug, (playCounts.get(slug) || 0) + 1);
+  if (sortSel.value === "plays") setTimeout(render, 0);
+
+  if (!sb) return;
+  // Use SDK — handles auth headers reliably
+  sb.from("plays")
+    .insert({ slug, device_id: deviceId })
+    .then(({ error }) => {
+      if (error) console.warn("[kapework] play insert failed:", error.message);
+    });
 }
 
-/* ─── Send feedback ────────────────────────────────────────────── */
-async function sendFeedback() {
+/* ─── Like tracking ─────────────────────────────────────────── */
+function recordLike(slug, btn) {
+  likedByMe[slug] = true;
+  localStorage.setItem(LIKED_KEY, JSON.stringify(likedByMe));
+  likeCounts.set(slug, (likeCounts.get(slug) || 0) + 1);
+
+  btn.classList.add("liked");
+  btn.setAttribute("aria-pressed", "true");
+  btn.querySelector(".lheart").textContent = "❤️";
+  btn.querySelector(".lnum").textContent   = likeCounts.get(slug) || "";
+  if (sortSel.value === "likes") render();
+
+  if (!sb) return;
+  sb.from("likes")
+    .insert({ slug, device_id: deviceId })
+    .then(({ error }) => {
+      if (error) console.warn("[kapework] like insert failed:", error.message);
+    });
+}
+
+/* ─── Stats modal render ────────────────────────────────────── */
+function renderStats() {
+  const sorted = sortGames(games, "plays");
+  statsTbody.innerHTML = sorted.map(g => {
+    const plays = playCounts.get(g.slug) ?? 0;
+    const likes = likeCounts.get(g.slug) ?? 0;
+    return `<tr>
+      <td><div class="game-cell">
+        <span class="game-emoji">${g.cover_emoji || "🎮"}</span>
+        <span class="game-label">${g.name}</span>
+      </div></td>
+      <td class="stats-val">${plays.toLocaleString()}</td>
+      <td class="stats-val">${likes.toLocaleString()}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ─── Feedback ──────────────────────────────────────────────── */
+function refreshFbTarget() {
+  const last = localStorage.getItem(LAST_KEY);
+  fbTarget.textContent = (last && bySlug.has(last)) ? bySlug.get(last).name : "General";
+}
+
+fbSend.addEventListener("click", async () => {
   const message = fbMsg.value.trim();
   if (!message) {
     fbStatus.textContent = "Please write something first.";
@@ -615,7 +727,7 @@ async function sendFeedback() {
     return;
   }
   if (!sb) {
-    fbStatus.textContent = "Feedback service unavailable — reload and try again.";
+    fbStatus.textContent = "Feedback unavailable — please reload.";
     fbStatus.className   = "feedback-status err";
     return;
   }
@@ -628,37 +740,31 @@ async function sendFeedback() {
   fbStatus.className   = "feedback-status";
 
   const { error } = await sb.from("feedback").insert({ slug, message });
-
   if (error) {
     fbStatus.textContent = "Could not send — please try again.";
     fbStatus.className   = "feedback-status err";
   } else {
     fbStatus.textContent = "Sent! Thank you.";
     fbStatus.className   = "feedback-status ok";
-    fbMsg.value          = "";
+    fbMsg.value = "";
   }
   fbSend.disabled = false;
-}
-
-/* ─── Events ───────────────────────────────────────────────────── */
-sortSel.addEventListener("change", render);
-fbSend.addEventListener("click", sendFeedback);
-
-document.addEventListener("visibilitychange", async () => {
-  if (!document.hidden) {
-    await loadCounts();
-    render();
-    refreshAttachLabel();
-  }
 });
 
-/* ─── Init ─────────────────────────────────────────────────────── */
+/* ─── Sort ──────────────────────────────────────────────────── */
+sortSel.addEventListener("change", render);
+
+/* ─── Visibility refresh ────────────────────────────────────── */
+document.addEventListener("visibilitychange", async () => {
+  if (!document.hidden) { await loadCounts(); render(); refreshFbTarget(); }
+});
+
+/* ─── Init ──────────────────────────────────────────────────── */
 window.addEventListener("load", async () => {
   try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch (e) {}
   await loadManifest();
   await loadCounts();
   render();
-  refreshAttachLabel();
 });
 </script>
 </body>
