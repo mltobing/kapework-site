@@ -1015,3 +1015,147 @@ body {
 /* ─── Utilities ────────────────────────────────────────────────── */
 .w-full { width: 100%; }
 .max-w  { max-width: 480px; }
+
+/* ─── Word Writer ──────────────────────────────────────────────── */
+#ww-game {
+  justify-content: flex-start;
+  padding-top: 16px;
+  gap: 0;
+}
+
+.ww-progress-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Word display zone */
+.ww-word-zone {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.ww-target-word {
+  font-size: 3rem;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 3px;
+  color: var(--text);
+  line-height: 1;
+}
+
+/* Three-set writing zone */
+.ww-writing-zone {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ww-line-set {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #1a2a42;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 100px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+}
+
+.ww-line-set.ww-active-step   { border-color: var(--cyan); box-shadow: 0 0 14px var(--cyan-dim); }
+.ww-line-set.ww-done-step     { border-color: var(--success); }
+.ww-line-set.ww-inactive-step { opacity: 0.42; }
+
+.ww-line-set-header {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px 3px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ww-step-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+.ww-active-step .ww-step-label { color: var(--cyan); }
+.ww-done-step   .ww-step-label { color: var(--success); }
+
+.ww-clear-btn {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.ww-clear-btn:hover  { opacity: 1; }
+.ww-clear-btn:active { transform: scale(0.92); }
+
+.ww-checkmark {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--success);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.ww-checkmark.visible { opacity: 1; }
+
+.ww-canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 82px;
+}
+
+.ww-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Next word button */
+.ww-next-btn {
+  width: 100%;
+  max-width: 480px;
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 800;
+  font-size: 1rem;
+  border: none;
+  border-radius: 14px;
+  padding: 15px;
+  cursor: pointer;
+  margin-top: 8px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.15s;
+}
+.ww-next-btn.visible  { opacity: 1; pointer-events: all; }
+.ww-next-btn:hover    { opacity: 0.9; }
+.ww-next-btn:active   { transform: scale(0.97); }
