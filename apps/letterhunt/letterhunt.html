@@ -794,6 +794,101 @@ body {
 .sw-option.shake     { animation: card-shake 0.35s ease; }
 .sw-option.locked-out { opacity: 0.4; cursor: default; pointer-events: none; }
 
+/* ─── Word Match ──────────────────────────────────────────────── */
+#wm-game {
+  justify-content: flex-start;
+  padding-top: 16px;
+  gap: 0;
+}
+
+.wm-area {
+  position: relative;
+  display: flex;
+  gap: 20px;
+  padding: 8px 0;
+  width: 100%;
+  max-width: 480px;
+  flex: 1;
+  align-items: stretch;
+}
+
+.wm-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.wm-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+}
+
+.wm-word {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 10px;
+  font-size: 1.7rem;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 1px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, opacity 0.3s ease, transform 0.15s ease;
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wm-word:active:not(.matched) { transform: scale(0.96); }
+
+.wm-left .wm-word:not(.matched):not(.selected) {
+  border-left: 4px solid var(--cyan-dim);
+}
+
+.wm-word.selected {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+  box-shadow: 0 0 16px var(--cyan-dim);
+}
+
+.wm-word.matched {
+  background: var(--success-dim);
+  border-color: var(--success);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wm-word.shake {
+  animation: card-shake 0.35s ease;
+}
+
+.wm-line {
+  stroke: var(--cyan);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.wm-line.active {
+  opacity: 1;
+}
+.wm-line.matched {
+  stroke: var(--success);
+  opacity: 0.4;
+  transition: stroke 0.5s ease, opacity 0.5s ease;
+}
+.wm-line.temp {
+  opacity: 0.6;
+  stroke-dasharray: 8 4;
+}
+
 /* ─── Utilities ────────────────────────────────────────────────── */
 .w-full { width: 100%; }
 .max-w  { max-width: 480px; }
@@ -832,6 +927,15 @@ body {
         <div class="mode-desc">8 words · tap the matching word</div>
       </div>
       <div id="sw-status" class="mode-status play">Play</div>
+    </div>
+
+    <div id="wm-card" class="mode-card ready" onclick="startWordMatch()">
+      <div class="mode-icon">✏️</div>
+      <div class="mode-info">
+        <div class="mode-name">Word Match</div>
+        <div class="mode-desc">4 rounds · match the words</div>
+      </div>
+      <div id="wm-status" class="mode-status play">Play</div>
     </div>
   </div>
 
@@ -925,6 +1029,26 @@ body {
   <div class="round-instruction">Tap the matching word</div>
 
   <div class="sw-options-grid" id="sw-options-grid"></div>
+</div>
+
+<!-- ─── Word Match Screen ───────────────────────────────── -->
+<div id="wm-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="wm-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="wm-game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="round-instruction">Match each word on the left to its twin on the right</div>
+
+  <div class="wm-area" id="wm-area">
+    <svg class="wm-lines" id="wm-lines"></svg>
+    <div class="wm-col wm-left" id="wm-left"></div>
+    <div class="wm-col wm-right" id="wm-right"></div>
+  </div>
 </div>
 
 <!-- ─── Gallery Screen ──────────────────────────────────── -->
@@ -1791,6 +1915,10 @@ let state = {
   swTodayDone:  false,
   swTodayStars: 0,
   swEarnedCard: null,
+  // Word Match
+  wmTodayDone:  false,
+  wmTodayStars: 0,
+  wmEarnedCard: null,
 };
 
 /* ─── LocalStorage helpers ─────────────────────────────────────── */
@@ -1811,6 +1939,9 @@ function loadProgress() {
     state.swTodayDone    = data.swTodayDone  ?? false;
     state.swTodayStars   = data.swTodayStars ?? 0;
     state.swEarnedCard   = data.swEarnedCard ?? null;
+    state.wmTodayDone    = data.wmTodayDone  ?? false;
+    state.wmTodayStars   = data.wmTodayStars ?? 0;
+    state.wmEarnedCard   = data.wmEarnedCard ?? null;
     // Check if "today" in stored data is still today
     const today = getTodayStr();
     if (data.lastPlayDate !== today) {
@@ -1820,6 +1951,9 @@ function loadProgress() {
       state.swTodayDone  = false;
       state.swTodayStars = 0;
       state.swEarnedCard = null;
+      state.wmTodayDone  = false;
+      state.wmTodayStars = 0;
+      state.wmEarnedCard = null;
       // Do NOT reset earnedCards or swMastery — those persist
     }
     // Streak: if last played was >1 day ago, and no shield, reset
@@ -1845,6 +1979,9 @@ function saveProgress() {
       swTodayDone:   state.swTodayDone,
       swTodayStars:  state.swTodayStars,
       swEarnedCard:  state.swEarnedCard,
+      wmTodayDone:   state.wmTodayDone,
+      wmTodayStars:  state.wmTodayStars,
+      wmEarnedCard:  state.wmEarnedCard,
     }));
   } catch (e) {}
 }
@@ -1957,6 +2094,23 @@ function updateHomeUI() {
       swStatus.className   = 'mode-status play';
       swStatus.textContent = 'Play';
       swCard.onclick = startSightWordDash;
+    }
+  }
+
+  // Word Match card
+  const wmCard   = document.getElementById('wm-card');
+  const wmStatus = document.getElementById('wm-status');
+  if (wmCard) {
+    if (state.wmTodayDone) {
+      wmCard.classList.remove('ready'); wmCard.classList.add('done');
+      wmStatus.className   = 'mode-status stars';
+      wmStatus.textContent = '⭐'.repeat(state.wmTodayStars) || '✓';
+      wmCard.onclick = () => showTodayWMSummary();
+    } else {
+      wmCard.classList.add('ready'); wmCard.classList.remove('done');
+      wmStatus.className   = 'mode-status play';
+      wmStatus.textContent = 'Play';
+      wmCard.onclick = startWordMatch;
     }
   }
 }
@@ -2154,7 +2308,7 @@ function onSessionComplete() {
 }
 
 /* ─── Summary screen ───────────────────────────────────────────── */
-let summaryMode = 'lh'; // 'lh' | 'sw' — used by shareResult()
+let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' — used by shareResult()
 
 function showSummary(stars, card) {
   summaryMode = 'lh';
@@ -2201,8 +2355,9 @@ function shareResult() {
   const date   = formatDate(getTodayStr());
   const streak = state.streak;
   const isSW   = (summaryMode === 'sw');
-  const stars  = '⭐'.repeat(isSW ? state.swTodayStars : state.todayStars) || '✓';
-  const game   = isSW ? 'Sight Word Dash' : 'Letter Hunt';
+  const isWM   = (summaryMode === 'wm');
+  const stars  = '⭐'.repeat(isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
+  const game   = isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
   const text   = `${stars} ${game} — ${date} — Streak: ${streak} 🔥\nKapework · letterhunt.kapework.com`;
 
   if (navigator.share) {
@@ -2539,6 +2694,337 @@ function showTodaySWSummary() {
   showSWSummary(state.swTodayStars, card);
 }
 
+/* ─── Word Match ──────────────────────────────────────────────── */
+const WM_ROUNDS_PER_SESSION = 4;
+const WM_PAIRS_PER_ROUND = 4;
+
+let wmSession = null;
+
+function buildWMSession() {
+  const tier  = SIGHT_WORD_TIERS.pre_primer;
+  const today = getTodayStr();
+  const seed  = dateHash(today + 'wm');
+
+  const words = tier.map(w => w.word);
+
+  // Group by visual complexity (character length)
+  const bands = [[], [], [], []];
+  words.forEach(w => {
+    const len = w.length;
+    if (len <= 2)      bands[0].push(w);
+    else if (len <= 3) bands[1].push(w);
+    else if (len <= 4) bands[2].push(w);
+    else               bands[3].push(w);
+  });
+
+  const rounds = [];
+  for (let r = 0; r < WM_ROUNDS_PER_SESSION; r++) {
+    const band     = bands[r % bands.length];
+    const shuffled = seededShuffle([...band], seed + r * 31);
+    const picked   = shuffled.slice(0, WM_PAIRS_PER_ROUND);
+
+    // Right side: same words in a different order
+    let rightOrder, attempts = 0;
+    do {
+      rightOrder = seededShuffle([...picked], seed + r * 31 + 100 + attempts);
+      attempts++;
+    } while (attempts < 10 && rightOrder.every((w, i) => w === picked[i]));
+
+    rounds.push({ leftWords: picked, rightWords: rightOrder, matched: new Set(), incorrect: 0 });
+  }
+
+  return { rounds, currentRound: 0, totalIncorrect: 0, sessionStartTime: Date.now(), selectedLeft: null };
+}
+
+function startWordMatch() {
+  if (state.wmTodayDone) { showTodayWMSummary(); return; }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  tts.unlockFromGesture();
+
+  wmSession = buildWMSession();
+  showScreen('wm-game');
+  document.getElementById('wm-game-streak').textContent = state.streak;
+  loadWMRound(0);
+}
+
+function buildWMDots(currentIdx) {
+  const container = document.getElementById('wm-dots');
+  container.innerHTML = '';
+  for (let i = 0; i < WM_ROUNDS_PER_SESSION; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' +
+      (i < currentIdx   ? ' done'    : '') +
+      (i === currentIdx ? ' current' : '');
+    container.appendChild(dot);
+  }
+}
+
+function loadWMRound(idx) {
+  if (!wmSession) return;
+  wmSession.currentRound = idx;
+  wmSession.selectedLeft = null;
+  const round = wmSession.rounds[idx];
+  if (!round) return;
+
+  buildWMDots(idx);
+
+  const leftCol  = document.getElementById('wm-left');
+  const rightCol = document.getElementById('wm-right');
+  const svg      = document.getElementById('wm-lines');
+
+  leftCol.innerHTML  = '';
+  rightCol.innerHTML = '';
+  svg.innerHTML      = '';
+
+  // Left words
+  round.leftWords.forEach(word => {
+    const el = document.createElement('div');
+    el.className    = 'wm-word';
+    el.textContent  = word;
+    el.dataset.word = word;
+    el.addEventListener('pointerdown', e => onWMLeftDown(e, el, word));
+    leftCol.appendChild(el);
+  });
+
+  // Right words
+  round.rightWords.forEach(word => {
+    const el = document.createElement('div');
+    el.className    = 'wm-word';
+    el.textContent  = word;
+    el.dataset.word = word;
+    el.addEventListener('click', () => onWMRightTap(el, word));
+    rightCol.appendChild(el);
+  });
+}
+
+/* ─── WM interaction: left side (tap + drag) ────────────────── */
+function onWMLeftDown(e, el, word) {
+  if (!wmSession) return;
+  const round = wmSession.rounds[wmSession.currentRound];
+  if (round.matched.has(word)) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+
+  // Select this word (works for both tap and drag start)
+  document.querySelectorAll('#wm-left .wm-word.selected').forEach(w => w.classList.remove('selected'));
+  el.classList.add('selected');
+  wmSession.selectedLeft = word;
+  tts.sayWord(word);
+
+  // Drag tracking
+  const startX = e.clientX, startY = e.clientY;
+  let isDragging = false;
+  let tempLine   = null;
+
+  el.setPointerCapture(e.pointerId);
+
+  const area = document.getElementById('wm-area');
+  const svg  = document.getElementById('wm-lines');
+
+  const onMove = (ev) => {
+    if (!isDragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 10) {
+      isDragging = true;
+      const aRect = area.getBoundingClientRect();
+      const lRect = el.getBoundingClientRect();
+      tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      tempLine.setAttribute('x1', lRect.right - aRect.left);
+      tempLine.setAttribute('y1', lRect.top + lRect.height / 2 - aRect.top);
+      tempLine.classList.add('wm-line', 'temp', 'active');
+      svg.appendChild(tempLine);
+    }
+    if (isDragging && tempLine) {
+      const aRect = area.getBoundingClientRect();
+      tempLine.setAttribute('x2', ev.clientX - aRect.left);
+      tempLine.setAttribute('y2', ev.clientY - aRect.top);
+    }
+  };
+
+  const onUp = (ev) => {
+    el.removeEventListener('pointermove', onMove);
+    el.removeEventListener('pointerup', onUp);
+    el.removeEventListener('pointercancel', onUp);
+    if (tempLine) tempLine.remove();
+    if (!isDragging) return; // simple tap — word is already selected, wait for right-side tap
+
+    // Find nearest unmatched right word
+    const rightEls = document.querySelectorAll('#wm-right .wm-word:not(.matched)');
+    let nearest = null, nearestDist = Infinity;
+    rightEls.forEach(rEl => {
+      const r = rEl.getBoundingClientRect();
+      const dist = Math.hypot(ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2));
+      if (dist < nearestDist) { nearestDist = dist; nearest = rEl; }
+    });
+
+    if (nearest && nearestDist < 80) {
+      const target = nearest.dataset.word;
+      tts.sayWord(target);
+      if (target === word) {
+        onWMCorrectMatch(target);
+      } else {
+        round.incorrect++;
+        wmSession.totalIncorrect++;
+        soundIncorrect();
+        nearest.classList.add('shake');
+        nearest.addEventListener('animationend', () => nearest.classList.remove('shake'), { once: true });
+      }
+    }
+  };
+
+  el.addEventListener('pointermove', onMove);
+  el.addEventListener('pointerup', onUp);
+  el.addEventListener('pointercancel', onUp);
+}
+
+/* ─── WM interaction: right side (tap) ──────────────────────── */
+function onWMRightTap(el, word) {
+  if (!wmSession || !wmSession.selectedLeft) return;
+  const round = wmSession.rounds[wmSession.currentRound];
+  if (round.matched.has(word)) return;
+
+  tts.sayWord(word);
+
+  if (word === wmSession.selectedLeft) {
+    onWMCorrectMatch(word);
+  } else {
+    round.incorrect++;
+    wmSession.totalIncorrect++;
+    soundIncorrect();
+    el.classList.add('shake');
+    el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
+  }
+}
+
+/* ─── WM correct match ──────────────────────────────────────── */
+function onWMCorrectMatch(word) {
+  const round = wmSession.rounds[wmSession.currentRound];
+  round.matched.add(word);
+  soundCorrect();
+  setTimeout(() => tts.sayWord(word), 300);
+
+  // Mark both sides matched
+  document.querySelectorAll('#wm-left .wm-word').forEach(el => {
+    if (el.dataset.word === word) { el.classList.remove('selected'); el.classList.add('matched'); }
+  });
+  document.querySelectorAll('#wm-right .wm-word').forEach(el => {
+    if (el.dataset.word === word) el.classList.add('matched');
+  });
+
+  wmSession.selectedLeft = null;
+  drawWMLine(word);
+
+  if (round.matched.size >= WM_PAIRS_PER_ROUND) {
+    setTimeout(() => onWMRoundComplete(), 800);
+  }
+}
+
+function drawWMLine(word) {
+  const area    = document.getElementById('wm-area');
+  const svg     = document.getElementById('wm-lines');
+  const leftEl  = document.querySelector('#wm-left .wm-word[data-word="' + word + '"]');
+  const rightEl = document.querySelector('#wm-right .wm-word[data-word="' + word + '"]');
+  if (!leftEl || !rightEl || !area) return;
+
+  const aRect = area.getBoundingClientRect();
+  const lRect = leftEl.getBoundingClientRect();
+  const rRect = rightEl.getBoundingClientRect();
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', lRect.right  - aRect.left);
+  line.setAttribute('y1', lRect.top + lRect.height / 2 - aRect.top);
+  line.setAttribute('x2', rRect.left   - aRect.left);
+  line.setAttribute('y2', rRect.top + rRect.height / 2 - aRect.top);
+  line.classList.add('wm-line');
+  svg.appendChild(line);
+
+  requestAnimationFrame(() => {
+    line.classList.add('active');
+    setTimeout(() => line.classList.add('matched'), 500);
+  });
+}
+
+function onWMRoundComplete() {
+  soundRoundComplete();
+  spawnConfetti(8);
+
+  const next = wmSession.currentRound + 1;
+  if (next >= WM_ROUNDS_PER_SESSION) {
+    setTimeout(() => onWMComplete(), 1200);
+  } else {
+    setTimeout(() => loadWMRound(next), 1000);
+  }
+}
+
+/* ─── WM session complete ───────────────────────────────────── */
+function onWMComplete() {
+  const duration = Math.round((Date.now() - wmSession.sessionStartTime) / 1000);
+
+  let stars;
+  if (wmSession.totalIncorrect === 0) {
+    stars = duration < 90 ? 3 : 2;
+  } else if (wmSession.totalIncorrect <= 3) {
+    stars = 1;
+  } else {
+    stars = 0;
+  }
+
+  // Streak — only advance once per day (shared)
+  const today = getTodayStr();
+  if (state.lastPlayDate !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    state.streak = (state.lastPlayDate === yStr || !state.lastPlayDate) ? state.streak + 1 : 1;
+    state.lastPlayDate = today;
+  }
+
+  // Pick collectible card
+  const seed = dateHash(today + 'wm' + stars);
+  const pool = stars >= 2
+    ? CARDS.filter(c => c.rarity === 'rare')
+    : CARDS.filter(c => c.rarity === 'standard');
+  const card = pool[seed % pool.length];
+
+  state.wmTodayDone  = true;
+  state.wmTodayStars = stars;
+  state.wmEarnedCard = card;
+  if (!state.earnedCards.includes(card.name)) state.earnedCards.push(card.name);
+
+  saveProgress();
+  showWMSummary(stars, card);
+}
+
+function showWMSummary(stars, card) {
+  summaryMode = 'wm';
+  showScreen('summary');
+  soundSessionComplete();
+  spawnConfetti(25);
+
+  const titles = ['Keep practicing!', 'Great job!', 'Excellent!', 'Perfect!'];
+  document.getElementById('summary-title').textContent = titles[Math.min(stars, 3)];
+  document.getElementById('summary-date').textContent  = 'Word Match · ' + formatDate(getTodayStr());
+
+  ['star1', 'star2', 'star3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('earned');
+    if (i < stars) setTimeout(() => el.classList.add('earned'), 300 + i * 250);
+  });
+
+  const labels = ['Keep practicing! ✨', 'Great job! 🎉', 'Excellent! 🌟', 'Perfect! 🏆'];
+  document.getElementById('star-label').textContent = labels[Math.min(stars, 3)];
+
+  const cardEl = document.getElementById('card-reveal');
+  cardEl.className = 'card-reveal' + (card.rarity === 'rare' ? ' rare' : '');
+  document.getElementById('card-emoji').textContent   = card.emoji;
+  document.getElementById('card-name').textContent    = card.name;
+  document.getElementById('card-rarity').textContent  = card.rarity === 'rare' ? '✨ Rare card!' : "Today's card";
+  document.getElementById('summary-streak-count').textContent = state.streak;
+}
+
+function showTodayWMSummary() {
+  const card = state.wmEarnedCard || CARDS[0];
+  showWMSummary(state.wmTodayStars, card);
+}
+
 /* ─── Gallery ──────────────────────────────────────────────────── */
 function openGallery() {
   renderGallery();
@@ -2557,7 +3043,7 @@ function renderGallery() {
     grid.innerHTML = `
       <div class="gallery-empty">
         <div class="gallery-empty-icon">🐾</div>
-        <div class="gallery-empty-text">Play Letter Hunt or Sight Word Dash to earn your first animal badge!</div>
+        <div class="gallery-empty-text">Play Letter Hunt, Sight Word Dash, or Word Match to earn your first animal badge!</div>
       </div>
     `;
     return;
