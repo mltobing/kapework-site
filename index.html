@@ -759,53 +759,12 @@ document.addEventListener("visibilitychange", async () => {
   if (!document.hidden) { await loadCounts(); render(); refreshFbTarget(); }
 });
 
-/* ─── DB self-test ──────────────────────────────────────────── */
-async function dbSelfTest() {
-  if (!sb) { console.warn("[kapework] ⚠️  Supabase client not initialised"); return; }
-  console.group("[kapework] DB self-test");
-
-  // Test SELECT on each resource
-  for (const tbl of ["plays","likes","game_play_counts","game_like_counts","feedback"]) {
-    const { error } = await sb.from(tbl).select("*", { head: true, count: "exact" });
-    if (error) console.warn(`  ✗ ${tbl}: ${error.message} (code ${error.code})`);
-    else       console.log(`  ✓ ${tbl}: readable`);
-  }
-
-  // Test INSERT into plays (canary row)
-  const { error: plErr } = await sb.from("plays").insert({ slug: "__test__", device_id: "self-test" });
-  if (plErr) console.warn(`  ✗ plays INSERT: ${plErr.message} (code ${plErr.code})`);
-  else       console.log("  ✓ plays INSERT: ok");
-
-  // Test INSERT into likes (canary row)
-  const { error: liErr } = await sb.from("likes").insert({ slug: "__test__", device_id: "self-test" });
-  if (liErr) console.warn(`  ✗ likes INSERT: ${liErr.message} (code ${liErr.code})`);
-  else       console.log("  ✓ likes INSERT: ok");
-
-  console.groupEnd();
-
-  // Show brief on-screen toast if plays or likes insert failed
-  if (plErr || liErr) {
-    const t = Object.assign(document.createElement("div"), {
-      textContent: "⚠️ Database not connected — plays & likes won't save. See console for details.",
-    });
-    Object.assign(t.style, {
-      position:"fixed", bottom:"20px", left:"50%", transform:"translateX(-50%)",
-      background:"#1a2a44", border:"1px solid rgba(248,113,113,0.4)", borderRadius:"12px",
-      color:"#f87171", fontSize:"0.8rem", padding:"10px 18px", zIndex:"9999",
-      boxShadow:"0 8px 32px rgba(0,0,0,0.5)", maxWidth:"90vw", textAlign:"center",
-    });
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 9000);
-  }
-}
-
 /* ─── Init ──────────────────────────────────────────────────── */
 window.addEventListener("load", async () => {
   try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch (e) {}
   await loadManifest();
   await loadCounts();
   render();
-  dbSelfTest(); // async, non-blocking — check console for results
 });
 </script>
 </body>
