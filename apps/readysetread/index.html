@@ -65,6 +65,15 @@
       </div>
       <div id="lw-status" class="mode-status play">Play</div>
     </div>
+
+    <div id="ww-card" class="mode-card ready" onclick="startWordWriter()">
+      <div class="mode-icon">📝</div>
+      <div class="mode-info">
+        <div class="mode-name">Word Writer</div>
+        <div class="mode-desc">4 words · trace and write each word</div>
+      </div>
+      <div id="ww-status" class="mode-status play">Play</div>
+    </div>
   </div>
 
   <button class="paw-btn" onclick="openGallery()" aria-label="My Animals collection">
@@ -215,6 +224,67 @@
   </div>
 </div>
 
+<!-- ─── Word Writer Screen ──────────────────────────────── -->
+<div id="ww-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="ww-progress-text" id="ww-progress-text">Word 1 of 4</div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="ww-game-streak">0</span>
+    </div>
+  </div>
+
+  <!-- Target word zone -->
+  <div class="ww-word-zone w-full max-w">
+    <div class="ww-target-word" id="ww-target-word">the</div>
+    <button class="speaker-btn" id="ww-speaker-btn" onclick="playWWWord()" aria-label="Hear the word" style="width:52px;height:52px;font-size:1.3rem;">🔊</button>
+  </div>
+
+  <!-- Three writing line sets -->
+  <div class="ww-writing-zone w-full max-w" id="ww-writing-zone">
+
+    <!-- Step 0: Trace -->
+    <div class="ww-line-set ww-active-step" id="ww-set-0">
+      <div class="ww-line-set-header">
+        <span class="ww-step-label">① Trace</span>
+        <button class="ww-clear-btn" onclick="wwClearStep(0)" aria-label="Clear this line">🧹</button>
+        <span class="ww-checkmark" id="ww-check-0">✓</span>
+      </div>
+      <div class="ww-canvas-wrap" id="ww-wrap-0">
+        <canvas class="ww-canvas" id="ww-canvas-0"></canvas>
+      </div>
+    </div>
+
+    <!-- Step 1: Write -->
+    <div class="ww-line-set ww-inactive-step" id="ww-set-1">
+      <div class="ww-line-set-header">
+        <span class="ww-step-label">② Write</span>
+        <button class="ww-clear-btn" onclick="wwClearStep(1)" aria-label="Clear this line">🧹</button>
+        <span class="ww-checkmark" id="ww-check-1">✓</span>
+      </div>
+      <div class="ww-canvas-wrap" id="ww-wrap-1">
+        <canvas class="ww-canvas" id="ww-canvas-1"></canvas>
+      </div>
+    </div>
+
+    <!-- Step 2: Write again -->
+    <div class="ww-line-set ww-inactive-step" id="ww-set-2">
+      <div class="ww-line-set-header">
+        <span class="ww-step-label">③ Write again</span>
+        <button class="ww-clear-btn" onclick="wwClearStep(2)" aria-label="Clear this line">🧹</button>
+        <span class="ww-checkmark" id="ww-check-2">✓</span>
+      </div>
+      <div class="ww-canvas-wrap" id="ww-wrap-2">
+        <canvas class="ww-canvas" id="ww-canvas-2"></canvas>
+      </div>
+    </div>
+
+  </div><!-- .ww-writing-zone -->
+
+  <button class="ww-next-btn" id="ww-next-btn" onclick="wwAdvanceWord()">Next word →</button>
+</div>
+
 <!-- ─── Gallery Screen ──────────────────────────────────── -->
 <div id="gallery" class="screen">
   <div class="top-bar w-full max-w">
@@ -238,6 +308,7 @@
 <script src="modes/sight-word-dash.js"></script>
 <script src="modes/word-match.js"></script>
 <script src="modes/letter-writer.js"></script>
+<script src="modes/word-writer.js"></script>
 <script>init();</script>
 
 </body>

@@ -248,6 +248,11 @@ let state = {
   lwTodayDone:  false,
   lwTodayStars: 0,
   lwEarnedCard: null,
+  // Word Writer
+  wwTodayDone:  false,
+  wwTodayStars: 0,
+  wwEarnedCard: null,
+  wwPracticed:  [],
 };
 
 /* ─── LocalStorage helpers ─────────────────────────────────────── */
@@ -274,6 +279,10 @@ function loadProgress() {
     state.lwTodayDone    = data.lwTodayDone  ?? false;
     state.lwTodayStars   = data.lwTodayStars ?? 0;
     state.lwEarnedCard   = data.lwEarnedCard ?? null;
+    state.wwTodayDone    = data.wwTodayDone  ?? false;
+    state.wwTodayStars   = data.wwTodayStars ?? 0;
+    state.wwEarnedCard   = data.wwEarnedCard ?? null;
+    state.wwPracticed    = data.wwPracticed  ?? [];
 
     const today = getTodayStr();
     if (data.lastPlayDate !== today) {
@@ -289,6 +298,10 @@ function loadProgress() {
       state.lwTodayDone  = false;
       state.lwTodayStars = 0;
       state.lwEarnedCard = null;
+      state.wwTodayDone  = false;
+      state.wwTodayStars = 0;
+      state.wwEarnedCard = null;
+      state.wwPracticed  = [];
       // earnedCards and swMastery persist across days
     }
     if (state.lastPlayDate) {
@@ -317,6 +330,10 @@ function saveProgress() {
       lwTodayDone:   state.lwTodayDone,
       lwTodayStars:  state.lwTodayStars,
       lwEarnedCard:  state.lwEarnedCard,
+      wwTodayDone:   state.wwTodayDone,
+      wwTodayStars:  state.wwTodayStars,
+      wwEarnedCard:  state.wwEarnedCard,
+      wwPracticed:   state.wwPracticed,
     }));
   } catch (e) {}
 }
@@ -433,10 +450,26 @@ function updateHomeUI() {
       lwCard.onclick = startLetterWriter;
     }
   }
+
+  const wwCard   = document.getElementById('ww-card');
+  const wwStatus = document.getElementById('ww-status');
+  if (wwCard) {
+    if (state.wwTodayDone) {
+      wwCard.classList.remove('ready'); wwCard.classList.add('done');
+      wwStatus.className   = 'mode-status stars';
+      wwStatus.textContent = '⭐'.repeat(state.wwTodayStars) || '✓';
+      wwCard.onclick = () => showTodayWWSummary();
+    } else {
+      wwCard.classList.add('ready'); wwCard.classList.remove('done');
+      wwStatus.className   = 'mode-status play';
+      wwStatus.textContent = 'Play';
+      wwCard.onclick = startWordWriter;
+    }
+  }
 }
 
 /* ─── Share ────────────────────────────────────────────────────── */
-let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' | 'lw'
+let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' | 'lw' | 'ww'
 
 function shareResult() {
   const date   = formatDate(getTodayStr());
@@ -444,8 +477,9 @@ function shareResult() {
   const isSW   = (summaryMode === 'sw');
   const isWM   = (summaryMode === 'wm');
   const isLW   = (summaryMode === 'lw');
-  const stars  = '⭐'.repeat(isLW ? state.lwTodayStars : isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
-  const game   = isLW ? 'Letter Writer' : isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
+  const isWW   = (summaryMode === 'ww');
+  const stars  = '⭐'.repeat(isWW ? state.wwTodayStars : isLW ? state.lwTodayStars : isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
+  const game   = isWW ? 'Word Writer' : isLW ? 'Letter Writer' : isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
   const text   = `${stars} ${game} — ${date} — Streak: ${streak} 🔥\nKapework · kapework.com/apps/readysetread/`;
 
   if (navigator.share) {
