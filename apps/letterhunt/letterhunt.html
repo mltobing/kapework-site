@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0a1628">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Letter Hunt | Kapework</title>
+<title>Ready, Set, Read! | Kapework</title>
 <style>
 /* ─── Reset & Root ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -889,6 +889,143 @@ body {
   stroke-dasharray: 8 4;
 }
 
+/* ─── Letter Writer ───────────────────────────────────────────── */
+#lw-game {
+  justify-content: flex-start;
+  padding-top: 16px;
+  gap: 0;
+}
+
+.lw-picture-zone {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.lw-emoji { font-size: 4.5rem; line-height: 1; flex-shrink: 0; }
+
+.lw-pic-info { flex: 1; }
+.lw-pic-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.lw-step-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+/* Canvas writing area */
+.lw-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  flex: 1;
+  min-height: 200px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #1a2a42;
+  border: 1px solid var(--border);
+}
+
+.lw-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Action bar below canvas */
+.lw-actions {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0 0;
+}
+
+.lw-btn-clear {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.lw-btn-clear:hover { color: var(--text); border-color: var(--muted); }
+
+.lw-btn-check {
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.lw-btn-check.visible { opacity: 1; pointer-events: all; }
+.lw-btn-check:hover { opacity: 0.9; }
+.lw-btn-check:active { transform: scale(0.96); }
+
+.lw-btn-next {
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.lw-btn-next:hover { opacity: 0.9; }
+.lw-btn-next:active { transform: scale(0.96); }
+
+.lw-btn-retry {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 8px;
+}
+.lw-btn-retry:hover { color: var(--text); }
+
+.lw-post-check {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 0 0;
+  justify-content: space-between;
+}
+.lw-post-check.visible { display: flex; }
+
 /* ─── Utilities ────────────────────────────────────────────────── */
 .w-full { width: 100%; }
 .max-w  { max-width: 480px; }
@@ -900,8 +1037,8 @@ body {
 <div id="home" class="screen active">
   <div class="home-header">
     <div class="home-logo">🔤</div>
-    <h1 class="home-title">Letter Hunt</h1>
-    <p class="home-subtitle">Find the matching sounds</p>
+    <h1 class="home-title">Ready, Set, Read!</h1>
+    <p class="home-subtitle">Daily reading games</p>
   </div>
 
   <div class="streak-bar">
@@ -930,12 +1067,21 @@ body {
     </div>
 
     <div id="wm-card" class="mode-card ready" onclick="startWordMatch()">
-      <div class="mode-icon">✏️</div>
+      <div class="mode-icon">🔗</div>
       <div class="mode-info">
         <div class="mode-name">Word Match</div>
         <div class="mode-desc">4 rounds · match the words</div>
       </div>
       <div id="wm-status" class="mode-status play">Play</div>
+    </div>
+
+    <div id="lw-card" class="mode-card ready" onclick="startLetterWriter()">
+      <div class="mode-icon">✏️</div>
+      <div class="mode-info">
+        <div class="mode-name">Letter Writer</div>
+        <div class="mode-desc">6 rounds · see picture, write the letter</div>
+      </div>
+      <div id="lw-status" class="mode-status play">Play</div>
     </div>
   </div>
 
@@ -944,7 +1090,7 @@ body {
   </button>
 
   <div class="home-footer">
-    Kapework · Letter Hunt · Tiers 1–5
+    Kapework — Ready, Set, Read v1
   </div>
 </div>
 
@@ -1048,6 +1194,41 @@ body {
     <svg class="wm-lines" id="wm-lines"></svg>
     <div class="wm-col wm-left" id="wm-left"></div>
     <div class="wm-col wm-right" id="wm-right"></div>
+  </div>
+</div>
+
+<!-- ─── Letter Writer Screen ────────────────────────────── -->
+<div id="lw-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="lw-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="lw-game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="lw-picture-zone" id="lw-picture-zone">
+    <div class="lw-emoji" id="lw-emoji">🐍</div>
+    <div class="lw-pic-info">
+      <div class="lw-step-label" id="lw-step-label">Step 1 — Write it</div>
+      <div class="lw-pic-hint" id="lw-pic-hint">What sound does it start with?</div>
+    </div>
+    <button class="speaker-btn" id="lw-speaker-btn" onclick="playLWWord()" aria-label="Hear the word" style="width:48px;height:48px;font-size:1.3rem;">🔊</button>
+  </div>
+
+  <div class="lw-canvas-wrap" id="lw-canvas-wrap">
+    <canvas class="lw-canvas" id="lw-canvas"></canvas>
+  </div>
+
+  <div class="lw-actions" id="lw-actions">
+    <button class="lw-btn-clear" id="lw-btn-clear" onclick="lwClearCanvas()">Clear</button>
+    <button class="lw-btn-check" id="lw-btn-check" onclick="lwCheck()">Check ✓</button>
+  </div>
+
+  <div class="lw-post-check" id="lw-post-check">
+    <button class="lw-btn-retry" id="lw-btn-retry" onclick="lwRetry()">Try again</button>
+    <button class="lw-btn-next" id="lw-btn-next" onclick="lwNext()">Next →</button>
   </div>
 </div>
 
@@ -1919,6 +2100,10 @@ let state = {
   wmTodayDone:  false,
   wmTodayStars: 0,
   wmEarnedCard: null,
+  // Letter Writer
+  lwTodayDone:  false,
+  lwTodayStars: 0,
+  lwEarnedCard: null,
 };
 
 /* ─── LocalStorage helpers ─────────────────────────────────────── */
@@ -1942,6 +2127,9 @@ function loadProgress() {
     state.wmTodayDone    = data.wmTodayDone  ?? false;
     state.wmTodayStars   = data.wmTodayStars ?? 0;
     state.wmEarnedCard   = data.wmEarnedCard ?? null;
+    state.lwTodayDone    = data.lwTodayDone  ?? false;
+    state.lwTodayStars   = data.lwTodayStars ?? 0;
+    state.lwEarnedCard   = data.lwEarnedCard ?? null;
     // Check if "today" in stored data is still today
     const today = getTodayStr();
     if (data.lastPlayDate !== today) {
@@ -1954,6 +2142,9 @@ function loadProgress() {
       state.wmTodayDone  = false;
       state.wmTodayStars = 0;
       state.wmEarnedCard = null;
+      state.lwTodayDone  = false;
+      state.lwTodayStars = 0;
+      state.lwEarnedCard = null;
       // Do NOT reset earnedCards or swMastery — those persist
     }
     // Streak: if last played was >1 day ago, and no shield, reset
@@ -1982,6 +2173,9 @@ function saveProgress() {
       wmTodayDone:   state.wmTodayDone,
       wmTodayStars:  state.wmTodayStars,
       wmEarnedCard:  state.wmEarnedCard,
+      lwTodayDone:   state.lwTodayDone,
+      lwTodayStars:  state.lwTodayStars,
+      lwEarnedCard:  state.lwEarnedCard,
     }));
   } catch (e) {}
 }
@@ -2111,6 +2305,23 @@ function updateHomeUI() {
       wmStatus.className   = 'mode-status play';
       wmStatus.textContent = 'Play';
       wmCard.onclick = startWordMatch;
+    }
+  }
+
+  // Letter Writer card
+  const lwCard   = document.getElementById('lw-card');
+  const lwStatus = document.getElementById('lw-status');
+  if (lwCard) {
+    if (state.lwTodayDone) {
+      lwCard.classList.remove('ready'); lwCard.classList.add('done');
+      lwStatus.className   = 'mode-status stars';
+      lwStatus.textContent = '⭐'.repeat(state.lwTodayStars) || '✓';
+      lwCard.onclick = () => showTodayLWSummary();
+    } else {
+      lwCard.classList.add('ready'); lwCard.classList.remove('done');
+      lwStatus.className   = 'mode-status play';
+      lwStatus.textContent = 'Play';
+      lwCard.onclick = startLetterWriter;
     }
   }
 }
@@ -2308,7 +2519,7 @@ function onSessionComplete() {
 }
 
 /* ─── Summary screen ───────────────────────────────────────────── */
-let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' — used by shareResult()
+let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' | 'lw' — used by shareResult()
 
 function showSummary(stars, card) {
   summaryMode = 'lh';
@@ -2356,8 +2567,9 @@ function shareResult() {
   const streak = state.streak;
   const isSW   = (summaryMode === 'sw');
   const isWM   = (summaryMode === 'wm');
-  const stars  = '⭐'.repeat(isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
-  const game   = isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
+  const isLW   = (summaryMode === 'lw');
+  const stars  = '⭐'.repeat(isLW ? state.lwTodayStars : isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
+  const game   = isLW ? 'Letter Writer' : isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
   const text   = `${stars} ${game} — ${date} — Streak: ${streak} 🔥\nKapework · letterhunt.kapework.com`;
 
   if (navigator.share) {
@@ -3025,6 +3237,481 @@ function showTodayWMSummary() {
   showWMSummary(state.wmTodayStars, card);
 }
 
+/* ─── Letter Writer ───────────────────────────────────────────── */
+const LW_ROUNDS_PER_SESSION = 6;
+
+// Pictures per letter (Tier 1)
+const LW_PICTURES = {
+  s: [
+    { emoji: '🐍', word: 'snake' },
+    { emoji: '🧦', word: 'sock' },
+    { emoji: '☀️', word: 'sun' },
+    { emoji: '⭐', word: 'star' },
+    { emoji: '🥣', word: 'soup' },
+    { emoji: '✂️', word: 'scissors' },
+  ],
+  a: [
+    { emoji: '🍎', word: 'apple' },
+    { emoji: '🐜', word: 'ant' },
+    { emoji: '👼', word: 'angel' },
+    { emoji: '🐊', word: 'alligator' },
+    { emoji: '🚑', word: 'ambulance' },
+  ],
+  t: [
+    { emoji: '🐯', word: 'tiger' },
+    { emoji: '🌮', word: 'taco' },
+    { emoji: '🎯', word: 'target' },
+    { emoji: '🐢', word: 'turtle' },
+    { emoji: '🌳', word: 'tree' },
+    { emoji: '🦷', word: 'tooth' },
+  ],
+  p: [
+    { emoji: '🐷', word: 'pig' },
+    { emoji: '🍕', word: 'pizza' },
+    { emoji: '🐧', word: 'penguin' },
+    { emoji: '✏️', word: 'pencil' },
+    { emoji: '🥞', word: 'pancake' },
+    { emoji: '🍑', word: 'peach' },
+  ],
+  i: [
+    { emoji: '🦎', word: 'iguana' },
+    { emoji: '🍦', word: 'ice cream' },
+    { emoji: '🏝️', word: 'island' },
+  ],
+  n: [
+    { emoji: '👃', word: 'nose' },
+    { emoji: '🥜', word: 'nut' },
+    { emoji: '📰', word: 'newspaper' },
+    { emoji: '🪺', word: 'nest' },
+    { emoji: '🌙', word: 'night' },
+  ],
+};
+
+// Letter placement on OG-style writing lines
+// yTop/yBot map to line positions: 0=green top, 0.5=midline, 1.0=red baseline
+const LW_LETTER_METRICS = {
+  s: { yTop: 0.5, yBot: 1.0 },   // short
+  a: { yTop: 0.5, yBot: 1.0 },   // short
+  t: { yTop: 0.0, yBot: 1.0 },   // tall
+  p: { yTop: 0.5, yBot: 1.35 },  // descender
+  i: { yTop: 0.5, yBot: 1.0 },   // short
+  n: { yTop: 0.5, yBot: 1.0 },   // short
+};
+
+let lwSession = null;
+
+function buildLWSession() {
+  const today = getTodayStr();
+  const seed  = dateHash(today + 'lw');
+  const letters = Object.keys(LW_PICTURES);
+
+  // Pick 6 rounds — allow repeats (intentional for motor memory)
+  const shuffled = seededShuffle([...letters, ...letters], seed);
+  const chosen   = shuffled.slice(0, LW_ROUNDS_PER_SESSION);
+
+  const rounds = chosen.map((letter, idx) => {
+    const pics = LW_PICTURES[letter];
+    const pic  = pics[(seed + idx) % pics.length];
+    return { letter, emoji: pic.emoji, word: pic.word };
+  });
+
+  return {
+    rounds,
+    currentRound: 0,
+    currentStep:  1,  // 1=write, 2=trace, 3=write again
+    totalRetries: 0,
+    sessionStartTime: Date.now(),
+  };
+}
+
+function startLetterWriter() {
+  if (state.lwTodayDone) { showTodayLWSummary(); return; }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  tts.unlockFromGesture();
+
+  lwSession = buildLWSession();
+  showScreen('lw-game');
+  document.getElementById('lw-game-streak').textContent = state.streak;
+  lwLoadRound(0, 1);
+}
+
+/* ─── LW round loading ──────────────────────────────────────── */
+function lwLoadRound(roundIdx, step) {
+  if (!lwSession) return;
+  lwSession.currentRound = roundIdx;
+  lwSession.currentStep  = step;
+  const round = lwSession.rounds[roundIdx];
+  if (!round) return;
+
+  lwBuildDots(roundIdx);
+
+  // Picture zone
+  document.getElementById('lw-emoji').textContent = round.emoji;
+  const stepLabels = { 1: 'Step 1 — Write it', 2: 'Step 2 — Trace it', 3: 'Step 3 — Write it again' };
+  document.getElementById('lw-step-label').textContent = stepLabels[step];
+  document.getElementById('lw-pic-hint').textContent =
+    step === 2 ? 'Trace the dotted letter' : 'What sound does it start with?';
+
+  // Reset action buttons
+  const checkBtn = document.getElementById('lw-btn-check');
+  checkBtn.classList.remove('visible');
+  document.getElementById('lw-post-check').classList.remove('visible');
+  document.getElementById('lw-actions').style.display = '';
+
+  // Setup canvas (deferred one frame so layout settles)
+  requestAnimationFrame(() => {
+    lwSetupCanvas();
+    if (step === 2) lwDrawDottedLetter(round.letter);
+    if (step !== 2) lwResetIdleTimer();
+  });
+
+  // Auto-play word
+  setTimeout(() => tts.sayWord(round.word), 400);
+}
+
+function lwBuildDots(currentIdx) {
+  const container = document.getElementById('lw-dots');
+  container.innerHTML = '';
+  for (let i = 0; i < LW_ROUNDS_PER_SESSION; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' +
+      (i < currentIdx   ? ' done'    : '') +
+      (i === currentIdx ? ' current' : '');
+    container.appendChild(dot);
+  }
+}
+
+/* ─── LW Canvas setup ───────────────────────────────────────── */
+let lwCtx       = null;
+let lwDrawing   = false;
+let lwPoints    = [];
+let lwHasStrokes = false;
+let lwIdleTimer = null;
+let lwChecked   = false;
+
+function lwSetupCanvas() {
+  const wrap   = document.getElementById('lw-canvas-wrap');
+  const canvas = document.getElementById('lw-canvas');
+  const rect   = wrap.getBoundingClientRect();
+  const dpr    = window.devicePixelRatio || 1;
+
+  canvas.width  = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width  = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+
+  lwDrawing    = false;
+  lwPoints     = [];
+  lwHasStrokes = false;
+  lwChecked    = false;
+  if (lwIdleTimer) { clearTimeout(lwIdleTimer); lwIdleTimer = null; }
+
+  // Replace canvas to remove old listeners
+  const newCanvas = canvas.cloneNode(false);
+  canvas.parentNode.replaceChild(newCanvas, canvas);
+  lwCtx = newCanvas.getContext('2d');
+  lwCtx.scale(dpr, dpr);
+  lwCtx.lineCap  = 'round';
+  lwCtx.lineJoin = 'round';
+
+  lwDrawLines(rect.width, rect.height);
+
+  // Touch events
+  newCanvas.addEventListener('touchstart',  lwOnTouchStart, { passive: false });
+  newCanvas.addEventListener('touchmove',   lwOnTouchMove,  { passive: false });
+  newCanvas.addEventListener('touchend',    lwOnTouchEnd,   { passive: false });
+  newCanvas.addEventListener('touchcancel', lwOnTouchEnd,   { passive: false });
+
+  // Mouse fallback
+  newCanvas.addEventListener('mousedown', lwOnMouseDown);
+  newCanvas.addEventListener('mousemove', lwOnMouseMove);
+  newCanvas.addEventListener('mouseup',   lwOnMouseUp);
+  newCanvas.addEventListener('mouseleave', lwOnMouseUp);
+}
+
+function lwGetLinePositions(h) {
+  const topY = h * 0.2;   // green line
+  const midY = h * 0.5;   // dashed midline
+  const botY = h * 0.8;   // red baseline
+  return { topY, midY, botY };
+}
+
+function lwDrawLines(w, h) {
+  const { topY, midY, botY } = lwGetLinePositions(h);
+
+  lwCtx.save();
+  // Green top line
+  lwCtx.strokeStyle = '#4ade80';
+  lwCtx.lineWidth   = 2;
+  lwCtx.setLineDash([]);
+  lwCtx.beginPath(); lwCtx.moveTo(0, topY); lwCtx.lineTo(w, topY); lwCtx.stroke();
+
+  // Dashed middle line
+  lwCtx.strokeStyle = 'rgba(232,237,245,0.4)';
+  lwCtx.lineWidth   = 1.5;
+  lwCtx.setLineDash([6, 6]);
+  lwCtx.beginPath(); lwCtx.moveTo(0, midY); lwCtx.lineTo(w, midY); lwCtx.stroke();
+
+  // Red bottom line
+  lwCtx.strokeStyle = '#ef4444';
+  lwCtx.lineWidth   = 2;
+  lwCtx.setLineDash([]);
+  lwCtx.beginPath(); lwCtx.moveTo(0, botY); lwCtx.lineTo(w, botY); lwCtx.stroke();
+  lwCtx.restore();
+}
+
+function lwDrawDottedLetter(letter) {
+  const wrap = document.getElementById('lw-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  const { topY, botY } = lwGetLinePositions(h);
+  const metrics = LW_LETTER_METRICS[letter] || { yTop: 0.5, yBot: 1.0 };
+
+  const lineSpan  = botY - topY;
+  const yStart    = topY + metrics.yTop * lineSpan;
+  const yEnd      = topY + metrics.yBot * lineSpan;
+  const fontSize  = (yEnd - yStart) * 1.1;
+  const yBaseline = yEnd;
+
+  lwCtx.save();
+  lwCtx.font         = `900 ${fontSize}px Georgia, 'Times New Roman', serif`;
+  lwCtx.textAlign    = 'center';
+  lwCtx.textBaseline = 'alphabetic';
+  lwCtx.strokeStyle  = 'rgba(0,229,204,0.4)';
+  lwCtx.lineWidth    = 2.5;
+  lwCtx.setLineDash([4, 6]);
+  lwCtx.strokeText(letter, w / 2, yBaseline);
+  lwCtx.restore();
+  lwCtx.setLineDash([]);
+}
+
+function lwShowCorrectLetterOverlay(letter) {
+  const wrap = document.getElementById('lw-canvas-wrap');
+  const rect = wrap.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  const { topY, botY } = lwGetLinePositions(h);
+  const metrics = LW_LETTER_METRICS[letter] || { yTop: 0.5, yBot: 1.0 };
+
+  const lineSpan  = botY - topY;
+  const yEnd      = topY + metrics.yBot * lineSpan;
+  const yStart    = topY + metrics.yTop * lineSpan;
+  const fontSize  = (yEnd - yStart) * 1.1;
+  const yBaseline = yEnd;
+
+  lwCtx.save();
+  lwCtx.font         = `900 ${fontSize}px Georgia, 'Times New Roman', serif`;
+  lwCtx.textAlign    = 'center';
+  lwCtx.textBaseline = 'alphabetic';
+  lwCtx.fillStyle    = 'rgba(0,229,204,0.5)';
+  lwCtx.setLineDash([]);
+  lwCtx.fillText(letter, w / 2, yBaseline);
+  lwCtx.restore();
+}
+
+/* ─── LW drawing input ──────────────────────────────────────── */
+function lwGetPos(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  if (e.touches) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function lwStartStroke(pos) {
+  lwDrawing    = true;
+  lwPoints     = [pos];
+  lwHasStrokes = true;
+  lwCtx.setLineDash([]);
+  lwCtx.strokeStyle = '#e8edf5';
+  lwCtx.lineWidth   = 4.5;
+  lwCtx.beginPath();
+  lwCtx.moveTo(pos.x, pos.y);
+}
+
+function lwContinueStroke(pos) {
+  if (!lwDrawing) return;
+  lwPoints.push(pos);
+  if (lwPoints.length >= 3) {
+    const p1 = lwPoints[lwPoints.length - 2];
+    const mx = (p1.x + pos.x) / 2;
+    const my = (p1.y + pos.y) / 2;
+    lwCtx.quadraticCurveTo(p1.x, p1.y, mx, my);
+  } else {
+    lwCtx.lineTo(pos.x, pos.y);
+  }
+  lwCtx.stroke();
+  lwCtx.beginPath();
+  lwCtx.moveTo(pos.x, pos.y);
+}
+
+function lwEndStroke() {
+  if (!lwDrawing) return;
+  lwDrawing = false;
+  const isTrace = lwSession && lwSession.currentStep === 2;
+  if (isTrace) {
+    setTimeout(() => lwTraceComplete(), 600);
+  } else if (!lwChecked) {
+    lwResetIdleTimer();
+  }
+}
+
+function lwOnTouchStart(e) { e.preventDefault(); lwStartStroke(lwGetPos(e.target, e)); }
+function lwOnTouchMove(e)  { e.preventDefault(); lwContinueStroke(lwGetPos(e.target, e)); }
+function lwOnTouchEnd(e)   { e.preventDefault(); lwEndStroke(); }
+function lwOnMouseDown(e)  { lwStartStroke(lwGetPos(e.target, e)); }
+function lwOnMouseMove(e)  { if (lwDrawing) lwContinueStroke(lwGetPos(e.target, e)); }
+function lwOnMouseUp()     { lwEndStroke(); }
+
+/* ─── LW idle timer (show Check after 1.5s pause) ──────────── */
+function lwResetIdleTimer() {
+  if (lwIdleTimer) clearTimeout(lwIdleTimer);
+  lwIdleTimer = setTimeout(() => {
+    if (lwHasStrokes && !lwChecked) {
+      document.getElementById('lw-btn-check').classList.add('visible');
+    }
+  }, 1500);
+}
+
+/* ─── LW actions ────────────────────────────────────────────── */
+function lwClearCanvas() {
+  if (lwChecked) return;
+  const step = lwSession ? lwSession.currentStep : 1;
+  lwSetupCanvas();
+  if (step === 2) {
+    const round = lwSession.rounds[lwSession.currentRound];
+    lwDrawDottedLetter(round.letter);
+  }
+}
+
+function lwCheck() {
+  if (!lwSession) return;
+  lwChecked = true;
+  if (lwIdleTimer) { clearTimeout(lwIdleTimer); lwIdleTimer = null; }
+  const round = lwSession.rounds[lwSession.currentRound];
+
+  lwShowCorrectLetterOverlay(round.letter);
+  tts.playPhoneme(round.letter);
+  soundCorrect();
+  spawnConfetti(8);
+
+  document.getElementById('lw-btn-check').classList.remove('visible');
+  document.getElementById('lw-actions').style.display = 'none';
+  document.getElementById('lw-post-check').classList.add('visible');
+}
+
+function lwRetry() {
+  if (!lwSession) return;
+  lwSession.totalRetries++;
+  lwLoadRound(lwSession.currentRound, lwSession.currentStep);
+}
+
+function lwNext() {
+  if (!lwSession) return;
+  const step = lwSession.currentStep;
+
+  if (step === 1) {
+    lwLoadRound(lwSession.currentRound, 2);
+  } else if (step === 3) {
+    const next = lwSession.currentRound + 1;
+    if (next >= LW_ROUNDS_PER_SESSION) {
+      soundRoundComplete();
+      setTimeout(() => onLWComplete(), 800);
+    } else {
+      soundRoundComplete();
+      spawnConfetti(8);
+      setTimeout(() => lwLoadRound(next, 1), 800);
+    }
+  }
+}
+
+function lwTraceComplete() {
+  if (!lwSession || lwSession.currentStep !== 2) return;
+  if (!lwHasStrokes) return;
+
+  soundCorrect();
+  spawnConfetti(5);
+  setTimeout(() => lwLoadRound(lwSession.currentRound, 3), 800);
+}
+
+function playLWWord() {
+  if (!lwSession) return;
+  const round = lwSession.rounds[lwSession.currentRound];
+  if (!round) return;
+  const btn = document.getElementById('lw-speaker-btn');
+  btn.classList.add('playing');
+  btn.addEventListener('animationend', () => btn.classList.remove('playing'), { once: true });
+  tts.sayWord(round.word);
+}
+
+/* ─── LW session complete ───────────────────────────────────── */
+function onLWComplete() {
+  const duration = Math.round((Date.now() - lwSession.sessionStartTime) / 1000);
+
+  let stars;
+  if (lwSession.totalRetries === 0) {
+    stars = duration < 180 ? 3 : 2;
+  } else if (lwSession.totalRetries <= 3) {
+    stars = 1;
+  } else {
+    stars = 0;
+  }
+
+  // Streak
+  const today = getTodayStr();
+  if (state.lastPlayDate !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    state.streak = (state.lastPlayDate === yStr || !state.lastPlayDate) ? state.streak + 1 : 1;
+    state.lastPlayDate = today;
+  }
+
+  // Collectible card
+  const seed = dateHash(today + 'lw' + stars);
+  const pool = stars >= 2
+    ? CARDS.filter(c => c.rarity === 'rare')
+    : CARDS.filter(c => c.rarity === 'standard');
+  const card = pool[seed % pool.length];
+
+  state.lwTodayDone  = true;
+  state.lwTodayStars = stars;
+  state.lwEarnedCard = card;
+  if (!state.earnedCards.includes(card.name)) state.earnedCards.push(card.name);
+
+  saveProgress();
+  showLWSummary(stars, card);
+}
+
+function showLWSummary(stars, card) {
+  summaryMode = 'lw';
+  showScreen('summary');
+  soundSessionComplete();
+  spawnConfetti(25);
+
+  const titles = ['Keep practicing!', 'Great job!', 'Excellent!', 'Perfect!'];
+  document.getElementById('summary-title').textContent = titles[Math.min(stars, 3)];
+  document.getElementById('summary-date').textContent  = 'Letter Writer · ' + formatDate(getTodayStr());
+
+  ['star1', 'star2', 'star3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('earned');
+    if (i < stars) setTimeout(() => el.classList.add('earned'), 300 + i * 250);
+  });
+
+  const labels = ['Keep practicing! ✨', 'Great job! 🎉', 'Excellent! 🌟', 'Perfect! 🏆'];
+  document.getElementById('star-label').textContent = labels[Math.min(stars, 3)];
+
+  const cardEl = document.getElementById('card-reveal');
+  cardEl.className = 'card-reveal' + (card.rarity === 'rare' ? ' rare' : '');
+  document.getElementById('card-emoji').textContent   = card.emoji;
+  document.getElementById('card-name').textContent    = card.name;
+  document.getElementById('card-rarity').textContent  = card.rarity === 'rare' ? '✨ Rare card!' : "Today's card";
+  document.getElementById('summary-streak-count').textContent = state.streak;
+}
+
+function showTodayLWSummary() {
+  const card = state.lwEarnedCard || CARDS[0];
+  showLWSummary(state.lwTodayStars, card);
+}
+
 /* ─── Gallery ──────────────────────────────────────────────────── */
 function openGallery() {
   renderGallery();
@@ -3043,7 +3730,7 @@ function renderGallery() {
     grid.innerHTML = `
       <div class="gallery-empty">
         <div class="gallery-empty-icon">🐾</div>
-        <div class="gallery-empty-text">Play Letter Hunt, Sight Word Dash, or Word Match to earn your first animal badge!</div>
+        <div class="gallery-empty-text">Play any game to earn your first animal badge!</div>
       </div>
     `;
     return;
