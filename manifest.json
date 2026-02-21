@@ -64,12 +64,12 @@
   "cover_emoji": "➗"
 },
 {
-  "slug": "letterhunt",
-  "name": "Letter Hunt",
+  "slug": "readysetread",
+  "name": "Ready, Set, Read!",
   "url": "apps/letterhunt/letterhunt.html",
   "released_at": "2026-02-19",
   "tags": ["phonics","kids","reading"],
-  "blurb": "Find pictures that start with the target sound. OG-aligned daily reading practice.",
-  "cover_emoji": "🔍"
+  "blurb": "4 daily reading games: letter sounds, sight words, word matching & letter writing.",
+  "cover_emoji": "📚"
 }
 ]
