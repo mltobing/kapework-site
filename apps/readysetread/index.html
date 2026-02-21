@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Ready, Set, Read! · Kapework</title>
+  <meta name="description" content="4 daily reading games: letter sounds, sight words, word matching & letter writing.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ─── Home Screen ──────────────────────────────────────── -->
+<div id="home" class="screen active">
+  <div class="home-header">
+    <div class="home-logo">🔤</div>
+    <h1 class="home-title">Ready, Set, Read!</h1>
+    <p class="home-subtitle">Daily reading games</p>
+  </div>
+
+  <div class="streak-bar">
+    <span class="streak-flame">🔥</span>
+    <span class="streak-count" id="home-streak">0</span>
+    <span class="streak-label">day streak</span>
+  </div>
+
+  <div class="mode-cards">
+    <div id="lh-card" class="mode-card ready" onclick="startLetterHunt()">
+      <div class="mode-icon">🔍</div>
+      <div class="mode-info">
+        <div class="mode-name">Letter Hunt</div>
+        <div class="mode-desc">5 rounds · match sounds to pictures</div>
+      </div>
+      <div id="lh-status" class="mode-status play">Play</div>
+    </div>
+
+    <div id="sw-card" class="mode-card ready" onclick="startSightWordDash()">
+      <div class="mode-icon">📖</div>
+      <div class="mode-info">
+        <div class="mode-name">Sight Word Dash</div>
+        <div class="mode-desc">8 words · tap the matching word</div>
+      </div>
+      <div id="sw-status" class="mode-status play">Play</div>
+    </div>
+
+    <div id="wm-card" class="mode-card ready" onclick="startWordMatch()">
+      <div class="mode-icon">🔗</div>
+      <div class="mode-info">
+        <div class="mode-name">Word Match</div>
+        <div class="mode-desc">5 pairs · match pictures to words</div>
+      </div>
+      <div id="wm-status" class="mode-status play">Play</div>
+    </div>
+
+    <div id="lw-card" class="mode-card ready" onclick="startLetterWriter()">
+      <div class="mode-icon">✏️</div>
+      <div class="mode-info">
+        <div class="mode-name">Letter Writer</div>
+        <div class="mode-desc">6 rounds · see picture, write the letter</div>
+      </div>
+      <div id="lw-status" class="mode-status play">Play</div>
+    </div>
+  </div>
+
+  <button class="paw-btn" onclick="openGallery()" aria-label="My Animals collection">
+    🐾 My Animals
+  </button>
+
+  <div class="home-footer">
+    Kapework — Ready, Set, Read v1
+  </div>
+</div>
+
+<!-- ─── Letter Hunt Screen ───────────────────────────────── -->
+<div id="game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="round-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="letter-zone w-full max-w">
+    <div class="letter-display">
+      <div class="letter-label">Find things that start with</div>
+      <div class="letter-chars" id="letter-chars">S s</div>
+      <div class="letter-hint" id="letter-hint">as in 🐍 snake</div>
+    </div>
+    <button class="speaker-btn" id="speaker-btn" onclick="playLetterSound()" aria-label="Hear the sound">🔊</button>
+  </div>
+
+  <div class="round-instruction" id="round-instruction">
+    Tap the 2 pictures that start with this sound
+  </div>
+
+  <div class="picture-grid" id="picture-grid"></div>
+</div>
+
+<!-- ─── Summary Screen ──────────────────────────────────── -->
+<div id="summary" class="screen">
+  <div>
+    <div class="summary-title" id="summary-title">Well done!</div>
+    <div class="summary-date" id="summary-date"></div>
+  </div>
+
+  <div class="stars-row" id="stars-row">
+    <div class="star" id="star1">⭐</div>
+    <div class="star" id="star2">⭐</div>
+    <div class="star" id="star3">⭐</div>
+  </div>
+  <div class="star-label" id="star-label">Great job!</div>
+
+  <div class="card-reveal" id="card-reveal">
+    <div class="card-emoji" id="card-emoji">🦁</div>
+    <div class="card-name" id="card-name">Lion</div>
+    <div class="card-rarity" id="card-rarity">Today's card</div>
+  </div>
+
+  <div class="summary-streak">
+    <span>🔥</span>
+    <span id="summary-streak-count">0</span>
+    <span style="color:var(--muted);font-size:0.9rem">day streak</span>
+  </div>
+
+  <div class="summary-actions">
+    <button class="btn-secondary" onclick="shareResult()" id="share-btn">Share result</button>
+    <button class="btn-primary" onclick="goHome()">Done!</button>
+  </div>
+</div>
+
+<!-- ─── Sight Word Dash Screen ──────────────────────────── -->
+<div id="sw-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="sw-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="sw-game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="letter-zone w-full max-w">
+    <div class="letter-display">
+      <div class="letter-label">Find this word</div>
+      <div class="letter-chars sw-word" id="sw-word" onclick="onSWWordTap()">the</div>
+    </div>
+    <button class="speaker-btn" id="sw-speaker-btn" onclick="playSWWord()" aria-label="Hear the word">🔊</button>
+  </div>
+
+  <div class="round-instruction">Tap the matching word</div>
+
+  <div class="sw-options-grid" id="sw-options-grid"></div>
+</div>
+
+<!-- ─── Word Match Screen ───────────────────────────────── -->
+<div id="wm-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="wm-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="wm-game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="round-instruction">Match each picture to its word</div>
+
+  <div class="wm-area" id="wm-area">
+    <svg class="wm-lines" id="wm-lines"></svg>
+    <div class="wm-col wm-left" id="wm-left"></div>
+    <div class="wm-col wm-right" id="wm-right"></div>
+  </div>
+</div>
+
+<!-- ─── Letter Writer Screen ────────────────────────────── -->
+<div id="lw-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="lw-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="lw-game-streak">0</span>
+    </div>
+  </div>
+
+  <div class="lw-picture-zone" id="lw-picture-zone">
+    <div class="lw-emoji" id="lw-emoji">🐍</div>
+    <div class="lw-pic-info">
+      <div class="lw-step-label" id="lw-step-label">Uppercase</div>
+      <div class="lw-pic-word" id="lw-pic-word"></div>
+      <div class="lw-pic-hint" id="lw-pic-hint">What sound does it start with?</div>
+    </div>
+    <button class="speaker-btn" id="lw-speaker-btn" onclick="playLWWord()" aria-label="Hear the word" style="width:48px;height:48px;font-size:1.3rem;">🔊</button>
+  </div>
+
+  <div class="lw-canvas-wrap" id="lw-canvas-wrap">
+    <canvas class="lw-canvas" id="lw-canvas"></canvas>
+  </div>
+
+  <div class="lw-actions" id="lw-actions">
+    <button class="lw-btn-clear" id="lw-btn-clear" onclick="lwClear()">Clear</button>
+    <button class="lw-btn-check" id="lw-btn-check" onclick="lwCheck()">Check ✓</button>
+  </div>
+
+  <div class="lw-post-check" id="lw-post-check">
+    <button class="lw-btn-retry" id="lw-btn-retry">Try again</button>
+    <button class="lw-btn-next" id="lw-btn-next">Next →</button>
+  </div>
+</div>
+
+<!-- ─── Gallery Screen ──────────────────────────────────── -->
+<div id="gallery" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="gallery-heading">My Animals</div>
+    <div class="gallery-count" id="gallery-count"></div>
+  </div>
+  <div id="gallery-grid" class="gallery-grid w-full max-w"></div>
+</div>
+
+<!-- ─── Confetti & Toast ─────────────────────────────────── -->
+<div class="confetti-container" id="confetti"></div>
+<div class="toast" id="toast"></div>
+
+<!-- ─── Scripts ──────────────────────────────────────────── -->
+<script src="data/tiers.js"></script>
+<script src="data/sightwords.js"></script>
+<script src="data/pictures.js"></script>
+<script src="shared.js"></script>
+<script src="modes/letter-hunt.js"></script>
+<script src="modes/sight-word-dash.js"></script>
+<script src="modes/word-match.js"></script>
+<script src="modes/letter-writer.js"></script>
+<script>init();</script>
+
+</body>
+</html>

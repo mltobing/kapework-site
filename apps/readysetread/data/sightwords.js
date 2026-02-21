@@ -1,0 +1,50 @@
+'use strict';
+
+const SW_WORDS_PER_SESSION = 8;
+
+// Pre-Primer Dolch words. Distractors share first letter, length, or ending
+// to force genuine recognition rather than shape-guessing.
+const SIGHT_WORD_TIERS = {
+  pre_primer: [
+    { word: 'a',      distractors: ['I',      'an',     'at'    ] },
+    { word: 'and',    distractors: ['ant',    'any',    'add'   ] },
+    { word: 'away',   distractors: ['say',    'stay',   'way'   ] },
+    { word: 'big',    distractors: ['bag',    'bit',    'pig'   ] },
+    { word: 'blue',   distractors: ['clue',   'glue',   'blow'  ] },
+    { word: 'can',    distractors: ['cat',    'cap',    'cup'   ] },
+    { word: 'come',   distractors: ['some',   'came',   'home'  ] },
+    { word: 'down',   distractors: ['town',   'dawn',   'gown'  ] },
+    { word: 'find',   distractors: ['fine',   'kind',   'mind'  ] },
+    { word: 'for',    distractors: ['far',    'fun',    'from'  ] },
+    { word: 'funny',  distractors: ['bunny',  'sunny',  'fan'   ] },
+    { word: 'go',     distractors: ['do',     'so',     'got'   ] },
+    { word: 'help',   distractors: ['felt',   'heap',   'held'  ] },
+    { word: 'here',   distractors: ['were',   'hare',   'her'   ] },
+    { word: 'I',      distractors: ['in',     'it',     'is'    ] },
+    { word: 'in',     distractors: ['it',     'is',     'an'    ] },
+    { word: 'is',     distractors: ['it',     'in',     'as'    ] },
+    { word: 'it',     distractors: ['is',     'in',     'at'    ] },
+    { word: 'jump',   distractors: ['dump',   'pump',   'lump'  ] },
+    { word: 'little', distractors: ['bottle', 'middle', 'rattle'] },
+    { word: 'look',   distractors: ['took',   'book',   'loop'  ] },
+    { word: 'make',   distractors: ['lake',   'fake',   'take'  ] },
+    { word: 'me',     distractors: ['my',     'be',     'we'    ] },
+    { word: 'my',     distractors: ['me',     'by',     'may'   ] },
+    { word: 'not',    distractors: ['hot',    'got',    'lot'   ] },
+    { word: 'one',    distractors: ['bone',   'tone',   'once'  ] },
+    { word: 'play',   distractors: ['clay',   'slay',   'plan'  ] },
+    { word: 'red',    distractors: ['rod',    'led',    'bed'   ] },
+    { word: 'run',    distractors: ['sun',    'fun',    'bun'   ] },
+    { word: 'said',   distractors: ['sail',   'sand',   'seed'  ] },
+    { word: 'see',    distractors: ['sea',    'bee',    'fee'   ] },
+    { word: 'the',    distractors: ['then',   'they',   'this'  ] },
+    { word: 'three',  distractors: ['tree',   'free',   'threw' ] },
+    { word: 'to',     distractors: ['too',    'do',     'two'   ] },
+    { word: 'two',    distractors: ['too',    'to',     'ten'   ] },
+    { word: 'up',     distractors: ['us',     'cup',    'pup'   ] },
+    { word: 'we',     distractors: ['me',     'be',     'he'    ] },
+    { word: 'where',  distractors: ['there',  'were',   'when'  ] },
+    { word: 'yellow', distractors: ['fellow', 'mellow', 'yell'  ] },
+    { word: 'you',    distractors: ['our',    'four',   'your'  ] },
+  ],
+};
