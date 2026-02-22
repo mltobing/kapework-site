@@ -253,6 +253,10 @@ let state = {
   wwTodayStars: 0,
   wwEarnedCard: null,
   wwPracticed:  [],
+  // Sound Blender
+  sbTodayDone:  false,
+  sbTodayStars: 0,
+  sbEarnedCard: null,
 };
 
 /* ─── LocalStorage helpers ─────────────────────────────────────── */
@@ -283,6 +287,9 @@ function loadProgress() {
     state.wwTodayStars   = data.wwTodayStars ?? 0;
     state.wwEarnedCard   = data.wwEarnedCard ?? null;
     state.wwPracticed    = data.wwPracticed  ?? [];
+    state.sbTodayDone    = data.sbTodayDone  ?? false;
+    state.sbTodayStars   = data.sbTodayStars ?? 0;
+    state.sbEarnedCard   = data.sbEarnedCard ?? null;
 
     const today = getTodayStr();
     if (data.lastPlayDate !== today) {
@@ -302,6 +309,9 @@ function loadProgress() {
       state.wwTodayStars = 0;
       state.wwEarnedCard = null;
       state.wwPracticed  = [];
+      state.sbTodayDone  = false;
+      state.sbTodayStars = 0;
+      state.sbEarnedCard = null;
       // earnedCards and swMastery persist across days
     }
     if (state.lastPlayDate) {
@@ -334,6 +344,9 @@ function saveProgress() {
       wwTodayStars:  state.wwTodayStars,
       wwEarnedCard:  state.wwEarnedCard,
       wwPracticed:   state.wwPracticed,
+      sbTodayDone:   state.sbTodayDone,
+      sbTodayStars:  state.sbTodayStars,
+      sbEarnedCard:  state.sbEarnedCard,
     }));
   } catch (e) {}
 }
@@ -466,20 +479,34 @@ function updateHomeUI() {
       wwCard.onclick = startWordWriter;
     }
   }
+
+  const sbCard   = document.getElementById('sb-card');
+  const sbStatus = document.getElementById('sb-status');
+  if (sbCard) {
+    if (state.sbTodayDone) {
+      sbCard.classList.remove('ready'); sbCard.classList.add('done');
+      sbStatus.className   = 'mode-status stars';
+      sbStatus.textContent = '⭐'.repeat(state.sbTodayStars) || '✓';
+      sbCard.onclick = () => showTodaySBSummary();
+    } else {
+      sbCard.classList.add('ready'); sbCard.classList.remove('done');
+      sbStatus.className   = 'mode-status play';
+      sbStatus.textContent = 'Play';
+      sbCard.onclick = startSoundBlender;
+    }
+  }
 }
 
 /* ─── Share ────────────────────────────────────────────────────── */
-let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' | 'lw' | 'ww'
+let summaryMode = 'lh'; // 'lh' | 'sw' | 'wm' | 'lw' | 'ww' | 'sb'
 
 function shareResult() {
   const date   = formatDate(getTodayStr());
   const streak = state.streak;
-  const isSW   = (summaryMode === 'sw');
-  const isWM   = (summaryMode === 'wm');
-  const isLW   = (summaryMode === 'lw');
-  const isWW   = (summaryMode === 'ww');
-  const stars  = '⭐'.repeat(isWW ? state.wwTodayStars : isLW ? state.lwTodayStars : isWM ? state.wmTodayStars : isSW ? state.swTodayStars : state.todayStars) || '✓';
-  const game   = isWW ? 'Word Writer' : isLW ? 'Letter Writer' : isWM ? 'Word Match' : isSW ? 'Sight Word Dash' : 'Letter Hunt';
+  const starMap = { sb: state.sbTodayStars, ww: state.wwTodayStars, lw: state.lwTodayStars, wm: state.wmTodayStars, sw: state.swTodayStars, lh: state.todayStars };
+  const nameMap = { sb: 'Sound Blender', ww: 'Word Writer', lw: 'Letter Writer', wm: 'Word Match', sw: 'Sight Word Dash', lh: 'Letter Hunt' };
+  const stars  = '⭐'.repeat(starMap[summaryMode] ?? 0) || '✓';
+  const game   = nameMap[summaryMode] || 'Letter Hunt';
   const text   = `${stars} ${game} — ${date} — Streak: ${streak} 🔥\nKapework · kapework.com/apps/readysetread/`;
 
   if (navigator.share) {

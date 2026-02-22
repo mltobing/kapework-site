@@ -1159,3 +1159,226 @@ body {
 .ww-next-btn.visible  { opacity: 1; pointer-events: all; }
 .ww-next-btn:hover    { opacity: 0.9; }
 .ww-next-btn:active   { transform: scale(0.97); }
+
+/* ─── Sound Blender ───────────────────────────────────────────── */
+#sb-game {
+  justify-content: flex-start;
+  padding-top: 16px;
+  gap: 0;
+}
+
+/* Picture + hint area */
+.sb-picture-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.sb-emoji {
+  font-size: 4.5rem;
+  line-height: 1;
+  transition: transform 0.3s ease;
+}
+.sb-emoji.sb-bounce {
+  animation: sb-emoji-bounce 0.5s ease;
+}
+@keyframes sb-emoji-bounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.sb-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.sb-hint-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sb-hint-btn:hover { color: var(--text); border-color: var(--muted); }
+.sb-hint-btn:active { transform: scale(0.95); }
+
+.sb-hint-word {
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--cyan);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+/* Elkonin boxes container */
+.sb-boxes {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+  min-height: 120px;
+  padding: 16px 8px;
+  position: relative;
+}
+
+.sb-boxes.slide-out { animation: slide-out-left 0.25s ease forwards; }
+.sb-boxes.slide-in  { animation: slide-in-right 0.25s ease; }
+
+/* Individual Elkonin box */
+.sb-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 108px;
+  border-radius: 18px;
+  font-size: 2.8rem;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.5s ease;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.sb-box:active { transform: scale(0.93); }
+
+.sb-consonant { background: #3b82f6; }
+.sb-vowel     { background: #ef4444; }
+
+/* Tapped state */
+.sb-box.sb-tapped {
+  box-shadow: 0 0 20px rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+.sb-box.sb-tapped.sb-consonant { background: #2563eb; }
+.sb-box.sb-tapped.sb-vowel     { background: #dc2626; }
+
+/* Guided pulsing */
+.sb-box.sb-pulse {
+  animation: sb-pulse 1.2s ease infinite;
+}
+@keyframes sb-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  70%  { box-shadow: 0 0 0 12px rgba(255,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+
+/* Successive blending partial merge */
+.sb-box.sb-partial-merge-left {
+  transform: translateX(6px) scale(1.05);
+}
+.sb-box.sb-partial-merge-right {
+  transform: translateX(-6px) scale(1.05);
+}
+
+/* Merged tile */
+.sb-merged {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--cyan);
+  color: #0a1628;
+  font-size: 2.4rem;
+  font-weight: 900;
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 3px;
+  border-radius: 20px;
+  padding: 16px 32px;
+  min-width: 120px;
+  min-height: 108px;
+}
+.sb-merged.sb-merged-pop {
+  animation: sb-merged-pop 0.4s ease;
+}
+@keyframes sb-merged-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Blend button */
+.sb-blend-btn {
+  width: 100%;
+  max-width: 300px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-weight: 800;
+  font-family: inherit;
+  font-size: 1.1rem;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.3s;
+  margin-top: 4px;
+}
+.sb-blend-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sb-blend-btn.sb-glow {
+  background: var(--cyan);
+  color: #0a1628;
+  border-color: var(--cyan);
+  box-shadow: 0 0 24px var(--cyan-dim);
+}
+.sb-blend-btn.sb-glow:not(:disabled):active { transform: scale(0.96); }
+.sb-blend-btn.sb-glow:not(:disabled):hover { opacity: 0.9; }
+
+/* Instruction text */
+.sb-instruction {
+  font-size: 0.88rem;
+  color: var(--muted);
+  text-align: center;
+  width: 100%;
+  max-width: 480px;
+  margin-top: 8px;
+}
+
+/* Settings gear */
+.sb-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sb-settings-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.sb-settings-btn:hover { opacity: 1; }
+
+.sb-successive-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-box.sb-pulse { animation: none; }
+  .sb-emoji.sb-bounce { animation: none; }
+  .sb-merged.sb-merged-pop { animation: none; }
+}
