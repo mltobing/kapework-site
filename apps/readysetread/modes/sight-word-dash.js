@@ -66,7 +66,7 @@ function loadSWWord(idx, animate = false) {
   wordEl.classList.remove('faded');
 
   if (swSession.fadeTimer) { clearTimeout(swSession.fadeTimer); swSession.fadeTimer = null; }
-  setTimeout(() => tts.sayWord(entry.word), 350);
+  setTimeout(() => playWordAudio(entry.word), 350);
   swSession.fadeTimer = setTimeout(() => wordEl.classList.add('faded'), 2300);
 
   const grid = document.getElementById('sw-options-grid');
@@ -101,7 +101,7 @@ function playSWWord() {
   const btn = document.getElementById('sw-speaker-btn');
   btn.classList.add('playing');
   btn.addEventListener('animationend', () => btn.classList.remove('playing'), { once: true });
-  tts.sayWord(entry.word);
+  playWordAudio(entry.word);
 }
 
 function onSWWordTap() {
@@ -123,7 +123,7 @@ function onSWOptionTap(btn, tappedWord, entry) {
   if (tappedWord === entry.word) {
     btn.classList.add('correct');
     soundCorrect();
-    tts.sayWord(entry.word);
+    playWordAudio(entry.word);
     const pts = entry.taps === 1 ? 2 : entry.taps === 2 ? 1 : 0;
     state.swMastery[entry.word] = (state.swMastery[entry.word] ?? 0) + pts;
     entry.solved = true;

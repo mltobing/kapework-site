@@ -78,7 +78,7 @@ function loadWWWord(idx) {
   initWWCanvases(word);
 
   // Read the word aloud
-  setTimeout(() => tts.sayWord(word), 400);
+  setTimeout(() => playWordAudio(word), 400);
 }
 
 function initWWCanvases(word) {
@@ -251,7 +251,7 @@ function markWWStepDone(step) {
   wwSession.stepsDone[step] = true;
 
   soundCorrect();
-  tts.sayWord(wwSession.words[wwSession.currentIdx]);
+  playWordAudio(wwSession.words[wwSession.currentIdx]);
 
   // Show checkmark
   document.getElementById(`ww-check-${step}`).classList.add('visible');
@@ -275,7 +275,7 @@ function markWWStepDone(step) {
 function onWWWordComplete() {
   spawnConfetti(10);
   soundRoundComplete();
-  tts.sayWord('Great job!');
+  playWordAudio('Great job!');
   document.getElementById('ww-next-btn').classList.add('visible');
 }
 
@@ -323,7 +323,7 @@ function playWWWord() {
     btn.classList.add('playing');
     btn.addEventListener('animationend', () => btn.classList.remove('playing'), { once: true });
   }
-  tts.sayWord(word);
+  playWordAudio(word);
 }
 
 /* ─── Session complete ────────────────────────────────────────── */

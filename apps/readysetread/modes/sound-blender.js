@@ -31,63 +31,11 @@ const SB_WORD_POOL = [
   { word: 'tat', emoji: '🧵', phonemes: ['t','a','t'] },
 ];
 
-/* ─── Audio file helpers ──────────────────────────────────────── */
-const SB_AUDIO_BASE = 'audio/';
-const sbAudioCache = {};
-
-function sbPreloadAudio(url) {
-  if (sbAudioCache[url]) return sbAudioCache[url];
-  return new Promise(resolve => {
-    const audio = new Audio(url);
-    audio.preload = 'auto';
-    audio.addEventListener('canplaythrough', () => {
-      sbAudioCache[url] = audio;
-      resolve(audio);
-    }, { once: true });
-    audio.addEventListener('error', () => {
-      sbAudioCache[url] = null;
-      resolve(null);
-    }, { once: true });
-    audio.load();
-  });
-}
-
-function sbPlayAudio(url) {
-  const cached = sbAudioCache[url];
-  if (cached) {
-    const clone = cached.cloneNode();
-    clone.play().catch(() => {});
-    return true;
-  }
-  return false;
-}
-
-function sbPlayPhoneme(letter) {
-  const url = SB_AUDIO_BASE + 'phoneme_' + letter + '.mp3';
-  if (!sbPlayAudio(url)) {
-    // Fallback: use speechSynthesis with PHONEMES table
-    tts.playPhoneme(letter);
-  }
-}
-
-function sbPlayWord(word) {
-  const url = SB_AUDIO_BASE + 'word_' + word + '.mp3';
-  if (!sbPlayAudio(url)) {
-    tts.sayWord(word);
-  }
-}
-
-function sbPlayBlend(letters) {
-  const key = letters.join('');
-  const url = SB_AUDIO_BASE + 'blend_' + key + '.mp3';
-  if (!sbPlayAudio(url)) {
-    tts.sayWord(key);
-  }
-}
-
-function sbPlaySFX(name) {
-  sbPlayAudio(SB_AUDIO_BASE + name);
-}
+/* ─── Audio helpers (delegate to shared playWordAudio / playUnitAudio / tryPlayFile) */
+function sbPlayPhoneme(letter) { playUnitAudio(letter); }
+function sbPlayWord(word)       { playWordAudio(word); }
+function sbPlayBlend(letters)   { playWordAudio(letters.join('')); }
+function sbPlaySFX(name)        { tryPlayFile(AUDIO_BASE + name); }
 
 /* ─── Session state ───────────────────────────────────────────── */
 let sbSession = null;
@@ -116,33 +64,22 @@ function buildSBSession() {
   };
 }
 
-/* ─── Preload audio for session ───────────────────────────────── */
-async function sbPreloadSession() {
-  const promises = [];
-  // SFX
-  ['correct.wav', 'celebrate.wav', 'whoosh.wav'].forEach(f => {
-    promises.push(sbPreloadAudio(SB_AUDIO_BASE + f));
+/* ─── Preload audio for session (warms browser cache; non-blocking) */
+function sbPreloadSession() {
+  if (!sbSession) return;
+  const load = url => { const a = new Audio(url); a.preload = 'auto'; a.load(); };
+  ['correct.wav', 'celebrate.wav', 'whoosh.wav'].forEach(f => load(AUDIO_BASE + f));
+  const phonemes = new Set();
+  const words    = new Set();
+  sbSession.words.forEach(e => {
+    e.phonemes.forEach(p => phonemes.add(p));
+    words.add(e.word);
   });
-  // Phonemes for session
-  if (sbSession) {
-    const phonemeSet = new Set();
-    const wordSet = new Set();
-    const blendSet = new Set();
-    sbSession.words.forEach(entry => {
-      entry.phonemes.forEach(p => phonemeSet.add(p));
-      wordSet.add(entry.word);
-      if (entry.phonemes.length >= 2) {
-        blendSet.add(entry.phonemes.slice(0, 2).join(''));
-      }
-    });
-    phonemeSet.forEach(p => promises.push(sbPreloadAudio(SB_AUDIO_BASE + 'phoneme_' + p + '.mp3')));
-    wordSet.forEach(w => {
-      promises.push(sbPreloadAudio(SB_AUDIO_BASE + 'word_' + w + '.mp3'));
-      promises.push(sbPreloadAudio(SB_AUDIO_BASE + 'word_' + w + '_slow.mp3'));
-    });
-    blendSet.forEach(b => promises.push(sbPreloadAudio(SB_AUDIO_BASE + 'blend_' + b + '.mp3')));
-  }
-  await Promise.all(promises);
+  phonemes.forEach(p => load(AUDIO_BASE + 'phoneme_' + p + '.mp3'));
+  words.forEach(w => {
+    load(AUDIO_BASE + 'word_' + w + '.mp3');
+    load(AUDIO_BASE + 'word_' + w + '_slow.mp3');
+  });
 }
 
 /* ─── Start ───────────────────────────────────────────────────── */
