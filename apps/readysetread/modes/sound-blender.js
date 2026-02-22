@@ -64,21 +64,17 @@ function buildSBSession() {
   };
 }
 
-/* ─── Preload audio for session (warms browser cache; non-blocking) */
+/* ─── Preload audio for session (uses shared cache) ──────────── */
 function sbPreloadSession() {
   if (!sbSession) return;
-  const load = url => { const a = new Audio(url); a.preload = 'auto'; a.load(); };
-  ['correct.wav', 'celebrate.wav', 'whoosh.wav'].forEach(f => load(AUDIO_BASE + f));
-  const phonemes = new Set();
-  const words    = new Set();
+  ['correct.wav', 'celebrate.wav', 'whoosh.wav'].forEach(f => preloadAudioFile(AUDIO_BASE + f));
   sbSession.words.forEach(e => {
-    e.phonemes.forEach(p => phonemes.add(p));
-    words.add(e.word);
-  });
-  phonemes.forEach(p => load(AUDIO_BASE + 'phoneme_' + p + '.mp3'));
-  words.forEach(w => {
-    load(AUDIO_BASE + 'word_' + w + '.mp3');
-    load(AUDIO_BASE + 'word_' + w + '_slow.mp3');
+    e.phonemes.forEach(p => preloadUnitAudio(p));
+    preloadWordAudio(e.word);
+    preloadAudioFile(AUDIO_BASE + 'word_' + e.word + '_slow.mp3');
+    if (e.phonemes.length >= 2) {
+      preloadAudioFile(AUDIO_BASE + 'blend_' + e.phonemes.slice(0, 2).join('') + '.mp3');
+    }
   });
 }
 

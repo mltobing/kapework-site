@@ -34,6 +34,12 @@ function startLetterHunt() {
   state.totalIncorrect   = 0;
   state.sessionStartTime = Date.now();
 
+  // Preload audio for session
+  state.rounds.forEach(round => {
+    preloadUnitAudio(round.letter);
+    round.items.forEach(item => preloadWordAudio(item.word));
+  });
+
   showScreen('game');
   document.getElementById('game-streak').textContent = state.streak;
   loadRound(0);
