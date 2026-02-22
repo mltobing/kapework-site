@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ready, Set, Read! · Kapework</title>
-  <meta name="description" content="4 daily reading games: letter sounds, sight words, word matching & letter writing.">
+  <meta name="description" content="6 daily reading games: phoneme blending, letter sounds, sight words, word matching, letter writing & word writing.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -30,6 +30,15 @@
   </div>
 
   <div class="mode-cards">
+    <div id="sb-card" class="mode-card ready" onclick="startSoundBlender()">
+      <div class="mode-icon">🔊</div>
+      <div class="mode-info">
+        <div class="mode-name">Sound Blender</div>
+        <div class="mode-desc">8 words · tap sounds, blend words</div>
+      </div>
+      <div id="sb-status" class="mode-status play">Play</div>
+    </div>
+
     <div id="lh-card" class="mode-card ready" onclick="startLetterHunt()">
       <div class="mode-icon">🔍</div>
       <div class="mode-info">
@@ -285,6 +294,51 @@
   <button class="ww-next-btn" id="ww-next-btn" onclick="wwAdvanceWord()">Next word →</button>
 </div>
 
+<!-- ─── Sound Blender Screen ─────────────────────────────── -->
+<div id="sb-game" class="screen">
+  <div class="top-bar w-full max-w">
+    <button class="back-btn" onclick="goHome()" aria-label="Back to home">←</button>
+    <div class="round-dots" id="sb-dots"></div>
+    <div class="streak-chip">
+      <span>🔥</span>
+      <span id="sb-game-streak">0</span>
+    </div>
+  </div>
+
+  <!-- Picture + hint -->
+  <div class="sb-picture-zone">
+    <div class="sb-emoji" id="sb-emoji">🐱</div>
+    <div class="sb-hint-row">
+      <button class="sb-hint-btn" id="sb-hint-btn" onclick="onSBHint()">💡 Hint</button>
+      <span class="sb-hint-word" id="sb-hint-word"></span>
+    </div>
+  </div>
+
+  <!-- Elkonin boxes -->
+  <div class="sb-boxes" id="sb-boxes"
+       ontouchstart="onSBSwipeStart(event)"
+       ontouchend="onSBSwipeEnd(event)"
+       onmousedown="onSBSwipeStart(event)"
+       onmouseup="onSBSwipeEnd(event)">
+  </div>
+
+  <!-- Blend button -->
+  <button class="sb-blend-btn" id="sb-blend-btn" onclick="onSBBlend()" disabled>
+    Blend! 🔗
+  </button>
+
+  <!-- Instruction -->
+  <div class="sb-instruction" id="sb-instruction">
+    Tap each sound, then blend!
+  </div>
+
+  <!-- Settings -->
+  <div class="sb-settings" id="sb-settings">
+    <button class="sb-settings-btn" onclick="toggleSBSuccessive()" aria-label="Toggle successive blending">⚙️</button>
+    <span class="sb-successive-label" id="sb-successive-label">Successive blending: ON</span>
+  </div>
+</div>
+
 <!-- ─── Gallery Screen ──────────────────────────────────── -->
 <div id="gallery" class="screen">
   <div class="top-bar w-full max-w">
@@ -309,6 +363,7 @@
 <script src="modes/word-match.js"></script>
 <script src="modes/letter-writer.js"></script>
 <script src="modes/word-writer.js"></script>
+<script src="modes/sound-blender.js"></script>
 <script>init();</script>
 
 </body>
