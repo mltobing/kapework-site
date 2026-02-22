@@ -215,45 +215,81 @@ class TTSPhonics {
 
 const tts = new TTSPhonics();
 
-/* ─── Pre-generated audio helpers ─────────────────────────────── */
+/* ─── Pre-generated audio file cache ──────────────────────────── */
 const AUDIO_BASE = 'audio/';
-const _knownMissing = new Set();
+const audioFileCache = new Map();     // url → HTMLAudioElement | null (failed)
+const audioFileLoading = new Set();   // urls currently loading
 
 /**
- * Play a raw audio file URL. No-ops silently if the file is missing.
- * Used for SFX (WAV) files where there is no TTS fallback.
+ * Preload an audio file into cache. Safe to call many times; dupes ignored.
  */
-function tryPlayFile(url) {
-  if (_knownMissing.has(url)) return;
+function preloadAudioFile(url) {
+  if (!url || audioFileCache.has(url) || audioFileLoading.has(url)) return;
+  audioFileLoading.add(url);
   const a = new Audio(url);
-  a.onerror = () => _knownMissing.add(url);
-  a.play().catch(() => {});
+  a.preload = 'auto';
+  const done = (val) => { audioFileLoading.delete(url); audioFileCache.set(url, val); };
+  a.addEventListener('canplaythrough', () => done(a), { once: true });
+  a.addEventListener('error', () => done(null), { once: true });
+  a.load();
 }
 
 /**
- * Play the pre-generated word_<word>.mp3 if it exists,
- * otherwise fall back to speechSynthesis via tts.sayWord().
+ * Try to play a cached audio file. Returns true if playback started.
+ * If not cached yet, triggers a preload for next time and returns false.
+ */
+function tryPlayFile(url) {
+  const cached = audioFileCache.get(url);
+  if (cached) {
+    try {
+      const clone = cached.cloneNode();
+      const p = clone.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+      return true;
+    } catch (_) { return false; }
+  }
+  if (cached === null) return false;   // known bad file
+  preloadAudioFile(url);               // not loaded yet → start loading
+  return false;
+}
+
+/**
+ * Play pre-generated word_<word>.mp3 if cached, else fall back to TTS.
  */
 function playWordAudio(word) {
   if (!word) return;
-  const url = AUDIO_BASE + 'word_' + String(word).toLowerCase().replace(/[^a-z0-9]/g, '_') + '.mp3';
-  if (_knownMissing.has(url)) { tts.sayWord(word); return; }
-  const a = new Audio(url);
-  a.onerror = () => { _knownMissing.add(url); tts.sayWord(word); };
-  a.play().catch(() => tts.sayWord(word));
+  const token = String(word).trim().toLowerCase();
+  if (!token) return;
+  if (tryPlayFile(AUDIO_BASE + 'word_' + token + '.mp3')) return;
+  // Also try with non-alphanumeric chars stripped
+  const slug = token.replace(/[^a-z0-9]/g, '');
+  if (slug !== token && tryPlayFile(AUDIO_BASE + 'word_' + slug + '.mp3')) return;
+  tts.sayWord(word);
 }
 
 /**
- * Play the pre-generated phoneme_<unit>.mp3 if it exists,
- * otherwise fall back to the TTSPhonics engine.
+ * Play pre-generated phoneme_<unit>.mp3 if cached, else fall back to TTS.
  */
 function playUnitAudio(unit) {
   if (!unit) return;
-  const url = AUDIO_BASE + 'phoneme_' + String(unit).toLowerCase() + '.mp3';
-  if (_knownMissing.has(url)) { tts.playPhoneme(unit); return; }
-  const a = new Audio(url);
-  a.onerror = () => { _knownMissing.add(url); tts.playPhoneme(unit); };
-  a.play().catch(() => tts.playPhoneme(unit));
+  const key = String(unit).trim().toLowerCase();
+  if (!key) return;
+  if (tryPlayFile(AUDIO_BASE + 'phoneme_' + key + '.mp3')) return;
+  tts.playPhoneme(unit);
+}
+
+/** Preload a word's mp3 so playWordAudio is instant later. */
+function preloadWordAudio(word) {
+  if (!word) return;
+  const token = String(word).trim().toLowerCase();
+  if (token) preloadAudioFile(AUDIO_BASE + 'word_' + token + '.mp3');
+}
+
+/** Preload a phoneme's mp3 so playUnitAudio is instant later. */
+function preloadUnitAudio(unit) {
+  if (!unit) return;
+  const key = String(unit).trim().toLowerCase();
+  if (key) preloadAudioFile(AUDIO_BASE + 'phoneme_' + key + '.mp3');
 }
 
 function playLetterPhoneme(letter) { playUnitAudio(letter); }

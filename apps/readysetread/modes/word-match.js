@@ -50,6 +50,10 @@ function startWordMatch() {
   tts.unlockFromGesture();
 
   wmSession = buildWMSession();
+
+  // Preload audio for session
+  wmSession.lefts.forEach(item => preloadWordAudio(item.word));
+
   showScreen('wm-game');
   document.getElementById('wm-game-streak').textContent = state.streak;
   renderWMGrid();

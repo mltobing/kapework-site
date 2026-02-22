@@ -39,6 +39,10 @@ function startWordWriter() {
   tts.unlockFromGesture();
 
   wwSession = buildWWSession();
+
+  // Preload audio for session
+  wwSession.words.forEach(word => preloadWordAudio(word));
+
   showScreen('ww-game');
   document.getElementById('ww-game-streak').textContent = state.streak;
   // rAF so the screen is active and canvas clientWidth/Height are computable

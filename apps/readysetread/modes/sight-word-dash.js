@@ -36,6 +36,10 @@ function startSightWordDash() {
   tts.unlockFromGesture();
 
   swSession = buildSWSession();
+
+  // Preload audio for session
+  swSession.words.forEach(entry => preloadWordAudio(entry.word));
+
   showScreen('sw-game');
   document.getElementById('sw-game-streak').textContent = state.streak;
   loadSWWord(0);

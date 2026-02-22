@@ -50,6 +50,12 @@ function startLetterWriter() {
   lwCanvas  = document.getElementById('lw-canvas');
   lwCtx     = lwCanvas.getContext('2d');
 
+  // Preload audio for session
+  lwSession.letters.forEach(letter => {
+    preloadUnitAudio(letter);
+    (LW_PICTURES[letter] || []).forEach(pic => preloadWordAudio(pic.word));
+  });
+
   showScreen('lw-game');
   document.getElementById('lw-game-streak').textContent = state.streak;
   initLWCanvas();
