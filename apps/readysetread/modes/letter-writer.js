@@ -9,7 +9,7 @@ function playLWWord() {
   const picture = pics[lwSession?.currentPictureIdx ?? 0];
   const btn = document.getElementById('lw-speaker-btn');
   if (btn) { btn.classList.add('playing'); btn.addEventListener('animationend', () => btn.classList.remove('playing'), { once: true }); }
-  tts.sayWord(picture?.word || letter || '');
+  playWordAudio(picture?.word || letter || '');
 }
 
 function lwClear()  { clearLWCanvas(); }
@@ -156,7 +156,7 @@ function updateLWUI(letter, picture, phase) {
   document.getElementById('lw-post-check').classList.remove('visible');
   document.getElementById('lw-actions').style.display = 'flex';
 
-  setTimeout(() => { tts.sayWord(picture?.word || letter); }, 400);
+  setTimeout(() => { playWordAudio(picture?.word || letter); }, 400);
 }
 
 function clearLWCanvas() {
@@ -217,7 +217,7 @@ function lwCheckLetter() {
 
   soundCorrect();
   spawnConfetti(10);
-  tts.sayWord('Great job!');
+  playWordAudio('Great job!');
 
   document.getElementById('lw-btn-check').classList.remove('visible');
   document.getElementById('lw-actions').style.display = 'none';

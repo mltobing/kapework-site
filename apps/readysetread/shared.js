@@ -215,7 +215,48 @@ class TTSPhonics {
 
 const tts = new TTSPhonics();
 
-function playLetterPhoneme(letter) { tts.playPhoneme(letter); }
+/* ─── Pre-generated audio helpers ─────────────────────────────── */
+const AUDIO_BASE = 'audio/';
+const _knownMissing = new Set();
+
+/**
+ * Play a raw audio file URL. No-ops silently if the file is missing.
+ * Used for SFX (WAV) files where there is no TTS fallback.
+ */
+function tryPlayFile(url) {
+  if (_knownMissing.has(url)) return;
+  const a = new Audio(url);
+  a.onerror = () => _knownMissing.add(url);
+  a.play().catch(() => {});
+}
+
+/**
+ * Play the pre-generated word_<word>.mp3 if it exists,
+ * otherwise fall back to speechSynthesis via tts.sayWord().
+ */
+function playWordAudio(word) {
+  if (!word) return;
+  const url = AUDIO_BASE + 'word_' + String(word).toLowerCase().replace(/[^a-z0-9]/g, '_') + '.mp3';
+  if (_knownMissing.has(url)) { tts.sayWord(word); return; }
+  const a = new Audio(url);
+  a.onerror = () => { _knownMissing.add(url); tts.sayWord(word); };
+  a.play().catch(() => tts.sayWord(word));
+}
+
+/**
+ * Play the pre-generated phoneme_<unit>.mp3 if it exists,
+ * otherwise fall back to the TTSPhonics engine.
+ */
+function playUnitAudio(unit) {
+  if (!unit) return;
+  const url = AUDIO_BASE + 'phoneme_' + String(unit).toLowerCase() + '.mp3';
+  if (_knownMissing.has(url)) { tts.playPhoneme(unit); return; }
+  const a = new Audio(url);
+  a.onerror = () => { _knownMissing.add(url); tts.playPhoneme(unit); };
+  a.play().catch(() => tts.playPhoneme(unit));
+}
+
+function playLetterPhoneme(letter) { playUnitAudio(letter); }
 
 /* ─── State ────────────────────────────────────────────────────── */
 let state = {
@@ -603,7 +644,7 @@ function onBadgeTap(el, card) {
   el.classList.add('bounce');
   el.addEventListener('animationend', () => el.classList.remove('bounce'), { once: true });
   soundRoundComplete();
-  tts.sayWord(card.name);
+  playWordAudio(card.name);
 }
 
 /* ─── Init ─────────────────────────────────────────────────────── */

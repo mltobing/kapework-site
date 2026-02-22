@@ -112,7 +112,7 @@ function onCardTap(card, item) {
   if (item.correct) {
     card.classList.add('correct');
     soundCorrect();
-    tts.sayWord(item.word);
+    playWordAudio(item.word);
     state.foundCorrect++;
     if (state.foundCorrect === 2) {
       setTimeout(() => onRoundComplete(), 600);

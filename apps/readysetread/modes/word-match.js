@@ -93,7 +93,7 @@ function onWMLeftTap(el, idx) {
   document.querySelectorAll('#wm-left .wm-word').forEach(e => e.classList.remove('selected'));
   el.classList.add('selected');
   wmSession.selectedLeft = idx;
-  tts.sayWord(wmSession.lefts[idx].word);
+  playWordAudio(wmSession.lefts[idx].word);
 }
 
 function onWMRightTap(el, rightIdx) {
@@ -111,7 +111,7 @@ function onWMRightTap(el, rightIdx) {
 
   if (isCorrect) {
     soundCorrect();
-    tts.sayWord(rightWord);
+    playWordAudio(rightWord);
 
     const leftEl = document.querySelectorAll('#wm-left .wm-word')[leftIdx];
     leftEl.classList.remove('selected');
