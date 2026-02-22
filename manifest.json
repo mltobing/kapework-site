@@ -1,75 +1,29 @@
 [
   {
-    "slug": "blinkgrid",
-    "name": "BlinkGrid",
-    "url": "apps/blinkgrid.html",
-    "released_at": "2025-08-15",
-    "tags": ["memory","family"],
-    "blurb": "Watch the blink, tap what changed.",
-    "cover_emoji": "✨"
+    "slug": "readysetread",
+    "name": "Ready, Set, Read!",
+    "url": "apps/readysetread/",
+    "released_at": "2026-02-19",
+    "tags": ["phonics","kids","reading"],
+    "blurb": "Daily reading games: letter sounds, sight words, word matching & letter writing.",
+    "cover_emoji": "📚"
   },
   {
-    "slug": "blinkgrid4",
-    "name": "BlinkGrid 4x4",
-    "url": "apps/blinkgrid4.html",
-    "released_at": "2025-08-16",
-    "tags": ["memory","kids"],
-    "blurb": "Smaller grid, perfect for quick play.",
-    "cover_emoji": "⚡️"
-  },
-  {
-    "slug": "cvcbuilder",
-    "name": "CVC Builder",
-    "url": "apps/cvcbuilder.html",
-    "released_at": "2025-08-12",
-    "tags": ["phonics","kids"],
-    "blurb": "Sound-first hints to build C-V-C words.",
-    "cover_emoji": "🔤"
-  },
-  {
-    "slug": "tapsum",
-    "name": "TapSum",
-    "url": "apps/tapsum.html",
-    "released_at": "2025-08-13",
+    "slug": "numbercrunch",
+    "name": "Number Crunch",
+    "url": "apps/numbercrunch/",
+    "released_at": "2026-02-22",
     "tags": ["math","logic"],
-    "blurb": "Tap numbers to hit the target sum.",
-    "cover_emoji": "➕"
+    "blurb": "Daily math puzzles: Make 24, TapSum, and more.",
+    "cover_emoji": "🔢"
   },
   {
-    "slug": "tiltrix",
-    "name": "Tiltrix",
-    "url": "apps/tiltrix.html",
-    "released_at": "2025-08-10",
-    "tags": ["puzzle","spatial"],
-    "blurb": "Tilt pieces into place.",
+    "slug": "braingym",
+    "name": "Brain Gym",
+    "url": "apps/braingym/",
+    "released_at": "2026-02-22",
+    "tags": ["puzzle","logic","word"],
+    "blurb": "Logic and word games: BlinkGrid, Longshot, Tiltrix, Rainbow Rules.",
     "cover_emoji": "🧩"
-  },
-  {
-  "slug": "rainbowrules",
-  "name": "Rainbow Rules",
-  "url": "apps/rainbowrules.html",
-  "released_at": "2025-08-19",
-  "tags": ["memory","rainbow"],
-  "blurb": "Memorize. Apply all rules in order.",
-  "cover_emoji": "🌈"
-},
-{"slug":"longshot","name":"Longshot","url":"apps/longshot/","released_at":"2025-08-30","tags":["word","daily"],"blurb":"3 shots to find your best word.","cover_emoji":"🧩"},
-{
-  "slug": "make24",
-  "name": "Make 24",
-  "url": "https://make24.app",
-  "released_at": "2025-09-27",
-  "tags": ["math","logic","24"],
-  "blurb": "Use each number once. Tap two cards, then an operator, to make 24.",
-  "cover_emoji": "➗"
-},
-{
-  "slug": "readysetread",
-  "name": "Ready, Set, Read!",
-  "url": "apps/readysetread/",
-  "released_at": "2026-02-19",
-  "tags": ["phonics","kids","reading"],
-  "blurb": "4 daily reading games: letter sounds, sight words, word matching & letter writing.",
-  "cover_emoji": "📚"
-}
+  }
 ]
