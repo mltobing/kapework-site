@@ -606,6 +606,10 @@ function onBadgeTap(el, card) {
   tts.sayWord(card.name);
 }
 
+function tryPlayFile(url) { /* preload+clone pattern */ }
+function playWordAudio(word) { /* try audio/word_<word>.mp3 then tts */ }
+function playUnitAudio(unit) { /* try audio/phoneme_<unit>.mp3 then tts */ }
+
 /* ─── Init ─────────────────────────────────────────────────────── */
 function init() {
   loadProgress();
