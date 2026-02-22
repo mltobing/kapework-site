@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Brain Gym · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:        #0a1628;
+  --surface:   #121e33;
+  --surface2:  #1a2a44;
+  --cyan:      #00e5cc;
+  --cyan-dim:  rgba(0,229,204,0.15);
+  --text:      #e8edf5;
+  --muted:     rgba(232,237,245,0.5);
+  --border:    rgba(232,237,245,0.08);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100dvh;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ─── Page layout ──────────────────────────────────────────── */
+.page {
+  width: 100%;
+  max-width: 480px;
+  padding: 16px 16px env(safe-area-inset-bottom, 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  flex: 1;
+}
+
+/* ─── Top bar ──────────────────────────────────────────────── */
+.top-bar {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.back-btn:hover { color: var(--text); }
+
+/* ─── Header ───────────────────────────────────────────────── */
+.hub-header { text-align: center; }
+.hub-logo   { font-size: 3rem; line-height: 1; }
+.hub-title  { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 8px; }
+.hub-sub    { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+
+/* ─── Game cards ───────────────────────────────────────────── */
+.game-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+a.game-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+a.game-card:hover { transform: translateY(-2px); border-color: var(--cyan); box-shadow: 0 0 20px var(--cyan-dim); }
+a.game-card:active { transform: scale(0.98); }
+
+.game-icon { font-size: 2.5rem; flex-shrink: 0; }
+.game-info { flex: 1; }
+.game-name { font-size: 1.1rem; font-weight: 800; }
+.game-desc { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+.game-play {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  border: 1px solid var(--cyan);
+  flex-shrink: 0;
+}
+
+/* ─── Footer ───────────────────────────────────────────────── */
+.hub-footer {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding-bottom: 8px;
+}
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="top-bar">
+    <a class="back-btn" href="../../">← Kapework</a>
+  </div>
+
+  <div class="hub-header">
+    <div class="hub-logo">🧩</div>
+    <h1 class="hub-title">Brain Gym</h1>
+    <p class="hub-sub">Logic and word games</p>
+  </div>
+
+  <div class="game-cards">
+
+    <a class="game-card" href="../blinkgrid4.html">
+      <div class="game-icon">✨</div>
+      <div class="game-info">
+        <div class="game-name">BlinkGrid</div>
+        <div class="game-desc">4x4 · remember the pattern</div>
+      </div>
+      <div class="game-play">Play</div>
+    </a>
+
+    <a class="game-card" href="../longshot.html">
+      <div class="game-icon">🧩</div>
+      <div class="game-info">
+        <div class="game-name">Longshot</div>
+        <div class="game-desc">3 shots · find the word</div>
+      </div>
+      <div class="game-play">Play</div>
+    </a>
+
+    <a class="game-card" href="../tiltrix.html">
+      <div class="game-icon">⚡</div>
+      <div class="game-info">
+        <div class="game-name">Tiltrix</div>
+        <div class="game-desc">Tilt to play · clear the lines</div>
+      </div>
+      <div class="game-play">Play</div>
+    </a>
+
+    <a class="game-card" href="../rainbowrules.html">
+      <div class="game-icon">🌈</div>
+      <div class="game-info">
+        <div class="game-name">Rainbow Rules</div>
+        <div class="game-desc">Colors · follow the rules</div>
+      </div>
+      <div class="game-play">Play</div>
+    </a>
+
+  </div>
+
+  <div class="hub-footer">Kapework · Brain Gym v1</div>
+
+</div>
+
+</body>
+</html>
