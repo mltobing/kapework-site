@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Make 36</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="puzzle-date" id="puzzleDate" role="button" tabindex="0" aria-label="Open calendar">Today</div>
+        </div>
+        <div class="header-right">
+            <button class="tutorial-help-btn" id="tutorialHelpBtn" title="How to play" aria-label="How to play">?</button>
+            <button class="hint-btn" id="hintBtn" title="Get a hint" aria-label="Get a hint">💡</button>
+            <button class="undo-btn" id="undoBtn" title="Undo" aria-label="Undo last move">↶</button>
+            <div class="streak-display" id="streakDisplay">
+                <span class="fire" aria-hidden="true">🔥</span>
+                <span id="streakCount" aria-label="Current streak">0</span>
+                <span class="freeze-indicator" id="freezeIndicator" aria-label="Streak freezes"></span>
+            </div>
+            <button class="more-btn" id="moreBtn" title="More" aria-label="More options">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+        </div>
+
+        <!-- More menu dropdown -->
+        <div class="more-menu" id="moreMenu">
+            <button class="more-menu-item" id="menuHintBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/></svg>
+                Hint
+            </button>
+            <button class="more-menu-item" id="menuCalendarBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                History
+            </button>
+            <button class="more-menu-item" id="menuTutorialBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                How to play
+            </button>
+            <button class="more-menu-item" id="menuSettingsBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Settings
+            </button>
+        </div>
+    </div>
+
+    <div class="archive-banner" id="archiveBanner"></div>
+
+    <div class="game-container">
+        <div class="result-display" id="resultDisplay"></div>
+        <div class="hint-display" id="hintDisplay"></div>
+
+        <div class="diamond-grid" id="diamondGrid">
+            <div class="slot top" id="slot0"></div>
+            <div class="slot left" id="slot1"></div>
+            <div class="slot right" id="slot2"></div>
+            <div class="slot bottom" id="slot3"></div>
+        </div>
+    </div>
+
+    <div class="operators-overlay" id="operatorsOverlay">
+        <div class="operators-grid">
+            <button class="op-btn" data-op="+" aria-label="Add">+</button>
+            <button class="op-btn" data-op="-" aria-label="Subtract">−</button>
+            <button class="op-btn" data-op="*" aria-label="Multiply">×</button>
+            <button class="op-btn" data-op="/" aria-label="Divide">÷</button>
+        </div>
+    </div>
+
+    <div class="move-dots" id="moveDots" aria-label="Move progress">
+        <div class="move-dot perfect-hint"></div>
+        <div class="move-dot perfect-hint"></div>
+        <div class="move-dot perfect-hint"></div>
+    </div>
+
+    <div class="victory-backdrop" id="victoryBackdrop">
+        <div class="victory-card" id="victoryCard">
+            <button class="victory-close" id="victoryClose" aria-label="Close">&times;</button>
+            <div class="victory-badge" id="victoryBadge"></div>
+            <div class="victory-date" id="victoryDate"></div>
+            <div class="victory-stats">
+                <div class="victory-stat">
+                    <span class="victory-stat-value" id="victoryTime">--</span>
+                    <span class="victory-stat-label">time</span>
+                </div>
+                <div class="victory-stat">
+                    <span class="victory-stat-value" id="victoryMoves">--</span>
+                    <span class="victory-stat-label">moves</span>
+                </div>
+                <div class="victory-stat">
+                    <span class="victory-stat-value" id="victoryStreak">--</span>
+                    <span class="victory-stat-label">streak</span>
+                </div>
+            </div>
+            <div class="victory-percentile" id="victoryPercentile"></div>
+            <div class="victory-actions">
+                <button class="btn btn-primary" id="shareBtn" aria-label="Share result">Share</button>
+                <button class="btn btn-challenge" id="challengeBtn" aria-label="Challenge a friend">Challenge</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="archiveModal">
+        <div class="modal">
+            <h2>📅 History</h2>
+            <div class="archive-list" id="archiveList"></div>
+            <button class="share-history-btn" id="shareHistoryBtn" aria-label="Share last 24 days history">📊 Share My Last 24 Days</button>
+            <button class="modal-close" id="closeArchive" aria-label="Close history">Close</button>
+        </div>
+    </div>
+
+    <!-- Puzzle details sheet -->
+    <div class="modal-overlay" id="detailsModal">
+        <div class="details-sheet" id="detailsSheet">
+            <div class="details-header">
+                <span class="details-date" id="detailsDate"></span>
+                <button class="details-close" id="detailsClose" aria-label="Close">&times;</button>
+            </div>
+            <div class="details-tiles" id="detailsTiles"></div>
+            <div class="details-status" id="detailsStatus"></div>
+            <div class="details-stats-row" id="detailsStatsRow"></div>
+            <div class="details-meta" id="detailsMeta"></div>
+            <div class="details-actions" id="detailsActions"></div>
+        </div>
+    </div>
+
+    <!-- Replay overlay -->
+    <div class="replay-overlay" id="replayOverlay">
+        <div class="replay-top-bar">
+            <button class="replay-close-btn" id="replayCloseBtn" aria-label="Close replay">&times;</button>
+        </div>
+        <div class="replay-grid" id="replayGrid">
+            <div class="replay-slot" id="rslot0"></div>
+            <div class="replay-slot" id="rslot1"></div>
+            <div class="replay-op-display" id="replayOpDisplay"></div>
+            <div class="replay-slot" id="rslot2"></div>
+            <div class="replay-slot" id="rslot3"></div>
+        </div>
+    </div>
+
+    <!-- Calendar history modal -->
+    <div class="modal-overlay" id="calendarModal">
+        <div class="modal calendar-modal">
+            <div class="calendar-header">
+                <button class="calendar-nav" id="calPrev" aria-label="Previous month">&lsaquo;</button>
+                <div class="calendar-title" id="calTitle"></div>
+                <button class="calendar-nav" id="calNext" aria-label="Next month">&rsaquo;</button>
+            </div>
+            <div class="calendar-streak" id="calStreak"></div>
+            <div class="calendar-weekdays">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+            <button class="share-history-btn" id="shareMonthBtn" aria-label="Share this month">Share this month</button>
+            <button class="modal-close" id="closeCalendar" aria-label="Close">Close</button>
+        </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2>Settings</h2>
+            <!-- Shake to undo setting -->
+            <div class="setting-row" id="shakeSettingRow">
+                <div class="setting-info">
+                    <span class="setting-label">Shake to undo</span>
+                    <span class="setting-desc" id="shakeDesc">Shake your phone to undo the last move</span>
+                </div>
+                <button class="setting-toggle" id="shakeToggle" role="switch" aria-checked="false" aria-label="Shake to undo">
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </button>
+            </div>
+            <div class="shake-guidance" id="shakeGuidance"></div>
+
+            <div class="sync-section" id="syncSection">
+                <div class="sync-label" id="syncLabel">Keep your streak across devices</div>
+                <div class="sync-methods" id="syncMethods">
+                    <button class="google-btn" id="googleSignInBtn" aria-label="Sign in with Google">
+                        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                        Continue with Google
+                    </button>
+                    <div class="sync-divider">or use email code</div>
+                    <div class="email-otp-row" id="emailOtpRow">
+                        <input type="email" class="email-otp-input" id="otpEmailInput" placeholder="your@email.com" autocomplete="email" autocapitalize="off" aria-label="Email address">
+                        <button class="email-send-btn" id="otpSendBtn" aria-label="Send verification code">Send code</button>
+                    </div>
+                    <div class="otp-verify-row" id="otpVerifyRow">
+                        <input type="text" class="otp-code-input" id="otpCodeInput" placeholder="6-digit code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" aria-label="Verification code">
+                        <button class="otp-verify-btn" id="otpVerifyBtn" aria-label="Verify code">Verify</button>
+                    </div>
+                    <div class="sync-status" id="syncStatus"></div>
+                </div>
+                <div id="syncSignedInView" style="display:none;">
+                    <button class="sync-signout" id="syncSignOutBtn" aria-label="Sign out">Sign out</button>
+                </div>
+            </div>
+            <button class="modal-close" id="closeSettings" aria-label="Close">Close</button>
+        </div>
+    </div>
+
+    <div class="sync-nudge" id="syncNudge">
+        🔥 Nice streak! <span class="sync-nudge-link" id="syncNudgeLink">Sign in</span> to keep it across devices.
+        <span class="sync-nudge-dismiss" id="syncNudgeDismiss" aria-label="Dismiss">✕</span>
+    </div>
+
+    <div class="sync-error-toast" id="syncErrorToast"></div>
+
+    <!-- Clipboard toast -->
+    <div class="clipboard-toast" id="clipboardToast">Copied to clipboard!</div>
+
+    <!-- Freeze tooltip -->
+    <div class="freeze-tooltip" id="freezeTooltip">Miss one day? A freeze auto-protects your streak. Earn one every 7-day streak.</div>
+
+    <!-- Tutorial -->
+    <div class="tutorial-banner" id="tutorialBanner">
+        Practice round — this won't affect your streak
+        <button class="tutorial-skip" id="tutorialSkip">Skip</button>
+    </div>
+    <div class="tutorial-tooltip" id="tutorialTooltip"></div>
+
+    <div class="confetti-container" id="confetti"></div>
+    <canvas class="share-canvas" id="shareCanvas"></canvas>
+
+    <script src="app.js"></script>
+</body>
+</html>
