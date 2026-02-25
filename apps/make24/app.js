@@ -613,11 +613,36 @@ async function registerDeviceFallback(userId, deviceId) {
     }
 }
 
+function extractUuidFromRpcResult(payload) {
+    if (!payload) return null;
+    if (typeof payload === 'string') return payload;
+
+    if (Array.isArray(payload)) {
+        if (payload.length === 0) return null;
+        const first = payload[0];
+        if (typeof first === 'string') return first;
+        if (first && typeof first === 'object') {
+            return first.id || first.player_id || first.out_player_id || Object.values(first)[0];
+        }
+        return null;
+    }
+
+    if (typeof payload === 'object') {
+        return payload.id || payload.player_id || payload.out_player_id || Object.values(payload)[0];
+    }
+
+    return null;
+}
+
 async function syncFromSupabase() {
     try {
         const headers = await getAuthHeaders();
         const { data: { session } } = await sb.auth.getSession();
         console.log('[SYNC DEBUG] syncFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
+        if (!session?.user?.id) {
+            console.log('[SYNC DEBUG] syncFromSupabase: not signed in; skipping server streak sync.');
+            return;
+        }
 
         // When logged in, try to find the player by auth user_id first.
         // This ensures a second device sees the same player row (and streak)
@@ -655,10 +680,36 @@ async function syncFromSupabase() {
                 body: JSON.stringify({ p_device_id: gameState.deviceId })
             });
             if (!response.ok) {
-                showSyncError('Could not sync streak — server returned an error.');
+                const body = await response.text();
+                console.error('[SYNC DEBUG] get_or_create_player failed:', response.status, body);
+                showSyncError(`Could not sync streak — server error (${response.status})`);
                 return;
             }
-            player = await response.json();
+            const raw = await response.json();
+            const playerId = extractUuidFromRpcResult(raw);
+            if (!playerId) {
+                console.error('[SYNC DEBUG] get_or_create_player returned unexpected payload:', raw);
+                showSyncError('Could not sync streak — bad player id');
+                return;
+            }
+
+            const playerRes = await fetch(
+                `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(playerId)}&select=id,current_streak,streak,freezes,device_id&limit=1`,
+                { headers }
+            );
+            if (!playerRes.ok) {
+                const body = await playerRes.text();
+                console.error('[SYNC DEBUG] fetch player by id failed:', playerRes.status, body);
+                showSyncError(`Could not sync streak — server error (${playerRes.status})`);
+                return;
+            }
+            const players = await playerRes.json();
+            player = players?.[0] || null;
+            if (!player) {
+                console.error('[SYNC DEBUG] no player row found for fallback player id:', playerId);
+                showSyncError('Could not sync streak — bad player id');
+                return;
+            }
             console.log('[SYNC DEBUG] syncFromSupabase: fallback player:', JSON.stringify(player));
         }
 
@@ -683,6 +734,10 @@ async function syncHistoryFromSupabase() {
         const headers = await getAuthHeaders();
         const { data: { session } } = await sb.auth.getSession();
         console.log('[SYNC DEBUG] syncHistoryFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
+        if (!session?.user?.id) {
+            console.log('[SYNC DEBUG] syncHistoryFromSupabase: not signed in; skipping server history sync.');
+            return;
+        }
 
         // Step 1: Get player_id — prefer user_id lookup when logged in,
         // fall back to device_id for anonymous play
@@ -1899,6 +1954,8 @@ async function trackPlay(success) {
 }
 
 async function syncStreakToSupabase() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session?.user?.id) return;
     try {
         const headers = await getAuthHeaders();
         const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_player_streak`, {
