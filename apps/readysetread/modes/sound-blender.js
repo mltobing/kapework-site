@@ -34,7 +34,10 @@ const SB_WORD_POOL = [
 /* ─── Audio helpers (delegate to shared playWordAudio / playUnitAudio / tryPlayFile) */
 function sbPlayPhoneme(letter) { playUnitAudio(letter); }
 function sbPlayWord(word)       { playWordAudio(word); }
-function sbPlayBlend(letters)   { playWordAudio(letters.join('')); }
+function sbPlayBlend(letters) {
+  const blend = letters.join('').toLowerCase();
+  playStoredAudio([AUDIO_BASE + 'blend_' + blend + '.mp3', AUDIO_BASE + 'blend_' + blend + '.wav'], `blend:${blend}`);
+}
 function sbPlaySFX(name)        { tryPlayFile(AUDIO_BASE + name); }
 
 /* ─── Session state ───────────────────────────────────────────── */

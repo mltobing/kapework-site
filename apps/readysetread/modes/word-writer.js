@@ -279,7 +279,7 @@ function markWWStepDone(step) {
 function onWWWordComplete() {
   spawnConfetti(10);
   soundRoundComplete();
-  playWordAudio('Great job!');
+  tryPlayFile(AUDIO_BASE + 'celebrate.wav');
   document.getElementById('ww-next-btn').classList.add('visible');
 }
 

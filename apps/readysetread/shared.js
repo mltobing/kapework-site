@@ -31,6 +31,7 @@ function playChord(freqs, duration) {
 }
 
 function soundCorrect() {
+  if (tryPlayFile(AUDIO_BASE + 'correct.wav')) return;
   playChord([523, 659, 784], 0.4);
 }
 
@@ -52,17 +53,15 @@ function soundIncorrect() {
 }
 
 function soundRoundComplete() {
+  if (tryPlayFile(AUDIO_BASE + 'correct.wav')) return;
   const notes = [392, 494, 587, 698, 784];
-  notes.forEach((f, i) => {
-    setTimeout(() => playTone(f, 0.3, 'sine', 0.25), i * 90);
-  });
+  notes.forEach((f, i) => setTimeout(() => playTone(f, 0.3, 'sine', 0.25), i * 90));
 }
 
 function soundSessionComplete() {
+  if (tryPlayFile(AUDIO_BASE + 'celebrate.wav')) return;
   const notes = [523, 659, 784, 1047, 1319];
-  notes.forEach((f, i) => {
-    setTimeout(() => playTone(f, 0.5, 'sine', 0.28), i * 100);
-  });
+  notes.forEach((f, i) => setTimeout(() => playTone(f, 0.5, 'sine', 0.28), i * 100));
   setTimeout(() => playChord([523, 659, 784], 0.8), 600);
 }
 
@@ -139,55 +138,26 @@ class TTSPhonics {
   }
 
   async init() {
-    await this._ensureVoices();
-    this.voice = this._pickEnglishVoice(this.lang);
+    this.voice = null;
   }
 
   unlockFromGesture() {
-    if (this.unlocked) return;
     this.unlocked = true;
-    if (!('speechSynthesis' in window)) return;
-    try {
-      const u = new SpeechSynthesisUtterance('unlock');
-      u.volume = 0; u.rate = this.ratePhoneme; u.pitch = this.pitch; u.lang = this.lang;
-      if (this.voice) u.voice = this.voice;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-      setTimeout(() => window.speechSynthesis.cancel(), 30);
-    } catch (e) {}
   }
 
   playPhoneme(key) {
-    const entry = PHONEMES[key];
-    if (!entry) return false;
-    return this._speak(entry.text, { cutMs: entry.cutMs ?? null, rate: this.ratePhoneme });
+    return false;
   }
 
   sayWord(word) {
-    return this._speak(String(word), { cutMs: null, rate: this.rateWord });
+    return false;
   }
 
   stop() {
-    if (!('speechSynthesis' in window)) return;
     if (this._cutTimer) { clearTimeout(this._cutTimer); this._cutTimer = null; }
-    window.speechSynthesis.cancel();
   }
 
   _speak(text, { cutMs = null, rate = 0.9 } = {}) {
-    if (!('speechSynthesis' in window)) return false;
-    this.stop();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = rate; u.pitch = this.pitch; u.volume = this.volume; u.lang = this.lang;
-    if (this.voice) u.voice = this.voice;
-    u.onstart = () => {
-      if (cutMs != null) {
-        this._cutTimer = setTimeout(() => { window.speechSynthesis.cancel(); this._cutTimer = null; }, cutMs);
-      }
-    };
-    u.onend = u.onerror = () => {
-      if (this._cutTimer) { clearTimeout(this._cutTimer); this._cutTimer = null; }
-    };
-    window.speechSynthesis.speak(u);
     return true;
   }
 
@@ -219,6 +189,7 @@ const tts = new TTSPhonics();
 const AUDIO_BASE = 'audio/';
 const audioFileCache = new Map();     // url → HTMLAudioElement | null (failed)
 const audioFileLoading = new Set();   // urls currently loading
+const missingAudioWarnings = new Set();
 
 /**
  * Preload an audio file into cache. Safe to call many times; dupes ignored.
@@ -253,6 +224,18 @@ function tryPlayFile(url) {
   return false;
 }
 
+function playStoredAudio(candidates, label = '') {
+  for (const url of candidates) {
+    if (tryPlayFile(url)) return true;
+  }
+  const key = label || candidates.join('|');
+  if (!missingAudioWarnings.has(key)) {
+    missingAudioWarnings.add(key);
+    console.warn('[readysetread] Missing pre-recorded audio asset for:', label || candidates);
+  }
+  return false;
+}
+
 /**
  * Play pre-generated word_<word>.mp3 if cached, else fall back to TTS.
  */
@@ -260,11 +243,12 @@ function playWordAudio(word) {
   if (!word) return;
   const token = String(word).trim().toLowerCase();
   if (!token) return;
-  if (tryPlayFile(AUDIO_BASE + 'word_' + token + '.mp3')) return;
+  if (playStoredAudio([AUDIO_BASE + 'word_' + token + '.mp3', AUDIO_BASE + 'word_' + token + '.wav'], token)) return;
   // Also try with non-alphanumeric chars stripped
   const slug = token.replace(/[^a-z0-9]/g, '');
-  if (slug !== token && tryPlayFile(AUDIO_BASE + 'word_' + slug + '.mp3')) return;
-  tts.sayWord(word);
+  if (slug !== token) {
+    playStoredAudio([AUDIO_BASE + 'word_' + slug + '.mp3', AUDIO_BASE + 'word_' + slug + '.wav'], token);
+  }
 }
 
 /**
@@ -274,22 +258,27 @@ function playUnitAudio(unit) {
   if (!unit) return;
   const key = String(unit).trim().toLowerCase();
   if (!key) return;
-  if (tryPlayFile(AUDIO_BASE + 'phoneme_' + key + '.mp3')) return;
-  tts.playPhoneme(unit);
+  playStoredAudio([AUDIO_BASE + 'phoneme_' + key + '.mp3', AUDIO_BASE + 'phoneme_' + key + '.wav'], key);
 }
 
 /** Preload a word's mp3 so playWordAudio is instant later. */
 function preloadWordAudio(word) {
   if (!word) return;
   const token = String(word).trim().toLowerCase();
-  if (token) preloadAudioFile(AUDIO_BASE + 'word_' + token + '.mp3');
+  if (token) {
+    preloadAudioFile(AUDIO_BASE + 'word_' + token + '.mp3');
+    preloadAudioFile(AUDIO_BASE + 'word_' + token + '.wav');
+  }
 }
 
 /** Preload a phoneme's mp3 so playUnitAudio is instant later. */
 function preloadUnitAudio(unit) {
   if (!unit) return;
   const key = String(unit).trim().toLowerCase();
-  if (key) preloadAudioFile(AUDIO_BASE + 'phoneme_' + key + '.mp3');
+  if (key) {
+    preloadAudioFile(AUDIO_BASE + 'phoneme_' + key + '.mp3');
+    preloadAudioFile(AUDIO_BASE + 'phoneme_' + key + '.wav');
+  }
 }
 
 function playLetterPhoneme(letter) { playUnitAudio(letter); }
@@ -666,6 +655,7 @@ function renderGallery() {
   }
 
   earned.forEach(card => {
+    preloadWordAudio(card.name);
     const el = document.createElement('div');
     el.className = 'gc' + (card.rarity === 'rare' ? ' gc-rare' : '');
     el.innerHTML = `<div class="gc-emoji">${card.emoji}</div><div class="gc-name">${card.name}</div>`;

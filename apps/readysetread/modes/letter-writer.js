@@ -223,7 +223,7 @@ function lwCheckLetter() {
 
   soundCorrect();
   spawnConfetti(10);
-  playWordAudio('Great job!');
+  tryPlayFile(AUDIO_BASE + 'celebrate.wav');
 
   document.getElementById('lw-btn-check').classList.remove('visible');
   document.getElementById('lw-actions').style.display = 'none';
