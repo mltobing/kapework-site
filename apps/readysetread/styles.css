@@ -1227,18 +1227,25 @@ body {
 /* Elkonin boxes container */
 .sb-boxes {
   display: flex;
-  gap: 14px;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
   width: 100%;
   max-width: 480px;
-  min-height: 120px;
-  padding: 16px 8px;
+  min-height: 160px;
+  padding: 16px 8px 8px;
   position: relative;
 }
 
 .sb-boxes.slide-out { animation: slide-out-left 0.25s ease forwards; }
 .sb-boxes.slide-in  { animation: slide-in-right 0.25s ease; }
+
+/* Tile row (horizontal) */
+.sb-tile-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  align-items: center;
+}
 
 /* Individual Elkonin box */
 .sb-box {
@@ -1252,40 +1259,71 @@ body {
   font-weight: 900;
   font-family: Georgia, 'Times New Roman', serif;
   color: #fff;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.5s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.5s ease, filter 0.2s ease;
   position: relative;
   -webkit-tap-highlight-color: transparent;
+  filter: brightness(0.6);
 }
-.sb-box:active { transform: scale(0.93); }
 
 .sb-consonant { background: #3b82f6; }
 .sb-vowel     { background: #ef4444; }
 
-/* Tapped state */
-.sb-box.sb-tapped {
-  box-shadow: 0 0 20px rgba(255,255,255,0.3);
+/* Active state — lit up as scrub passes over */
+.sb-box.sb-active {
+  filter: brightness(1);
+  box-shadow: 0 0 20px rgba(255,255,255,0.25);
   transform: scale(1.05);
 }
-.sb-box.sb-tapped.sb-consonant { background: #2563eb; }
-.sb-box.sb-tapped.sb-vowel     { background: #dc2626; }
 
-/* Guided pulsing */
-.sb-box.sb-pulse {
-  animation: sb-pulse 1.2s ease infinite;
-}
-@keyframes sb-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
-  70%  { box-shadow: 0 0 0 12px rgba(255,255,255,0); }
-  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+/* Blending track bar */
+.sb-track {
+  position: relative;
+  width: calc(100% - 16px);
+  max-width: 380px;
+  height: 28px;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  margin-top: 12px;
+  touch-action: none;
+  cursor: pointer;
+  overflow: hidden;
 }
 
-/* Successive blending partial merge */
-.sb-box.sb-partial-merge-left {
-  transform: translateX(6px) scale(1.05);
+/* Progress fill */
+.sb-track-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--cyan-dim);
+  border-radius: 14px;
+  transition: width 0.08s ease;
+  pointer-events: none;
 }
-.sb-box.sb-partial-merge-right {
-  transform: translateX(-6px) scale(1.05);
+
+/* Draggable handle */
+.sb-track-handle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  margin-top: -18px;
+  margin-left: -18px;
+  background: var(--cyan);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--cyan-glow);
+  z-index: 2;
+  pointer-events: none;
+  transition: left 0.08s ease;
+}
+
+/* Demo animation glow on handle */
+.sb-track-handle.sb-demo-active {
+  box-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan-glow);
 }
 
 /* Merged tile */
@@ -1313,35 +1351,6 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Blend button */
-.sb-blend-btn {
-  width: 100%;
-  max-width: 300px;
-  background: var(--surface2);
-  color: var(--muted);
-  font-weight: 800;
-  font-family: inherit;
-  font-size: 1.1rem;
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  padding: 16px;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.3s;
-  margin-top: 4px;
-}
-.sb-blend-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.sb-blend-btn.sb-glow {
-  background: var(--cyan);
-  color: #0a1628;
-  border-color: var(--cyan);
-  box-shadow: 0 0 24px var(--cyan-dim);
-}
-.sb-blend-btn.sb-glow:not(:disabled):active { transform: scale(0.96); }
-.sb-blend-btn.sb-glow:not(:disabled):hover { opacity: 0.9; }
-
 /* Instruction text */
 .sb-instruction {
   font-size: 0.88rem;
@@ -1352,33 +1361,7 @@ body {
   margin-top: 8px;
 }
 
-/* Settings gear */
-.sb-settings {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.sb-settings-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 4px;
-  opacity: 0.5;
-  transition: opacity 0.15s;
-}
-.sb-settings-btn:hover { opacity: 1; }
-
-.sb-successive-label {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-weight: 700;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .sb-box.sb-pulse { animation: none; }
   .sb-emoji.sb-bounce { animation: none; }
   .sb-merged.sb-merged-pop { animation: none; }
 }
