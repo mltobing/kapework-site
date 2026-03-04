@@ -50,8 +50,10 @@
   ],
   "vowels_used": [
     "a",
+    "e",
     "i",
-    "o"
+    "o",
+    "u"
   ],
   "required_files": [
     "phoneme_a.mp3",
@@ -67,8 +69,13 @@
     "phoneme_s.mp3",
     "phoneme_t.mp3",
     "vowel_a_loop.mp3",
+    "vowel_a_loop.wav",
+    "vowel_e_loop.wav",
     "vowel_i_loop.mp3",
+    "vowel_i_loop.wav",
     "vowel_o_loop.mp3",
+    "vowel_o_loop.wav",
+    "vowel_u_loop.wav",
     "word_an.mp3",
     "word_an_slow.mp3",
     "word_ant.mp3",
@@ -130,6 +137,9 @@
     "word_tin.mp3",
     "word_tin_slow.mp3",
     "word_tip.mp3",
-    "word_tip_slow.mp3"
+    "word_tip_slow.mp3",
+    "correct.wav",
+    "celebrate.wav",
+    "whoosh.wav"
   ]
 }

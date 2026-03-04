@@ -314,28 +314,12 @@
     </div>
   </div>
 
-  <!-- Elkonin boxes -->
-  <div class="sb-boxes" id="sb-boxes"
-       ontouchstart="onSBSwipeStart(event)"
-       ontouchend="onSBSwipeEnd(event)"
-       onmousedown="onSBSwipeStart(event)"
-       onmouseup="onSBSwipeEnd(event)">
-  </div>
-
-  <!-- Blend button -->
-  <button class="sb-blend-btn" id="sb-blend-btn" onclick="onSBBlend()" disabled>
-    Blend! 🔗
-  </button>
+  <!-- Letter tiles + blending track (populated by JS) -->
+  <div class="sb-boxes" id="sb-boxes"></div>
 
   <!-- Instruction -->
   <div class="sb-instruction" id="sb-instruction">
-    Tap each sound, then blend!
-  </div>
-
-  <!-- Settings -->
-  <div class="sb-settings" id="sb-settings">
-    <button class="sb-settings-btn" onclick="toggleSBSuccessive()" aria-label="Toggle successive blending">⚙️</button>
-    <span class="sb-successive-label" id="sb-successive-label">Successive blending: ON</span>
+    Slide your finger under the letters!
   </div>
 </div>
 

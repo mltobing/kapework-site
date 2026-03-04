@@ -283,6 +283,78 @@ function preloadUnitAudio(unit) {
 
 function playLetterPhoneme(letter) { playUnitAudio(letter); }
 
+/* ─── WebAudio vowel sustain (looping AudioBufferSourceNode) ──── */
+const vowelBufferCache = new Map();   // vowel letter → AudioBuffer
+let sustainSource = null;             // currently looping source node
+let sustainGain   = null;             // gain node for fade-out
+
+/**
+ * Decode a vowel loop file into an AudioBuffer and cache it.
+ * Call once per vowel during preload.
+ */
+async function preloadVowelBuffer(vowel) {
+  if (vowelBufferCache.has(vowel)) return;
+  const ctx = getAudioCtx();
+  const candidates = [
+    AUDIO_BASE + 'vowel_' + vowel + '_loop.mp3',
+    AUDIO_BASE + 'vowel_' + vowel + '_loop.wav',
+  ];
+  for (const url of candidates) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const arrayBuf = await resp.arrayBuffer();
+      const audioBuf = await ctx.decodeAudioData(arrayBuf);
+      vowelBufferCache.set(vowel, audioBuf);
+      return;
+    } catch (_) { /* try next candidate */ }
+  }
+  console.warn('[sustain] Could not decode vowel loop for:', vowel);
+}
+
+/**
+ * Start looping a vowel sustain sound via WebAudio.
+ * Stops any previous sustain first.
+ */
+function startVowelSustain(vowel) {
+  stopVowelSustain();
+  const buf = vowelBufferCache.get(vowel);
+  if (!buf) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    sustainGain = ctx.createGain();
+    sustainGain.gain.setValueAtTime(0.55, ctx.currentTime);
+    sustainGain.connect(ctx.destination);
+    sustainSource = ctx.createBufferSource();
+    sustainSource.buffer = buf;
+    sustainSource.loop = true;
+    sustainSource.connect(sustainGain);
+    sustainSource.start(0);
+  } catch (e) {
+    console.warn('[sustain] Failed to start vowel loop:', e);
+  }
+}
+
+/**
+ * Stop the currently playing vowel sustain with a short fade-out.
+ */
+function stopVowelSustain() {
+  if (sustainSource) {
+    try {
+      if (sustainGain) {
+        const ctx = getAudioCtx();
+        sustainGain.gain.setValueAtTime(sustainGain.gain.value, ctx.currentTime);
+        sustainGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+      }
+      const src = sustainSource;
+      setTimeout(() => { try { src.stop(); } catch (_) {} }, 100);
+    } catch (_) {}
+    sustainSource = null;
+    sustainGain = null;
+  }
+}
+
 /* ─── State ────────────────────────────────────────────────────── */
 let state = {
   // Session
