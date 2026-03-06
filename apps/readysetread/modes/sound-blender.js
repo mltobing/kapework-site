@@ -73,21 +73,30 @@ function sbPreloadSession() {
   if (!sbSession) return;
   ['correct.wav', 'celebrate.wav', 'whoosh.wav'].forEach(f => preloadAudioFile(AUDIO_BASE + f));
   const vowelsNeeded = new Set();
+  const blendsNeeded = new Set();
   sbSession.words.forEach(e => {
-    e.phonemes.forEach(p => {
+    e.phonemes.forEach((p, i) => {
       preloadUnitAudio(p);
       if (SB_VOWELS.has(p)) vowelsNeeded.add(p);
+      if (i > 0) blendsNeeded.add(e.phonemes[i - 1] + p);
     });
     preloadWordAudio(e.word);
     preloadAudioFile(AUDIO_BASE + 'word_' + e.word + '_slow.mp3');
   });
   // Decode vowel loops into AudioBuffers for WebAudio sustain
   vowelsNeeded.forEach(v => preloadVowelBuffer(v));
+
+  // Preload any recorded blend transitions if present.
+  blendsNeeded.forEach(pair => {
+    preloadAudioFile(AUDIO_BASE + 'blend_' + pair + '.mp3');
+    preloadAudioFile(AUDIO_BASE + 'blend_' + pair + '.wav');
+  });
 }
 
 /* ─── Scrub track state ─────────────────────────────────────────── */
 let sbScrubbing = false;
 let sbCurrentSnapIdx = -1;
+let sbPendingCompleteTimer = null;
 
 /* ─── Start ─────────────────────────────────────────────────────── */
 function startSoundBlender() {
@@ -122,6 +131,10 @@ function loadSBWord(idx, animate = false) {
   sbSession.currentIdx = idx;
   sbCurrentSnapIdx = -1;
   sbScrubbing = false;
+  if (sbPendingCompleteTimer) {
+    clearTimeout(sbPendingCompleteTimer);
+    sbPendingCompleteTimer = null;
+  }
   const entry = sbSession.words[idx];
   if (!entry) return;
 
@@ -252,13 +265,6 @@ function sbOnPointerUp(e) {
   e.preventDefault();
   sbScrubbing = false;
   stopVowelSustain();
-
-  // If we reached the last index, trigger completion
-  if (!sbSession) return;
-  const entry = sbSession.words[sbSession.currentIdx];
-  if (entry && sbCurrentSnapIdx === entry.phonemes.length - 1 && !entry.blended) {
-    sbCompleteWord();
-  }
 }
 
 /* ─── Process pointer position → snap to nearest letter ─────────── */
@@ -319,23 +325,42 @@ function sbOnSnapChange(idx, entry, tiles, tileCenters, trackRect) {
 
   // Audio behavior
   stopVowelSustain();
+  if (sbPendingCompleteTimer) {
+    clearTimeout(sbPendingCompleteTimer);
+    sbPendingCompleteTimer = null;
+  }
 
   if (idx < lastIdx) {
-    // Play the phoneme for the current unit
-    sbPlayPhoneme(phonemes[idx]);
+    // Play a transition sound if available for smoother blending.
+    const prev = idx > 0 ? phonemes[idx - 1] : null;
+    const curr = phonemes[idx];
+    const playedBlend = !!(prev && playStoredAudio([
+      AUDIO_BASE + 'blend_' + prev + curr + '.mp3',
+      AUDIO_BASE + 'blend_' + prev + curr + '.wav',
+    ], 'blend_' + prev + curr));
+    if (!playedBlend) {
+      sbPlayPhoneme(curr);
+    }
 
     // If this unit is a vowel, start sustain loop
-    if (SB_VOWELS.has(phonemes[idx])) {
-      // Small delay so the phoneme plays first
+    if (SB_VOWELS.has(curr)) {
+      // Keep a tiny delay so the attack is intelligible, then hold the vowel.
       setTimeout(() => {
         if (sbScrubbing && sbCurrentSnapIdx === idx) {
-          startVowelSustain(phonemes[idx]);
+          startVowelSustain(curr);
         }
-      }, 250);
+      }, 80);
     }
   } else {
-    // Last index: stop sustain, play full word, trigger success
-    sbCompleteWord();
+    // Last index: let the learner hear the final phoneme before completion.
+    sbPlayPhoneme(phonemes[idx]);
+    sbPendingCompleteTimer = setTimeout(() => {
+      if (!sbSession) return;
+      const liveEntry = sbSession.words[sbSession.currentIdx];
+      if (!liveEntry) return;
+      const stillOnLast = sbCurrentSnapIdx === liveEntry.phonemes.length - 1;
+      if (!liveEntry.blended && stillOnLast) sbCompleteWord();
+    }, 220);
   }
 }
 
