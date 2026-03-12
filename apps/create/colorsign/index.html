@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a1628">
+<title>Color &amp; Sign · Kapework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg:       #0a1628;
+  --surface:  #121e33;
+  --surface2: #1a2a44;
+  --cyan:     #00e5cc;
+  --cyan-dim: rgba(0,229,204,0.15);
+  --text:     #e8edf5;
+  --muted:    rgba(232,237,245,0.5);
+  --border:   rgba(232,237,245,0.08);
+  --border-h: rgba(232,237,245,0.18);
+  --success:  #4ade80;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  min-height: 100dvh;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+
+/* ─── Screen system ──────────────────────────────────────────── */
+.screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.screen.active { display: flex; }
+
+/* ─── Top bar (shared) ───────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 0.15s;
+}
+.back-btn:hover, .back-btn:active { color: var(--text); }
+
+.top-actions { display: flex; gap: 8px; }
+
+.icon-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.icon-btn:hover, .icon-btn:active { color: var(--text); border-color: var(--border-h); }
+
+/* ─── ═══════════════════════════════════════════════════════════
+   SCREEN 1: PICK
+   ══════════════════════════════════════════════════════════════ */
+#screen-pick {
+  padding: 0 0 env(safe-area-inset-bottom, 16px);
+}
+
+.pick-header {
+  text-align: center;
+  padding: 8px 16px 20px;
+  flex-shrink: 0;
+}
+.pick-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.pick-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 16px 20px;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+}
+@media (min-width: 480px) {
+  .template-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 720px) {
+  .template-grid { max-width: 680px; }
+}
+
+.template-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  padding: 16px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.template-card:hover, .template-card:active {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 1px var(--cyan);
+}
+.template-card:active { transform: scale(0.96); }
+
+.template-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.template-preview svg {
+  width: 100%;
+  height: 100%;
+}
+
+.template-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text);
+}
+
+/* gallery link in pick screen */
+.gallery-link-bar {
+  padding: 0 16px 8px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gallery-link-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 8px 20px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.gallery-link-btn:hover { color: var(--text); border-color: var(--border-h); }
+
+/* ─── ═══════════════════════════════════════════════════════════
+   SCREEN 2: COLOR
+   ══════════════════════════════════════════════════════════════ */
+#screen-color {
+  /* full-height flex column */
+}
+
+/* Canvas wrapper: takes remaining vertical space */
+.canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  min-height: 0;
+  position: relative;
+}
+
+.canvas-container {
+  position: relative;
+  /* square, capped by available space */
+  width: min(100%, calc(100dvh - 220px));
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+#drawing-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* SVG template overlay — visible above the canvas, no pointer events */
+.template-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.template-overlay svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────────── */
+.toolbar {
+  flex-shrink: 0;
+  padding: 10px 12px env(safe-area-inset-bottom, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Row 1: tool buttons */
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  height: 44px;
+  padding: 0 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.tool-btn .tool-icon { font-size: 1.1rem; }
+.tool-btn:hover   { color: var(--text); border-color: var(--border-h); }
+.tool-btn.active  {
+  color: var(--bg);
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+/* size dots */
+.size-opts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.size-dot {
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.size-dot.active {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  transform: scale(1.2);
+}
+
+/* Row 2: colour palette */
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.palette-row::-webkit-scrollbar { display: none; }
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.color-swatch:hover  { transform: scale(1.15); }
+.color-swatch.active {
+  border-color: #fff;
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #fff;
+}
+
+/* Row 3: action buttons */
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  height: 44px;
+  padding: 0 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--border-h); }
+
+.btn-primary {
+  background: var(--cyan);
+  border: none;
+  border-radius: 12px;
+  color: var(--bg);
+  height: 44px;
+  padding: 0 20px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-left: auto;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:active { opacity: 0.75; transform: scale(0.97); }
+
+/* ─── iPad / desktop layout ─────────────────────────────────── */
+@media (min-width: 680px) and (min-height: 500px) {
+  #screen-color {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+  /* top bar spans full width */
+  #screen-color .top-bar {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    padding: 0 0 12px 16px;
+    align-items: flex-start;
+    padding-top: 0;
+  }
+  .canvas-container {
+    width: min(100%, calc(100dvh - 160px));
+  }
+
+  .toolbar {
+    width: 200px;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 0 16px env(safe-area-inset-bottom, 16px);
+    gap: 12px;
+  }
+
+  .tool-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .tool-btn { width: 100%; justify-content: flex-start; }
+
+  .size-opts {
+    margin-left: 0;
+    justify-content: flex-start;
+    padding: 4px 0;
+  }
+
+  .palette-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    overflow-x: unset;
+    flex-wrap: wrap;
+  }
+  .color-swatch { width: 100%; height: 0; padding-bottom: 100%; border-radius: 10px; }
+
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: auto;
+  }
+  .btn-primary, .btn-secondary { margin-left: 0; width: 100%; justify-content: center; }
+}
+
+/* ─── ═══════════════════════════════════════════════════════════
+   SCREEN 3: SIGN
+   ══════════════════════════════════════════════════════════════ */
+#screen-sign {
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+.sign-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  width: 100%;
+  max-width: 520px;
+  flex: 1;
+}
+
+.sign-artwork {
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  flex-shrink: 0;
+}
+.sign-artwork img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sign-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 700;
+  align-self: flex-start;
+}
+
+.sign-canvas-wrap {
+  width: 100%;
+  max-width: 340px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  position: relative;
+}
+#sign-canvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sign-clear-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: rgba(0,0,0,0.12);
+  border: none;
+  border-radius: 6px;
+  color: rgba(0,0,0,0.45);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.sign-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+.sign-actions .btn-secondary { flex: 1; justify-content: center; }
+.sign-actions .btn-primary   { flex: 2; justify-content: center; }
+
+/* ─── ═══════════════════════════════════════════════════════════
+   SCREEN 4: GALLERY
+   ══════════════════════════════════════════════════════════════ */
+#screen-gallery {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+.gallery-header {
+  padding: 4px 16px 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.gallery-title { font-size: 1.3rem; font-weight: 800; }
+.gallery-sub   { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  padding: 0 16px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+}
+@media (min-width: 480px) {
+  .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 720px) {
+  .gallery-grid { grid-template-columns: repeat(4, 1fr); max-width: 680px; }
+}
+
+.gallery-item {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.gallery-item:hover { transform: scale(1.03); }
+.gallery-item:active { transform: scale(0.97); }
+
+.gallery-item img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-item-del {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 28px; height: 28px;
+  background: rgba(10,22,40,0.7);
+  border: none;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 0.8rem;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  backdrop-filter: blur(4px);
+}
+.gallery-item:hover .gallery-item-del { opacity: 1; }
+/* always visible on touch */
+@media (hover: none) {
+  .gallery-item-del { opacity: 0.7; }
+}
+
+.gallery-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  padding: 48px 0;
+  font-size: 0.9rem;
+}
+
+.gallery-actions {
+  padding: 16px 16px 0;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn-make-more {
+  background: var(--cyan);
+  border: none;
+  border-radius: 12px;
+  color: var(--bg);
+  height: 48px;
+  padding: 0 28px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  transition: opacity 0.15s;
+}
+.btn-make-more:hover { opacity: 0.88; }
+
+/* ─── Lightbox ───────────────────────────────────────────────── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,22,40,0.92);
+  backdrop-filter: blur(6px);
+  z-index: 500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+  max-width: min(100%, 480px);
+  max-height: 80dvh;
+  border-radius: 16px;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px; right: 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border-h);
+  border-radius: 10px;
+  color: var(--text);
+  width: 40px; height: 40px;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCREEN 1: PICK A PICTURE
+     ═══════════════════════════════════════════════════════════ -->
+<section id="screen-pick" class="screen active" aria-label="Choose a picture">
+
+  <div class="top-bar">
+    <a class="back-btn" href="../">← Create</a>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-open-gallery" aria-label="My gallery" title="My gallery">🖼</button>
+    </div>
+  </div>
+
+  <div class="pick-header">
+    <div class="pick-title">Pick a picture</div>
+    <div class="pick-sub">Tap one to start colouring</div>
+  </div>
+
+  <div class="template-grid" id="template-grid">
+    <!-- filled by JS -->
+  </div>
+
+  <div class="gallery-link-bar">
+    <button class="gallery-link-btn" id="btn-gallery-link">🖼 My artwork</button>
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCREEN 2: COLOUR IT
+     ═══════════════════════════════════════════════════════════ -->
+<section id="screen-color" class="screen" aria-label="Colour your picture">
+
+  <div class="top-bar">
+    <button class="back-btn" id="btn-color-back">← Pick</button>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-undo" aria-label="Undo" title="Undo">↩</button>
+      <button class="icon-btn" id="btn-clear" aria-label="Clear" title="Clear all">✕</button>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="canvas-container" id="canvas-container">
+      <canvas id="drawing-canvas"></canvas>
+      <div class="template-overlay" id="template-overlay" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+
+    <!-- Tool + size row -->
+    <div class="tool-row">
+      <button class="tool-btn active" id="btn-brush" aria-pressed="true">
+        <span class="tool-icon">🖌</span> Brush
+      </button>
+      <button class="tool-btn" id="btn-eraser" aria-pressed="false">
+        <span class="tool-icon">⬜</span> Erase
+      </button>
+      <div class="size-opts" id="size-opts">
+        <div class="size-dot active" data-size="10" style="width:12px;height:12px;" title="Small"></div>
+        <div class="size-dot"        data-size="22" style="width:20px;height:20px;" title="Medium"></div>
+        <div class="size-dot"        data-size="40" style="width:28px;height:28px;" title="Large"></div>
+      </div>
+    </div>
+
+    <!-- Colour palette -->
+    <div class="palette-row" id="palette-row" role="group" aria-label="Colour palette">
+      <!-- filled by JS -->
+    </div>
+
+    <!-- Finish row -->
+    <div class="action-row">
+      <button class="btn-primary" id="btn-next-sign">Sign it →</button>
+    </div>
+
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCREEN 3: SIGN YOUR NAME
+     ═══════════════════════════════════════════════════════════ -->
+<section id="screen-sign" class="screen" aria-label="Sign your name">
+
+  <div class="top-bar">
+    <button class="back-btn" id="btn-sign-back">← Colour</button>
+  </div>
+
+  <div class="sign-layout">
+
+    <div class="sign-artwork">
+      <img id="sign-preview" src="" alt="Your coloured picture">
+    </div>
+
+    <div class="sign-label">Sign your name ✍️</div>
+
+    <div class="sign-canvas-wrap">
+      <canvas id="sign-canvas"></canvas>
+      <button class="sign-clear-btn" id="btn-sign-clear">clear</button>
+    </div>
+
+    <div class="sign-actions">
+      <button class="btn-secondary" id="btn-skip-sign">Skip</button>
+      <button class="btn-primary"   id="btn-save">Save it 💾</button>
+    </div>
+
+  </div>
+
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCREEN 4: GALLERY
+     ═══════════════════════════════════════════════════════════ -->
+<section id="screen-gallery" class="screen" aria-label="Your gallery">
+
+  <div class="top-bar">
+    <button class="back-btn" id="btn-gallery-back">← Pick</button>
+  </div>
+
+  <div class="gallery-header">
+    <div class="gallery-title">My Artwork 🖼</div>
+    <div class="gallery-sub" id="gallery-sub">Your saved pictures</div>
+  </div>
+
+  <div class="gallery-actions">
+    <button class="btn-make-more" id="btn-make-more">Make something new +</button>
+  </div>
+
+  <div class="gallery-grid" id="gallery-grid">
+    <!-- filled by JS -->
+  </div>
+
+</section>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="View picture">
+  <img id="lightbox-img" src="" alt="">
+  <button class="lightbox-close" id="lightbox-close" aria-label="Close">✕</button>
+</div>
+
+<script>
+'use strict';
+
+/* ─── SVG Templates ──────────────────────────────────────────── */
+const TEMPLATES = [
+  {
+    id: 'rainbow',
+    name: 'Rainbow',
+    emoji: '🌈',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Rainbow arcs -->
+  <path d="M 30 345 A 170 150 0 0 1 370 345" stroke-width="7"/>
+  <path d="M 64 345 A 136 120 0 0 1 336 345" stroke-width="7"/>
+  <path d="M 98 345 A 102 90 0 0 1 302 345"  stroke-width="7"/>
+  <path d="M 132 345 A 68 60 0 0 1 268 345"  stroke-width="7"/>
+  <path d="M 166 345 A 34 30 0 0 1 234 345"  stroke-width="7"/>
+  <!-- Left cloud -->
+  <ellipse cx="58"  cy="260" rx="42" ry="28" stroke-width="6"/>
+  <ellipse cx="26"  cy="278" rx="28" ry="22" stroke-width="6"/>
+  <ellipse cx="90"  cy="280" rx="28" ry="20" stroke-width="6"/>
+  <!-- Right cloud -->
+  <ellipse cx="342" cy="260" rx="42" ry="28" stroke-width="6"/>
+  <ellipse cx="310" cy="278" rx="28" ry="22" stroke-width="6"/>
+  <ellipse cx="374" cy="280" rx="28" ry="20" stroke-width="6"/>
+  <!-- Sun -->
+  <circle cx="320" cy="85" r="38" stroke-width="6"/>
+  <line x1="320" y1="32" x2="320" y2="22" stroke-width="5"/>
+  <line x1="320" y1="138" x2="320" y2="148" stroke-width="5"/>
+  <line x1="267" y1="85" x2="257" y2="85" stroke-width="5"/>
+  <line x1="373" y1="85" x2="383" y2="85" stroke-width="5"/>
+  <line x1="283" y1="48" x2="276" y2="41" stroke-width="5"/>
+  <line x1="357" y1="122" x2="364" y2="129" stroke-width="5"/>
+  <line x1="357" y1="48" x2="364" y2="41" stroke-width="5"/>
+  <line x1="283" y1="122" x2="276" y2="129" stroke-width="5"/>
+</svg>`
+  },
+  {
+    id: 'rocket',
+    name: 'Rocket',
+    emoji: '🚀',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Body -->
+  <rect x="148" y="165" width="104" height="130" rx="12" stroke-width="7"/>
+  <!-- Nose cone -->
+  <path d="M 148 175 Q 148 60 200 38 Q 252 60 252 175" stroke-width="7"/>
+  <!-- Window -->
+  <circle cx="200" cy="225" r="30" stroke-width="7"/>
+  <!-- Left fin -->
+  <path d="M 148 275 L 92 330 L 148 310" stroke-width="7"/>
+  <!-- Right fin -->
+  <path d="M 252 275 L 308 330 L 252 310" stroke-width="7"/>
+  <!-- Flames -->
+  <path d="M 172 295 Q 180 355 200 370 Q 220 355 228 295" stroke-width="7"/>
+  <path d="M 162 295 Q 165 342 184 360" stroke-width="6"/>
+  <path d="M 238 295 Q 235 342 216 360" stroke-width="6"/>
+  <!-- Stars -->
+  <text x="42"  y="75"  font-size="22" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="330" y="160" font-size="16" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="34"  y="200" font-size="14" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="345" y="80"  font-size="12" stroke="none" fill="#1a1a2e">✦</text>
+</svg>`
+  },
+  {
+    id: 'fish',
+    name: 'Fish',
+    emoji: '🐟',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Body -->
+  <ellipse cx="175" cy="210" rx="130" ry="92" stroke-width="7"/>
+  <!-- Tail -->
+  <path d="M 304 210 L 378 148 L 362 210 L 378 272 Z" stroke-width="7"/>
+  <!-- Eye -->
+  <circle cx="108" cy="184" r="20" stroke-width="6"/>
+  <circle cx="113" cy="179" r="7" fill="#1a1a2e" stroke="none"/>
+  <!-- Top fin -->
+  <path d="M 150 118 Q 196 76 245 112" stroke-width="7"/>
+  <!-- Bottom fin -->
+  <path d="M 155 302 Q 190 336 230 305" stroke-width="6"/>
+  <!-- Smile -->
+  <path d="M 90 228 Q 112 248 134 228" stroke-width="6"/>
+  <!-- Scales -->
+  <path d="M 165 162 Q 192 180 165 198" stroke-width="5"/>
+  <path d="M 212 156 Q 238 174 212 192" stroke-width="5"/>
+  <path d="M 185 196 Q 212 214 185 232" stroke-width="5"/>
+  <path d="M 232 194 Q 256 212 232 230" stroke-width="5"/>
+  <!-- Bubbles -->
+  <circle cx="60"  cy="140" r="10" stroke-width="5"/>
+  <circle cx="44"  cy="112" r="7"  stroke-width="5"/>
+  <circle cx="70"  cy="88"  r="5"  stroke-width="5"/>
+</svg>`
+  },
+  {
+    id: 'car',
+    name: 'Car',
+    emoji: '🚗',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Body -->
+  <path d="M 28 255 L 28 208 Q 28 192 46 192 L 108 192 L 148 148 L 282 148 L 346 192 L 368 192 Q 384 192 384 210 L 384 255 Z" stroke-width="7"/>
+  <!-- Left wheel well cutout arc -->
+  <path d="M 52 255 A 56 56 0 0 1 164 255" stroke-width="7"/>
+  <!-- Right wheel well cutout arc -->
+  <path d="M 236 255 A 56 56 0 0 1 348 255" stroke-width="7"/>
+  <!-- Left wheel -->
+  <circle cx="108" cy="268" r="40" stroke-width="7"/>
+  <circle cx="108" cy="268" r="16" stroke-width="5"/>
+  <!-- Right wheel -->
+  <circle cx="292" cy="268" r="40" stroke-width="7"/>
+  <circle cx="292" cy="268" r="16" stroke-width="5"/>
+  <!-- Window -->
+  <path d="M 155 153 L 134 192 L 268 192 L 278 153 Z" stroke-width="6"/>
+  <!-- Door line -->
+  <line x1="200" y1="192" x2="200" y2="252" stroke-width="5"/>
+  <!-- Door handle -->
+  <line x1="190" y1="222" x2="172" y2="222" stroke-width="5"/>
+  <!-- Headlight -->
+  <ellipse cx="368" cy="220" rx="10" ry="8" stroke-width="5"/>
+  <!-- Tail light -->
+  <rect x="29" y="210" width="8" height="14" rx="3" stroke-width="5"/>
+</svg>`
+  },
+  {
+    id: 'cat',
+    name: 'Cat',
+    emoji: '🐱',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Head -->
+  <circle cx="200" cy="228" r="136" stroke-width="7"/>
+  <!-- Left ear -->
+  <path d="M 90 126 L 66 48 L 152 102" stroke-width="7"/>
+  <!-- Right ear -->
+  <path d="M 310 126 L 334 48 L 248 102" stroke-width="7"/>
+  <!-- Left ear inner -->
+  <path d="M 100 118 L 82 64 L 145 102" stroke-width="4"/>
+  <!-- Right ear inner -->
+  <path d="M 300 118 L 318 64 L 255 102" stroke-width="4"/>
+  <!-- Left eye -->
+  <ellipse cx="158" cy="196" rx="28" ry="24" stroke-width="6"/>
+  <ellipse cx="158" cy="196" rx="11" ry="20" fill="#1a1a2e" stroke="none"/>
+  <!-- Right eye -->
+  <ellipse cx="242" cy="196" rx="28" ry="24" stroke-width="6"/>
+  <ellipse cx="242" cy="196" rx="11" ry="20" fill="#1a1a2e" stroke="none"/>
+  <!-- Nose -->
+  <path d="M 200 246 L 188 262 L 212 262 Z" fill="#1a1a2e" stroke="none"/>
+  <!-- Mouth -->
+  <path d="M 188 262 Q 200 280 212 262" stroke-width="5"/>
+  <!-- Whiskers left -->
+  <line x1="48"  y1="252" x2="178" y2="256" stroke-width="4"/>
+  <line x1="48"  y1="270" x2="178" y2="268" stroke-width="4"/>
+  <line x1="52"  y1="288" x2="178" y2="282" stroke-width="4"/>
+  <!-- Whiskers right -->
+  <line x1="352" y1="252" x2="222" y2="256" stroke-width="4"/>
+  <line x1="352" y1="270" x2="222" y2="268" stroke-width="4"/>
+  <line x1="348" y1="288" x2="222" y2="282" stroke-width="4"/>
+</svg>`
+  },
+  {
+    id: 'dog',
+    name: 'Dog',
+    emoji: '🐶',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Head -->
+  <ellipse cx="200" cy="200" rx="130" ry="118" stroke-width="7"/>
+  <!-- Left floppy ear -->
+  <path d="M 84 148 Q 36 168 38 255 Q 40 310 86 298 Q 112 290 108 248 Q 108 192 96 152" stroke-width="7"/>
+  <!-- Right floppy ear -->
+  <path d="M 316 148 Q 364 168 362 255 Q 360 310 314 298 Q 288 290 292 248 Q 292 192 304 152" stroke-width="7"/>
+  <!-- Left eye -->
+  <circle cx="158" cy="176" r="24" stroke-width="6"/>
+  <circle cx="164" cy="170" r="10" fill="#1a1a2e" stroke="none"/>
+  <!-- Right eye -->
+  <circle cx="242" cy="176" r="24" stroke-width="6"/>
+  <circle cx="248" cy="170" r="10" fill="#1a1a2e" stroke="none"/>
+  <!-- Snout -->
+  <ellipse cx="200" cy="242" rx="46" ry="34" stroke-width="6"/>
+  <!-- Nose -->
+  <ellipse cx="200" cy="228" rx="26" ry="18" fill="#1a1a2e" stroke="none"/>
+  <!-- Mouth -->
+  <path d="M 172 254 Q 200 278 228 254" stroke-width="6"/>
+  <!-- Tongue -->
+  <path d="M 192 264 Q 200 286 208 264" stroke-width="5"/>
+  <!-- Eyebrow left -->
+  <ellipse cx="158" cy="150" rx="12" ry="5" fill="#1a1a2e" stroke="none"/>
+  <!-- Eyebrow right -->
+  <ellipse cx="242" cy="150" rx="12" ry="5" fill="#1a1a2e" stroke="none"/>
+</svg>`
+  },
+  {
+    id: 'dinosaur',
+    name: 'Dino',
+    emoji: '🦕',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Body -->
+  <ellipse cx="230" cy="256" rx="118" ry="86" stroke-width="7"/>
+  <!-- Neck -->
+  <path d="M 148 210 Q 136 152 154 108 L 206 124 Q 190 162 192 200" stroke-width="7"/>
+  <!-- Head -->
+  <path d="M 154 110 L 186 78 L 268 88 L 276 128 L 216 136 Z" stroke-width="7"/>
+  <!-- Eye -->
+  <circle cx="240" cy="100" r="13" stroke-width="5"/>
+  <circle cx="243"  cy="97"  r="5"  fill="#1a1a2e" stroke="none"/>
+  <!-- Teeth top -->
+  <path d="M 246 128 L 252 144 L 240 128" fill="#1a1a2e" stroke="none"/>
+  <path d="M 266 126 L 272 140 L 260 126" fill="#1a1a2e" stroke="none"/>
+  <!-- Small arm -->
+  <path d="M 195 222 L 162 252 L 180 258" stroke-width="6"/>
+  <line x1="162" y1="252" x2="152" y2="266" stroke-width="5"/>
+  <line x1="162" y1="252" x2="158" y2="268" stroke-width="5"/>
+  <!-- Left leg -->
+  <path d="M 206 338 L 198 378 L 180 386 L 240 386 L 238 374 L 224 342" stroke-width="7"/>
+  <!-- Right leg -->
+  <path d="M 268 336 L 278 376 L 262 386 L 322 386 L 320 372 L 302 338" stroke-width="7"/>
+  <!-- Tail -->
+  <path d="M 345 286 Q 390 268 396 236 Q 400 208 374 198" stroke-width="7" stroke-linecap="round"/>
+  <!-- Back spikes -->
+  <path d="M 248 174 L 260 146 L 274 172" stroke-width="6"/>
+  <path d="M 280 166 L 296 136 L 312 164" stroke-width="6"/>
+  <path d="M 314 178 L 332 150 L 346 176" stroke-width="6"/>
+</svg>`
+  },
+  {
+    id: 'unicorn',
+    name: 'Unicorn',
+    emoji: '🦄',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none" stroke="#1a1a2e" stroke-linecap="round" stroke-linejoin="round">
+  <rect width="400" height="400" fill="white" stroke="none"/>
+  <!-- Neck / chest -->
+  <path d="M 120 390 L 148 278 Q 162 240 188 228 L 208 390 Z" stroke-width="7"/>
+  <!-- Head -->
+  <ellipse cx="252" cy="196" rx="102" ry="82" stroke-width="7"/>
+  <!-- Snout bump -->
+  <path d="M 332 214 Q 368 228 356 260 Q 344 282 312 276 Q 292 270 295 248" stroke-width="6"/>
+  <!-- Nostril -->
+  <ellipse cx="346" cy="258" rx="8" ry="6" fill="#1a1a2e" stroke="none"/>
+  <!-- Eye -->
+  <ellipse cx="222" cy="178" rx="22" ry="20" stroke-width="6"/>
+  <ellipse cx="226" cy="174" rx="10" ry="10" fill="#1a1a2e" stroke="none"/>
+  <!-- Eyelash -->
+  <line x1="204" y1="162" x2="198" y2="154" stroke-width="4"/>
+  <line x1="214" y1="158" x2="210" y2="149" stroke-width="4"/>
+  <!-- Horn -->
+  <path d="M 216 118 L 196 46 L 246 108" stroke-width="7"/>
+  <!-- Horn spiral lines -->
+  <line x1="212" y1="108" x2="198" y2="64" stroke-width="3"/>
+  <!-- Left ear -->
+  <path d="M 172 140 L 160 96 L 210 128" stroke-width="6"/>
+  <!-- Mane strands -->
+  <path d="M 168 136 Q 122 165 118 208 Q 114 248 138 268 Q 152 280 168 268 Q 140 244 144 214 Q 150 180 178 162" stroke-width="8"/>
+  <path d="M 178 142 Q 148 166 148 200 Q 148 232 162 252" stroke-width="5"/>
+  <path d="M 194 132 Q 172 154 172 184 Q 172 212 184 232" stroke-width="5"/>
+  <!-- Stars -->
+  <text x="44"  y="95"  font-size="22" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="338" y="80"  font-size="16" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="36"  y="188" font-size="13" stroke="none" fill="#1a1a2e">✦</text>
+  <text x="344" y="330" font-size="11" stroke="none" fill="#1a1a2e">✦</text>
+</svg>`
+  }
+];
+
+/* ─── Palette ────────────────────────────────────────────────── */
+const PALETTE = [
+  { hex: '#FF3333', label: 'Red'    },
+  { hex: '#FF8800', label: 'Orange' },
+  { hex: '#FFD700', label: 'Yellow' },
+  { hex: '#44CC00', label: 'Lime'   },
+  { hex: '#00BB88', label: 'Teal'   },
+  { hex: '#1188FF', label: 'Blue'   },
+  { hex: '#8833CC', label: 'Purple' },
+  { hex: '#FF44AA', label: 'Pink'   },
+  { hex: '#884411', label: 'Brown'  },
+  { hex: '#FFB3BA', label: 'Blush'  },
+  { hex: '#FFFFFF', label: 'White'  },
+  { hex: '#333333', label: 'Black'  },
+];
+
+/* ─── State ──────────────────────────────────────────────────── */
+const GALLERY_KEY = 'kapework_colorsign_gallery_v1';
+
+let currentTemplate = null;
+let currentColor    = PALETTE[0].hex;
+let brushSize       = 22;
+let toolMode        = 'brush';  // 'brush' | 'eraser'
+let isDrawing       = false;
+let lastX = 0, lastY = 0;
+let undoStack = [];
+
+/* ─── Canvas refs ────────────────────────────────────────────── */
+const drawingCanvas  = document.getElementById('drawing-canvas');
+const drawingCtx     = drawingCanvas.getContext('2d');
+const signCanvas     = document.getElementById('sign-canvas');
+const signCtx        = signCanvas.getContext('2d');
+
+/* ─── DOM refs ───────────────────────────────────────────────── */
+const screens = {
+  pick:    document.getElementById('screen-pick'),
+  color:   document.getElementById('screen-color'),
+  sign:    document.getElementById('screen-sign'),
+  gallery: document.getElementById('screen-gallery'),
+};
+const templateGrid   = document.getElementById('template-grid');
+const paletteRow     = document.getElementById('palette-row');
+const templateOverlay = document.getElementById('template-overlay');
+const signPreview    = document.getElementById('sign-preview');
+const galleryGrid    = document.getElementById('gallery-grid');
+const gallerySub     = document.getElementById('gallery-sub');
+const lightbox       = document.getElementById('lightbox');
+const lightboxImg    = document.getElementById('lightbox-img');
+
+/* ─── Screen navigation ──────────────────────────────────────── */
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* ─── Template grid ──────────────────────────────────────────── */
+function buildTemplateGrid() {
+  templateGrid.innerHTML = '';
+  TEMPLATES.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'template-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', t.name);
+    card.innerHTML = `
+      <div class="template-preview">${t.svg}</div>
+      <div class="template-name">${t.name}</div>
+    `;
+    card.addEventListener('click', () => selectTemplate(t));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') selectTemplate(t); });
+    templateGrid.appendChild(card);
+  });
+}
+
+/* ─── Palette ────────────────────────────────────────────────── */
+function buildPalette() {
+  paletteRow.innerHTML = '';
+  PALETTE.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'color-swatch' + (c.hex === currentColor ? ' active' : '');
+    sw.style.background = c.hex;
+    if (c.hex === '#FFFFFF') sw.style.border = '3px solid rgba(0,0,0,0.2)';
+    sw.setAttribute('role', 'radio');
+    sw.setAttribute('aria-label', c.label);
+    sw.setAttribute('tabindex', '0');
+    sw.addEventListener('click', () => pickColor(c.hex));
+    sw.addEventListener('keydown', e => { if (e.key === 'Enter') pickColor(c.hex); });
+    paletteRow.appendChild(sw);
+  });
+}
+
+function pickColor(hex) {
+  currentColor = hex;
+  toolMode = 'brush';
+  updateToolUI();
+  buildPalette();
+}
+
+/* ─── Tool UI ────────────────────────────────────────────────── */
+function updateToolUI() {
+  document.getElementById('btn-brush').classList.toggle('active', toolMode === 'brush');
+  document.getElementById('btn-eraser').classList.toggle('active', toolMode === 'eraser');
+  document.getElementById('btn-brush').setAttribute('aria-pressed', String(toolMode === 'brush'));
+  document.getElementById('btn-eraser').setAttribute('aria-pressed', String(toolMode === 'eraser'));
+}
+
+document.getElementById('btn-brush').addEventListener('click', () => {
+  toolMode = 'brush';
+  updateToolUI();
+});
+document.getElementById('btn-eraser').addEventListener('click', () => {
+  toolMode = 'eraser';
+  updateToolUI();
+});
+
+document.getElementById('size-opts').addEventListener('click', e => {
+  const dot = e.target.closest('.size-dot');
+  if (!dot) return;
+  brushSize = parseInt(dot.dataset.size);
+  document.querySelectorAll('.size-dot').forEach(d => d.classList.remove('active'));
+  dot.classList.add('active');
+});
+
+/* ─── Canvas setup ───────────────────────────────────────────── */
+function initCanvas() {
+  // Physical resolution 800×800 for quality
+  drawingCanvas.width  = 800;
+  drawingCanvas.height = 800;
+  clearCanvas();
+}
+
+function clearCanvas() {
+  drawingCtx.fillStyle = '#ffffff';
+  drawingCtx.fillRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+}
+
+/* ─── Undo stack ─────────────────────────────────────────────── */
+const MAX_UNDO = 20;
+
+function pushUndo() {
+  undoStack.push(drawingCtx.getImageData(0, 0, drawingCanvas.width, drawingCanvas.height));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  drawingCtx.putImageData(undoStack.pop(), 0, 0);
+}
+
+/* ─── Get canvas coordinates ─────────────────────────────────── */
+function getPoint(e) {
+  const rect   = drawingCanvas.getBoundingClientRect();
+  const scaleX = drawingCanvas.width  / rect.width;
+  const scaleY = drawingCanvas.height / rect.height;
+  const src    = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY,
+  };
+}
+
+/* ─── Drawing ────────────────────────────────────────────────── */
+function startDraw(e) {
+  e.preventDefault();
+  pushUndo();
+  isDrawing = true;
+  const p = getPoint(e);
+  lastX = p.x; lastY = p.y;
+
+  drawingCtx.beginPath();
+  drawingCtx.arc(p.x, p.y, currentRadius(), 0, Math.PI * 2);
+  drawingCtx.fillStyle = toolMode === 'eraser' ? '#ffffff' : currentColor;
+  drawingCtx.fill();
+}
+
+function draw(e) {
+  e.preventDefault();
+  if (!isDrawing) return;
+  const p = getPoint(e);
+
+  drawingCtx.beginPath();
+  drawingCtx.moveTo(lastX, lastY);
+  drawingCtx.lineTo(p.x, p.y);
+  drawingCtx.strokeStyle = toolMode === 'eraser' ? '#ffffff' : currentColor;
+  drawingCtx.lineWidth   = currentRadius() * 2;
+  drawingCtx.lineCap     = 'round';
+  drawingCtx.lineJoin    = 'round';
+  drawingCtx.stroke();
+
+  lastX = p.x; lastY = p.y;
+}
+
+function endDraw(e) {
+  if (e) e.preventDefault();
+  isDrawing = false;
+}
+
+function currentRadius() {
+  // Scale brush to canvas resolution (800px) from the CSS size (~320px typical)
+  const rect = drawingCanvas.getBoundingClientRect();
+  const scale = drawingCanvas.width / rect.width;
+  return (brushSize / 2) * scale;
+}
+
+drawingCanvas.addEventListener('pointerdown',  startDraw, { passive: false });
+drawingCanvas.addEventListener('pointermove',  draw,      { passive: false });
+drawingCanvas.addEventListener('pointerup',    endDraw,   { passive: false });
+drawingCanvas.addEventListener('pointerleave', endDraw,   { passive: false });
+drawingCanvas.addEventListener('pointercancel', endDraw,  { passive: false });
+
+/* ─── Template selection ─────────────────────────────────────── */
+function selectTemplate(t) {
+  currentTemplate = t;
+  undoStack = [];
+
+  // Set SVG overlay
+  templateOverlay.innerHTML = t.svg;
+
+  // Reset drawing canvas
+  initCanvas();
+
+  showScreen('color');
+}
+
+/* ─── Undo / Clear buttons ───────────────────────────────────── */
+document.getElementById('btn-undo').addEventListener('click', undo);
+document.getElementById('btn-clear').addEventListener('click', () => {
+  pushUndo();
+  clearCanvas();
+});
+
+/* ─── Sign canvas setup ──────────────────────────────────────── */
+function initSignCanvas() {
+  const w = signCanvas.parentElement.clientWidth;
+  signCanvas.width  = w * devicePixelRatio;
+  signCanvas.height = 80 * devicePixelRatio;
+  signCanvas.style.height = '80px';
+  signCtx.fillStyle = '#ffffff';
+  signCtx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+}
+
+let signDrawing = false, signLastX = 0, signLastY = 0;
+
+function getSignPoint(e) {
+  const rect   = signCanvas.getBoundingClientRect();
+  const scaleX = signCanvas.width  / rect.width;
+  const scaleY = signCanvas.height / rect.height;
+  const src    = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY,
+  };
+}
+
+signCanvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  signDrawing = true;
+  const p = getSignPoint(e);
+  signLastX = p.x; signLastY = p.y;
+  signCtx.beginPath();
+  signCtx.arc(p.x, p.y, 2 * devicePixelRatio, 0, Math.PI * 2);
+  signCtx.fillStyle = '#1a1a2e';
+  signCtx.fill();
+}, { passive: false });
+
+signCanvas.addEventListener('pointermove', e => {
+  e.preventDefault();
+  if (!signDrawing) return;
+  const p = getSignPoint(e);
+  signCtx.beginPath();
+  signCtx.moveTo(signLastX, signLastY);
+  signCtx.lineTo(p.x, p.y);
+  signCtx.strokeStyle = '#1a1a2e';
+  signCtx.lineWidth   = 3 * devicePixelRatio;
+  signCtx.lineCap     = 'round';
+  signCtx.lineJoin    = 'round';
+  signCtx.stroke();
+  signLastX = p.x; signLastY = p.y;
+}, { passive: false });
+
+signCanvas.addEventListener('pointerup',     () => { signDrawing = false; });
+signCanvas.addEventListener('pointerleave',  () => { signDrawing = false; });
+signCanvas.addEventListener('pointercancel', () => { signDrawing = false; });
+
+document.getElementById('btn-sign-clear').addEventListener('click', () => {
+  signCtx.fillStyle = '#ffffff';
+  signCtx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+});
+
+/* ─── Navigate to sign screen ────────────────────────────────── */
+document.getElementById('btn-next-sign').addEventListener('click', () => {
+  // Snapshot drawing as preview
+  signPreview.src = drawingCanvas.toDataURL('image/png');
+  initSignCanvas();
+  showScreen('sign');
+});
+
+/* ─── Save artwork ───────────────────────────────────────────── */
+function compositeAndSave(includeSignature) {
+  const W = 800, H = includeSignature ? 960 : 800;
+  const out = document.createElement('canvas');
+  out.width  = W;
+  out.height = H;
+  const ctx = out.getContext('2d');
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Drawing layer
+  ctx.drawImage(drawingCanvas, 0, 0, W, 800);
+
+  // SVG template overlay
+  const svgEl = templateOverlay.querySelector('svg');
+  if (svgEl) {
+    const svgStr  = new XMLSerializer().serializeToString(svgEl);
+    const blob    = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url     = URL.createObjectURL(blob);
+    const img     = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, W, 800);
+      URL.revokeObjectURL(url);
+
+      // Signature strip
+      if (includeSignature) {
+        ctx.fillStyle = '#f8f6f2';
+        ctx.fillRect(0, 800, W, 160);
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 800); ctx.lineTo(W, 800); ctx.stroke();
+        // Draw signature scaled up
+        ctx.drawImage(signCanvas, 0, 0, signCanvas.width, signCanvas.height,
+                      40, 830, W - 80, 100);
+      }
+
+      const dataUrl = out.toDataURL('image/png');
+      storeInGallery(dataUrl);
+      renderGallery();
+      showScreen('gallery');
+    };
+    img.onerror = () => {
+      // Fallback: save without SVG overlay
+      const dataUrl = out.toDataURL('image/png');
+      storeInGallery(dataUrl);
+      renderGallery();
+      showScreen('gallery');
+    };
+    img.src = url;
+  } else {
+    const dataUrl = out.toDataURL('image/png');
+    storeInGallery(dataUrl);
+    renderGallery();
+    showScreen('gallery');
+  }
+}
+
+document.getElementById('btn-save').addEventListener('click', () => {
+  compositeAndSave(true);
+});
+document.getElementById('btn-skip-sign').addEventListener('click', () => {
+  compositeAndSave(false);
+});
+
+/* ─── Gallery storage ────────────────────────────────────────── */
+function loadGallery() {
+  try {
+    return JSON.parse(localStorage.getItem(GALLERY_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function storeInGallery(dataUrl) {
+  const gallery = loadGallery();
+  gallery.unshift({ id: Date.now(), dataUrl, savedAt: new Date().toISOString() });
+  if (gallery.length > 24) gallery.length = 24;
+  try {
+    localStorage.setItem(GALLERY_KEY, JSON.stringify(gallery));
+  } catch (e) {
+    // localStorage full — trim aggressively
+    gallery.length = Math.max(1, Math.floor(gallery.length / 2));
+    try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gallery)); } catch {}
+  }
+}
+
+function deleteFromGallery(id) {
+  const gallery = loadGallery().filter(g => g.id !== id);
+  localStorage.setItem(GALLERY_KEY, JSON.stringify(gallery));
+}
+
+/* ─── Gallery render ─────────────────────────────────────────── */
+function renderGallery() {
+  const gallery = loadGallery();
+  gallerySub.textContent = gallery.length
+    ? `${gallery.length} saved picture${gallery.length !== 1 ? 's' : ''}`
+    : 'No pictures yet';
+
+  if (!gallery.length) {
+    galleryGrid.innerHTML = '<div class="gallery-empty">Nothing here yet — make your first picture! 🎨</div>';
+    return;
+  }
+
+  galleryGrid.innerHTML = '';
+  gallery.forEach(item => {
+    const wrap = document.createElement('div');
+    wrap.className = 'gallery-item';
+
+    const img = document.createElement('img');
+    img.src = item.dataUrl;
+    img.alt = 'Saved artwork';
+    img.loading = 'lazy';
+    img.addEventListener('click', () => openLightbox(item.dataUrl));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'gallery-item-del';
+    delBtn.textContent = '✕';
+    delBtn.setAttribute('aria-label', 'Delete');
+    delBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteFromGallery(item.id);
+      renderGallery();
+    });
+
+    wrap.append(img, delBtn);
+    galleryGrid.appendChild(wrap);
+  });
+}
+
+/* ─── Lightbox ───────────────────────────────────────────────── */
+function openLightbox(src) {
+  lightboxImg.src = src;
+  lightbox.classList.add('open');
+}
+function closeLightbox() {
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+}
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+lightbox.addEventListener('click', e => { if (e.target === lightbox) closeLightbox(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+/* ─── Back / nav buttons ─────────────────────────────────────── */
+document.getElementById('btn-color-back').addEventListener('click', () => showScreen('pick'));
+document.getElementById('btn-sign-back').addEventListener('click',  () => showScreen('color'));
+document.getElementById('btn-gallery-back').addEventListener('click', () => showScreen('pick'));
+document.getElementById('btn-make-more').addEventListener('click', () => showScreen('pick'));
+document.getElementById('btn-open-gallery').addEventListener('click', () => { renderGallery(); showScreen('gallery'); });
+document.getElementById('btn-gallery-link').addEventListener('click', () => { renderGallery(); showScreen('gallery'); });
+
+/* ─── Init ───────────────────────────────────────────────────── */
+buildTemplateGrid();
+buildPalette();
+initCanvas();
+</script>
+</body>
+</html>
