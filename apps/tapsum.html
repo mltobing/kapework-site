@@ -19,14 +19,25 @@
   .pill strong{font-weight:800}
   .btn{padding:6px 10px;border-radius:10px;border:1px solid var(--bd);background:#0e1729;color:var(--ink);cursor:pointer}
   .panel{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:12px}
-  .target{display:flex;flex-direction:column;align-items:center;gap:6px;margin:10px 0 6px}
+  .helper{margin:2px 2px 8px;color:var(--muted);font-size:14px}
+  .target{display:flex;flex-direction:column;align-items:center;gap:6px;margin:4px 0 6px;padding:10px;border-radius:14px;background:rgba(125,211,252,.05);border:1px solid rgba(125,211,252,.15)}
   .label{font-size:12px;color:var(--muted)}
   .target .num{font-size:48px;font-weight:800;letter-spacing:.5px}
+  .live{display:flex;flex-direction:column;gap:4px;align-items:center;padding:6px 0 2px}
+  .expr{min-height:20px;font-size:14px;color:var(--muted)}
+  .total{font-size:20px;font-weight:700}
+  .delta{font-size:14px;color:var(--muted);transition:color .12s ease, transform .12s ease}
+  .delta.exact{color:var(--ok);transform:scale(1.03)}
+  .delta.over{color:var(--err)}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 8px}
   .cell{height:100px;border-radius:16px;border:1px solid var(--bd);background:rgba(255,255,255,.02);
-        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;cursor:pointer;user-select:none;transition:transform .06s ease, background .06s}
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;cursor:pointer;user-select:none;transition:transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease}
   .cell:active{transform:scale(.98)}
-  .cell.sel{outline:2px solid var(--accent);background:rgba(125,211,252,.12)}
+  .cell.sel{border-color:rgba(125,211,252,.75);background:rgba(125,211,252,.16);box-shadow:0 0 0 2px rgba(125,211,252,.18),0 8px 20px rgba(0,0,0,.3);transform:translateY(-1px)}
+  .cell.hit{animation:hitPulse .14s ease}
+  .cell.over{animation:overPulse .14s ease}
+  @keyframes hitPulse { 0%{transform:scale(1)} 50%{transform:scale(1.07)} 100%{transform:scale(1)} }
+  @keyframes overPulse { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
   .sumrow{display:flex;justify-content:center;gap:10px;margin:6px 0 2px;color:var(--muted)}
   .sumrow .v{min-width:2ch;text-align:right;color:var(--ink)}
   .actions{display:flex;gap:10px;justify-content:center;margin-top:14px}
@@ -34,6 +45,12 @@
   button:hover{background:#0f1a2f}
   .toast{height:22px;text-align:center;font-size:14px;color:var(--muted);margin-top:8px}
   .toast.ok{color:var(--ok)} .toast.err{color:var(--err)}
+  .share{display:none;justify-content:center;gap:8px;align-items:center;margin-top:8px}
+  .share.show{display:flex}
+  .share .mini{font-size:12px;color:var(--muted)}
+  .kbd-hint{margin:10px 4px 0;color:var(--muted);font-size:12px;opacity:.7}
+  .summary{margin-top:8px;text-align:center;font-size:12px;color:var(--muted);min-height:18px}
+  @media (max-width:559px){ .kbd-hint{display:none} }
   @media (min-width:560px){ .cell{height:120px} }
 </style>
 </head>
@@ -42,35 +59,41 @@
   <header>
     <h1>TapSum</h1>
     <div class="stats">
-      <span class="pill">Streak <strong id="streak">0</strong></span>
-      <span class="pill">Best <strong id="best">0</strong></span>
-      <span class="pill">Global <strong id="global">0</strong></span>
+      <span class="pill">Today <strong id="today">0</strong></span>
+      <span class="pill">Chain <strong id="streak">0</strong></span>
+      <span class="pill">Best Chain <strong id="best">0</strong></span>
       <button id="ambience" class="btn" title="Ambient sound (calming pad)">🎧</button>
     </div>
   </header>
 
   <div class="panel">
+    <p class="helper">Tap numbers that add exactly to the target.</p>
     <div class="target">
       <div class="label">Target</div>
       <div id="target" class="num">12</div>
+      <div class="live">
+        <div id="expr" class="expr"></div>
+        <div id="sumline" class="total">Total 0</div>
+        <div id="delta" class="delta">Need 12</div>
+      </div>
     </div>
 
     <div id="grid" class="grid" role="group" aria-label="number grid"></div>
 
-    <div class="sumrow">
-      <span class="label">Sum</span>
-      <span id="sum" class="v">0</span>
-    </div>
-
     <div class="actions">
-      <button id="restart" title="Clear picks (Esc / Enter)">Restart</button>
-      <button id="new" title="New round (Enter after win)">New</button>
+      <button id="restart" title="Clear picks (Esc / Enter)">Clear</button>
+      <button id="new" title="New board (Enter after win)">New Board</button>
     </div>
 
     <div id="toast" class="toast" aria-live="polite"></div>
+    <div id="shareRow" class="share">
+      <span class="mini" id="shareText">Share your run</span>
+      <button id="shareBtn" class="btn" type="button">Share</button>
+    </div>
+    <div id="summary" class="summary"></div>
   </div>
 
-  <p class="label" style="margin:10px 4px 0">
+  <p class="kbd-hint">
     Keyboard: <strong>1–9</strong> select, <strong>Backspace</strong> undo, <strong>Esc</strong> clear, <strong>Enter</strong> new.
   </p>
 </div>
@@ -87,22 +110,41 @@
   // --- DOM
   const gridEl = document.getElementById('grid');
   const targetEl = document.getElementById('target');
-  const sumEl = document.getElementById('sum');
+  const sumLineEl = document.getElementById('sumline');
+  const exprEl = document.getElementById('expr');
+  const deltaEl = document.getElementById('delta');
   const restartBtn = document.getElementById('restart');
   const newBtn = document.getElementById('new');
   const toast = document.getElementById('toast');
   const streakEl = document.getElementById('streak');
   const bestEl = document.getElementById('best');
-  const globalEl = document.getElementById('global');
+  const todayEl = document.getElementById('today');
   const ambienceBtn = document.getElementById('ambience');
+  const shareRow = document.getElementById('shareRow');
+  const shareBtn = document.getElementById('shareBtn');
+  const shareText = document.getElementById('shareText');
+  const summaryEl = document.getElementById('summary');
 
   // --- Device/local state
   const DID_KEY = "kapework_did_v1";
   const BEST_KEY = "tapsum_best_streak_v1";
+  const TODAY_KEY = "tapsum_solved_today_v1";
   let deviceId = localStorage.getItem(DID_KEY);
   if (!deviceId) { deviceId = (crypto?.randomUUID?.() || String(Math.random()).slice(2)); localStorage.setItem(DID_KEY, deviceId); }
   let bestLocal = parseInt(localStorage.getItem(BEST_KEY)||"0",10);
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function readTodaySolved(){
+    const data = JSON.parse(localStorage.getItem(TODAY_KEY) || '{}');
+    if (data.date !== todayStr()) return 0;
+    return Number(data.count || 0);
+  }
+  function bumpTodaySolved(){
+    const next = readTodaySolved() + 1;
+    localStorage.setItem(TODAY_KEY, JSON.stringify({ date: todayStr(), count: next }));
+    todayEl.textContent = String(next);
+  }
   bestEl.textContent = bestLocal;
+  todayEl.textContent = String(readTodaySolved());
 
   // --- Game state
   let cells = [];          // [{el,val,selected}]
@@ -110,6 +152,8 @@
   let target = 0;
   let won = false;
   let streak = 0;
+  let runSolved = 0;
+  let runStartAt = Date.now();
   let interacted = false;  // to decide if Restart/New should reset streak
 
   // --- Ambient sound (very soft pad; requires user tap)
@@ -135,11 +179,30 @@
   // --- Helpers
   const rand = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   function updateStreak(v){ streak = v; streakEl.textContent = v; }
+  function shortVibrate(ms){ if (navigator.vibrate) navigator.vibrate(ms); }
+  function fmtSecs(ms){ return Math.max(1, Math.round(ms / 1000)); }
+  function hideShare(){ shareRow.classList.remove('show'); }
+
+  async function shareRun(){
+    const text = `TapSum\n✅ ${runSolved} targets\n⚡ ${fmtSecs(Date.now()-runStartAt)}s\n🔥 Streak ${streak}\n${location.origin + location.pathname}`;
+    try{
+      if (navigator.share){ await navigator.share({ title:'TapSum', text }); return true; }
+      if (navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); toast.textContent = 'Copied run summary.'; toast.className='toast ok'; return true; }
+    }catch(e){ /* noop */ }
+    toast.textContent = 'Share unavailable on this device.'; toast.className='toast err';
+    return false;
+  }
+
+  function showSummary(prefix='Run'){
+    const elapsed = fmtSecs(Date.now()-runStartAt);
+    summaryEl.textContent = `${prefix}: ${runSolved} solved • ${elapsed}s • best chain ${bestLocal}`;
+  }
 
   function genRound(){
     won = false; interacted = false;
     toast.textContent = "";
-    picks = []; sumEl.textContent = "0";
+    picks = [];
+    hideShare();
 
     // Build guaranteed-solvable target: pick 2-4 base numbers
     const must = Array.from({length:rand(2,4)}, ()=>rand(1,9));
@@ -168,14 +231,28 @@
 
   function updateSum(){
     const s = picks.reduce((a,i)=>a+cells[i].val,0);
-    sumEl.textContent = String(s);
+    const expr = picks.map(i=>cells[i].val).join(' + ');
+    exprEl.textContent = expr;
+    sumLineEl.textContent = `Total ${s}`;
+    const delta = target - s;
+    deltaEl.classList.remove('exact','over');
+    if (s === 0){ deltaEl.textContent = `Need ${target}`; }
+    else if (delta > 0){ deltaEl.textContent = `Need ${delta}`; }
+    else if (delta < 0){ deltaEl.textContent = `Over by ${Math.abs(delta)}`; deltaEl.classList.add('over'); }
+    else { deltaEl.textContent = 'Exact'; deltaEl.classList.add('exact'); }
     return s;
   }
 
   async function onWin(){
     won = true;
+    shortVibrate([18,30,18]);
+    cells.forEach(c=>c.el.classList.add('hit'));
+    setTimeout(()=>cells.forEach(c=>c.el.classList.remove('hit')), 150);
+
     updateStreak(streak+1);
-    toast.textContent = "Nice! Starting a new round…";
+    runSolved += 1;
+    bumpTodaySolved();
+    toast.textContent = "Exact! Nice hit.";
     toast.className = "toast ok";
 
     // Personal best (local + cloud)
@@ -190,9 +267,12 @@
           { slug: SLUG, device_id: deviceId, best_streak: bestLocal },
           { onConflict: "slug,device_id" }
         );
-        refreshGlobal();
       }catch(e){ /* ignore */ }
     }
+
+    showSummary('Current run');
+    shareText.textContent = `✅ ${runSolved} targets • ${fmtSecs(Date.now()-runStartAt)}s`;
+    shareRow.classList.add('show');
     setTimeout(genRound, 900);
   }
 
@@ -204,7 +284,13 @@
     else { picks = picks.filter(x=>x!==i); c.el.classList.remove('sel'); }
     const s = updateSum();
     if (s === target){ onWin(); }
-    else if (s > target){ toast.textContent = "Too high – undo or restart."; toast.className = "toast err"; }
+    else if (s > target){
+      shortVibrate(14);
+      c.el.classList.add('over');
+      setTimeout(()=>c.el.classList.remove('over'), 150);
+      toast.textContent = "Over target — undo or clear.";
+      toast.className = "toast err";
+    }
     else { toast.textContent = ""; toast.className = "toast"; }
   }
 
@@ -222,12 +308,22 @@
   }
 
   restartBtn.addEventListener('click', ()=>{
-    if (!won && interacted) updateStreak(0); // break streak if you give up mid-round
+    if (!won && interacted){
+      showSummary('Run ended');
+      updateStreak(0); // break streak if you give up mid-round
+      runSolved = 0;
+      runStartAt = Date.now();
+    }
     picks.forEach(i=>cells[i].el.classList.remove('sel'));
-    cells.forEach(c=>c.selected=false); picks=[]; toast.textContent=""; toast.className="toast"; updateSum();
+    cells.forEach(c=>c.selected=false); picks=[]; toast.textContent=""; toast.className="toast"; updateSum(); hideShare();
   });
   newBtn.addEventListener('click', ()=>{
-    if (!won && interacted) updateStreak(0); // starting fresh mid-round breaks streak
+    if (!won && interacted){
+      showSummary('Run ended');
+      updateStreak(0); // starting fresh mid-round breaks streak
+      runSolved = 0;
+      runStartAt = Date.now();
+    }
     genRound();
   });
 
@@ -244,17 +340,11 @@
     if (e.key==='Enter'){ if (won) newBtn.click(); else restartBtn.click(); }
   });
 
-  async function refreshGlobal(){
-    try{
-      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      const { data } = await sb.from("global_best_scores").select().eq("slug", SLUG).maybeSingle();
-      globalEl.textContent = data?.global_best ?? 0;
-    }catch(e){ /* ignore */ }
-  }
+  shareBtn.addEventListener('click', shareRun);
 
   // init
-  refreshGlobal();
   updateStreak(0);
+  showSummary('Current run');
   genRound();
 })();
 </script>
