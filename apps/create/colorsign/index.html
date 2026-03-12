@@ -693,9 +693,9 @@ button { font: inherit; cursor: pointer; }
         <span class="tool-icon">⬜</span> Erase
       </button>
       <div class="size-opts" id="size-opts">
-        <div class="size-dot active" data-size="10" style="width:12px;height:12px;" title="Small"></div>
-        <div class="size-dot"        data-size="22" style="width:20px;height:20px;" title="Medium"></div>
-        <div class="size-dot"        data-size="40" style="width:28px;height:28px;" title="Large"></div>
+        <div class="size-dot"        data-size="6"  style="width:10px;height:10px;" title="Fine"></div>
+        <div class="size-dot active" data-size="16" style="width:18px;height:18px;" title="Medium"></div>
+        <div class="size-dot"        data-size="34" style="width:26px;height:26px;" title="Thick"></div>
       </div>
     </div>
 
@@ -779,6 +779,18 @@ button { font: inherit; cursor: pointer; }
 
 /* ─── SVG Templates ──────────────────────────────────────────── */
 const TEMPLATES = [
+  {
+    id: 'blank',
+    name: 'Freestyle',
+    emoji: '✏️',
+    // Preview thumbnail shows a dashed frame hint; overlay is cleared entirely
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="white"/>
+  <rect x="20" y="20" width="360" height="360" fill="none" stroke="#d0d0d0" stroke-width="7" stroke-dasharray="24 14" rx="16"/>
+  <line x1="180" y1="200" x2="220" y2="200" stroke="#c8c8c8" stroke-width="8" stroke-linecap="round"/>
+  <line x1="200" y1="180" x2="200" y2="220" stroke="#c8c8c8" stroke-width="8" stroke-linecap="round"/>
+</svg>`
+  },
   {
     id: 'rainbow',
     name: 'Rainbow',
@@ -1060,7 +1072,7 @@ const GALLERY_KEY = 'kapework_colorsign_gallery_v1';
 
 let currentTemplate = null;
 let currentColor    = PALETTE[0].hex;
-let brushSize       = 22;
+let brushSize       = 16;
 let toolMode        = 'brush';  // 'brush' | 'eraser'
 let isDrawing       = false;
 let lastX = 0, lastY = 0;
@@ -1255,8 +1267,13 @@ function selectTemplate(t) {
   currentTemplate = t;
   undoStack = [];
 
-  // Set SVG overlay
-  templateOverlay.innerHTML = t.svg;
+  // Set SVG overlay — strip the white background rect so drawn colours show through.
+  // The drawing canvas itself provides the white background.
+  if (t.id === 'blank') {
+    templateOverlay.innerHTML = '';
+  } else {
+    templateOverlay.innerHTML = t.svg.replace(/<rect[^>]+fill="white"[^>]*\/>/g, '');
+  }
 
   // Reset drawing canvas
   initCanvas();
@@ -1272,21 +1289,30 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 
 /* ─── Sign canvas setup ──────────────────────────────────────── */
+// Fixed internal resolution — avoids the 0-width problem when the
+// screen is still display:none at measurement time.
+const SIGN_W = 800, SIGN_H = 160;
+
 function initSignCanvas() {
-  const w = signCanvas.parentElement.clientWidth;
-  signCanvas.width  = w * devicePixelRatio;
-  signCanvas.height = 80 * devicePixelRatio;
-  signCanvas.style.height = '80px';
+  signCanvas.width  = SIGN_W;
+  signCanvas.height = SIGN_H;
   signCtx.fillStyle = '#ffffff';
-  signCtx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+  signCtx.fillRect(0, 0, SIGN_W, SIGN_H);
+}
+
+// Derive sign line-width from canvas→CSS scale so it looks the same
+// regardless of device pixel ratio or screen size.
+function signLineWidth() {
+  const rect = signCanvas.getBoundingClientRect();
+  return 4 * (SIGN_W / (rect.width || SIGN_W));
 }
 
 let signDrawing = false, signLastX = 0, signLastY = 0;
 
 function getSignPoint(e) {
   const rect   = signCanvas.getBoundingClientRect();
-  const scaleX = signCanvas.width  / rect.width;
-  const scaleY = signCanvas.height / rect.height;
+  const scaleX = SIGN_W / rect.width;
+  const scaleY = SIGN_H / rect.height;
   const src    = e.touches ? e.touches[0] : e;
   return {
     x: (src.clientX - rect.left) * scaleX,
@@ -1300,7 +1326,7 @@ signCanvas.addEventListener('pointerdown', e => {
   const p = getSignPoint(e);
   signLastX = p.x; signLastY = p.y;
   signCtx.beginPath();
-  signCtx.arc(p.x, p.y, 2 * devicePixelRatio, 0, Math.PI * 2);
+  signCtx.arc(p.x, p.y, signLineWidth() / 2, 0, Math.PI * 2);
   signCtx.fillStyle = '#1a1a2e';
   signCtx.fill();
 }, { passive: false });
@@ -1313,7 +1339,7 @@ signCanvas.addEventListener('pointermove', e => {
   signCtx.moveTo(signLastX, signLastY);
   signCtx.lineTo(p.x, p.y);
   signCtx.strokeStyle = '#1a1a2e';
-  signCtx.lineWidth   = 3 * devicePixelRatio;
+  signCtx.lineWidth   = signLineWidth();
   signCtx.lineCap     = 'round';
   signCtx.lineJoin    = 'round';
   signCtx.stroke();
@@ -1326,15 +1352,16 @@ signCanvas.addEventListener('pointercancel', () => { signDrawing = false; });
 
 document.getElementById('btn-sign-clear').addEventListener('click', () => {
   signCtx.fillStyle = '#ffffff';
-  signCtx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+  signCtx.fillRect(0, 0, SIGN_W, SIGN_H);
 });
 
 /* ─── Navigate to sign screen ────────────────────────────────── */
 document.getElementById('btn-next-sign').addEventListener('click', () => {
-  // Snapshot drawing as preview
+  // Show screen first so the sign canvas has layout dimensions,
+  // then initialise (a rAF ensures paint has settled).
   signPreview.src = drawingCanvas.toDataURL('image/png');
-  initSignCanvas();
   showScreen('sign');
+  requestAnimationFrame(initSignCanvas);
 });
 
 /* ─── Save artwork ───────────────────────────────────────────── */
