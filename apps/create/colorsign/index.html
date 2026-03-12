@@ -1355,80 +1355,63 @@ document.getElementById('btn-sign-clear').addEventListener('click', () => {
   signCtx.fillRect(0, 0, SIGN_W, SIGN_H);
 });
 
-/* ─── Navigate to sign screen ────────────────────────────────── */
-document.getElementById('btn-next-sign').addEventListener('click', () => {
-  // Show screen first so the sign canvas has layout dimensions,
-  // then initialise (a rAF ensures paint has settled).
-  signPreview.src = drawingCanvas.toDataURL('image/png');
-  showScreen('sign');
-  requestAnimationFrame(initSignCanvas);
-});
+/* ─── Composite drawing + SVG lines into a single data URL ──────
+   Used for both the sign-screen preview and the final save.       */
+function buildComposite(includeSignature) {
+  return new Promise(resolve => {
+    const W = 800, H = includeSignature ? 960 : 800;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = H;
+    const ctx = out.getContext('2d');
 
-/* ─── Save artwork ───────────────────────────────────────────── */
-function compositeAndSave(includeSignature) {
-  const W = 800, H = includeSignature ? 960 : 800;
-  const out = document.createElement('canvas');
-  out.width  = W;
-  out.height = H;
-  const ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(drawingCanvas, 0, 0, W, 800);
 
-  // White background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
-
-  // Drawing layer
-  ctx.drawImage(drawingCanvas, 0, 0, W, 800);
-
-  // SVG template overlay
-  const svgEl = templateOverlay.querySelector('svg');
-  if (svgEl) {
-    const svgStr  = new XMLSerializer().serializeToString(svgEl);
-    const blob    = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url     = URL.createObjectURL(blob);
-    const img     = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, W, 800);
-      URL.revokeObjectURL(url);
-
-      // Signature strip
+    const svgEl = templateOverlay.querySelector('svg');
+    const finish = () => {
       if (includeSignature) {
         ctx.fillStyle = '#f8f6f2';
         ctx.fillRect(0, 800, W, 160);
         ctx.strokeStyle = '#ddd';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(0, 800); ctx.lineTo(W, 800); ctx.stroke();
-        // Draw signature scaled up
         ctx.drawImage(signCanvas, 0, 0, signCanvas.width, signCanvas.height,
                       40, 830, W - 80, 100);
       }
+      resolve(out.toDataURL('image/png'));
+    };
 
-      const dataUrl = out.toDataURL('image/png');
-      storeInGallery(dataUrl);
-      renderGallery();
-      showScreen('gallery');
-    };
-    img.onerror = () => {
-      // Fallback: save without SVG overlay
-      const dataUrl = out.toDataURL('image/png');
-      storeInGallery(dataUrl);
-      renderGallery();
-      showScreen('gallery');
-    };
+    if (!svgEl) { finish(); return; }
+
+    const svgStr = new XMLSerializer().serializeToString(svgEl);
+    const blob   = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    const url    = URL.createObjectURL(blob);
+    const img    = new Image();
+    img.onload  = () => { ctx.drawImage(img, 0, 0, W, 800); URL.revokeObjectURL(url); finish(); };
+    img.onerror = () => { URL.revokeObjectURL(url); finish(); };
     img.src = url;
-  } else {
-    const dataUrl = out.toDataURL('image/png');
-    storeInGallery(dataUrl);
-    renderGallery();
-    showScreen('gallery');
-  }
+  });
 }
 
-document.getElementById('btn-save').addEventListener('click', () => {
-  compositeAndSave(true);
+/* ─── Navigate to sign screen ────────────────────────────────── */
+document.getElementById('btn-next-sign').addEventListener('click', async () => {
+  showScreen('sign');
+  requestAnimationFrame(initSignCanvas);
+  // Preview shows drawing + template lines (not just the paint layer)
+  signPreview.src = await buildComposite(false);
 });
-document.getElementById('btn-skip-sign').addEventListener('click', () => {
-  compositeAndSave(false);
-});
+
+/* ─── Save artwork ───────────────────────────────────────────── */
+async function compositeAndSave(includeSignature) {
+  const dataUrl = await buildComposite(includeSignature);
+  storeInGallery(dataUrl);
+  renderGallery();
+  showScreen('gallery');
+}
+
+document.getElementById('btn-save').addEventListener('click', () => compositeAndSave(true));
+document.getElementById('btn-skip-sign').addEventListener('click', () => compositeAndSave(false));
 
 /* ─── Gallery storage ────────────────────────────────────────── */
 function loadGallery() {
