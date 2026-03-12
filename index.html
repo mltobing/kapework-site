@@ -129,17 +129,16 @@ button, select, textarea { font: inherit; }
 
 /* ─── Category grid ──────────────────────────────────────────── */
 .cat-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   max-width: 440px;
   margin: 0 auto;
 }
 @media (min-width: 720px) {
   .cat-grid {
-    flex-direction: row;
+    grid-template-columns: repeat(4, 1fr);
     max-width: none;
-    align-items: stretch;
   }
 }
 
@@ -158,9 +157,8 @@ a.cat-card {
   overflow: hidden;
   width: 100%;
 }
-@media (min-width: 720px) {
-  a.cat-card { flex: 1; }
-}
+/* cards stretch to fill their grid cell */
+a.cat-card { width: 100%; }
 a.cat-card::before {
   content: '';
   position: absolute;
@@ -368,6 +366,15 @@ textarea:focus { outline: none; border-color: var(--cyan); }
       </button>
     </a>
 
+    <a class="cat-card" href="apps/create/">
+      <div class="cat-icon">🎨</div>
+      <div class="cat-name">Create</div>
+      <div class="cat-sub">Creative toys and art apps</div>
+      <button type="button" class="card-like" data-slug="create" onclick="event.preventDefault();event.stopPropagation();">
+        <span class="lheart">♡</span><span class="lnum"></span>
+      </button>
+    </a>
+
   </div>
 
   <footer class="site-footer">Kapework &mdash; small games, big ideas</footer>
@@ -438,11 +445,12 @@ const bySlug   = new Map();
 let likeCounts = new Map();
 let playCounts = new Map();
 
-/* The 3 category definitions (for stats display) */
+/* The 4 category definitions (for stats display) */
 const CATEGORIES = [
   { slug: "readysetread",  name: "Ready, Set, Read!", emoji: "📚" },
   { slug: "numbercrunch",  name: "Number Crunch",     emoji: "🔢" },
   { slug: "braingym",      name: "Brain Gym",         emoji: "🧩" },
+  { slug: "create",        name: "Create",            emoji: "🎨" },
 ];
 
 /* ─── DOM refs ──────────────────────────────────────────────── */

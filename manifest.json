@@ -25,5 +25,14 @@
     "tags": ["puzzle","logic","word"],
     "blurb": "Logic and word games: BlinkGrid, Longshot, Tiltrix, Rainbow Rules.",
     "cover_emoji": "🧩"
+  },
+  {
+    "slug": "create",
+    "name": "Create",
+    "url": "apps/create/",
+    "released_at": "2026-03-12",
+    "tags": ["art","creative","kids"],
+    "blurb": "Creative toys and art apps: Color & Sign.",
+    "cover_emoji": "🎨"
   }
 ]
