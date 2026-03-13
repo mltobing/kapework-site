@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Pixel Tiles · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+/* ── Reset & tokens ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --bg:       #0a1628;
+  --surface:  #121e33;
+  --surface2: #1a2a44;
+  --cyan:     #00e5cc;
+  --cyan-dim: rgba(0,229,204,0.15);
+  --text:     #e8edf5;
+  --muted:    rgba(232,237,245,0.5);
+  --border:   rgba(232,237,245,0.08);
+}
+html, body {
+  height: 100%; background: var(--bg);
+  overscroll-behavior: none;
+}
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ── Screens ─────────────────────────────────────────────── */
+.screen        { display: none; }
+.screen.active { display: flex; flex-direction: column; height: 100dvh; }
+
+#screen-draw.active   { align-items: center; }
+#screen-save.active,
+#screen-gallery.active { align-items: center; }
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top, 8px));
+  flex-shrink: 0; width: 100%; max-width: 600px; gap: 6px;
+}
+.back-btn {
+  background: none; border: none; color: var(--muted);
+  font-family: inherit; font-size: 0.9rem; font-weight: 700;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  transition: color 0.15s; text-decoration: none;
+}
+.back-btn:hover, .back-btn:active { color: var(--text); }
+.icon-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--muted);
+  font-family: inherit; font-size: 0.78rem; font-weight: 700;
+  padding: 6px 11px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.icon-btn:hover { color: var(--text); border-color: rgba(232,237,245,0.18); }
+
+/* ── Canvas area ─────────────────────────────────────────── */
+#canvas-wrap {
+  flex: 1; width: 100%; max-width: 600px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px; overflow: hidden; min-height: 0;
+}
+#canvas {
+  display: block; cursor: crosshair; touch-action: none;
+  /* The transparent 1px gaps between cells show the dark bg as grid lines.
+     A subtle shadow frames the whole grid. */
+  box-shadow: 0 0 0 1px rgba(232,237,245,0.07), 0 6px 32px rgba(0,0,0,0.5);
+}
+
+/* ── Controls panel ──────────────────────────────────────── */
+.controls {
+  flex-shrink: 0; width: 100%; max-width: 600px;
+  padding: 7px 14px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+}
+
+/* ── Palette ─────────────────────────────────────────────── *
+   Fixed 6-per-row grid, max 330px.
+   The +1 eraser lives in the util row.                       */
+.color-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  width: 100%; max-width: 330px;
+}
+.swatch {
+  aspect-ratio: 1; border-radius: 6px;
+  border: 2px solid transparent; cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+  min-height: 26px;
+}
+.swatch:hover  { transform: scale(1.1); }
+.swatch.active {
+  border-color: #fff;
+  transform: scale(1.05);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+}
+
+/* ── Utility row ─────────────────────────────────────────── */
+.util-row {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; max-width: 330px; flex-wrap: wrap; justify-content: center;
+}
+.util-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; color: var(--muted);
+  font-family: inherit; font-size: 0.78rem; font-weight: 800;
+  padding: 6px 10px; cursor: pointer; transition: all 0.12s;
+  white-space: nowrap;
+}
+.util-btn:hover     { color: var(--text); border-color: rgba(232,237,245,0.22); }
+.util-btn.active    { background: var(--surface2); border-color: var(--cyan); color: var(--cyan); }
+.util-btn.erase-on  { background: rgba(255,60,60,0.1); border-color: #ff5050; color: #ff5050; }
+/* Divider */
+.util-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+/* ── Save button ─────────────────────────────────────────── */
+.save-btn {
+  width: 100%; max-width: 330px;
+  background: var(--cyan); border: none; border-radius: 14px;
+  color: #0a1628; font-family: inherit; font-size: 1rem; font-weight: 800;
+  padding: 13px; cursor: pointer; transition: filter 0.15s;
+}
+.save-btn:hover { filter: brightness(1.08); }
+
+/* ── Save screen ─────────────────────────────────────────── */
+.save-page {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; width: 100%; max-width: 360px; flex: 1;
+  padding: 24px 24px max(24px, env(safe-area-inset-bottom, 24px));
+}
+.save-emoji  { font-size: 3.5rem; line-height: 1; }
+.save-title  { font-size: 1.6rem; font-weight: 900; text-align: center; }
+.save-preview {
+  width: 140px; height: 140px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 2px solid var(--border); border-radius: 8px;
+  box-shadow: 0 0 24px rgba(0,229,204,0.08);
+}
+.art-input {
+  width: 100%; background: var(--surface2);
+  border: 2px solid var(--border); border-radius: 16px;
+  color: var(--text); font-family: inherit; font-size: 1.2rem; font-weight: 700;
+  padding: 14px 18px; text-align: center; outline: none;
+  -webkit-user-select: text; user-select: text; transition: border-color 0.15s;
+}
+.art-input:focus       { border-color: var(--cyan); }
+.art-input::placeholder { color: var(--muted); font-weight: 400; }
+.save-actions { display: flex; gap: 10px; width: 100%; }
+.btn-secondary {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 14px; color: var(--muted); font-family: inherit;
+  font-size: 0.95rem; font-weight: 700; padding: 14px 0; cursor: pointer; transition: all 0.15s;
+}
+.btn-secondary:hover { color: var(--text); }
+.btn-primary {
+  flex: 2; background: var(--cyan); border: none; border-radius: 14px;
+  color: #0a1628; font-family: inherit; font-size: 0.95rem; font-weight: 800;
+  padding: 14px 0; cursor: pointer; transition: filter 0.15s;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+
+/* ── Gallery screen ──────────────────────────────────────── */
+.gallery-scroll {
+  flex: 1; overflow-y: auto; width: 100%; max-width: 700px;
+  padding: 0 14px max(16px, env(safe-area-inset-bottom, 16px));
+  -webkit-overflow-scrolling: touch;
+}
+.gallery-title {
+  font-size: 1.4rem; font-weight: 900; text-align: center; padding: 4px 0 14px;
+}
+.art-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+.art-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden; cursor: pointer; transition: all 0.15s; position: relative;
+}
+.art-card:hover { border-color: var(--cyan); box-shadow: 0 0 18px var(--cyan-dim); }
+.art-card:active { transform: scale(0.97); }
+.art-card img {
+  width: 100%; aspect-ratio: 1; display: block; object-fit: cover;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.art-card-meta  { padding: 7px 10px 9px; }
+.art-card-name  { font-size: 0.82rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.art-card-date  { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+.art-card-btns  {
+  position: absolute; top: 5px; right: 5px;
+  display: flex; gap: 4px; opacity: 0; transition: opacity 0.12s;
+}
+.art-card:hover .art-card-btns { opacity: 1; }
+.art-card-btn {
+  background: rgba(6,10,20,0.8); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted);
+  font-family: inherit; font-size: 0.68rem; font-weight: 700;
+  padding: 4px 7px; cursor: pointer; transition: all 0.12s;
+}
+.art-card-btn:hover        { color: var(--text); border-color: rgba(232,237,245,0.25); }
+.art-card-btn.del:hover    { color: #ff5050; border-color: #ff5050; background: rgba(255,80,80,0.12); }
+
+.gallery-empty {
+  text-align: center; color: var(--muted);
+  font-size: 1rem; line-height: 1.7; padding: 52px 20px;
+}
+
+/* ── Lightbox ────────────────────────────────────────────── */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: rgba(6,10,20,0.94); align-items: center; justify-content: center;
+  padding: 20px;
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+  max-width: min(90vw, 480px); max-height: 80dvh;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+  border-radius: 8px; box-shadow: 0 0 60px rgba(0,229,204,0.1);
+}
+.lightbox-close {
+  position: absolute; top: 16px; right: 16px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; color: var(--text);
+  width: 40px; height: 40px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 700; transition: all 0.15s;
+}
+.lightbox-close:hover { border-color: var(--cyan); color: var(--cyan); }
+
+.hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     DRAW SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-draw" class="screen active">
+
+  <div class="top-bar">
+    <a class="back-btn" href="../">← Create</a>
+    <button class="icon-btn" id="btn-gallery">🖼 Gallery</button>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="controls">
+
+    <!-- Colour palette: 12 swatches, 2 rows of 6 -->
+    <div class="color-row" id="color-row"></div>
+
+    <!-- Utility row: erase · undo · clear | grid 12 / 16 -->
+    <div class="util-row">
+      <button class="util-btn" id="btn-erase">✕ Erase</button>
+      <button class="util-btn" id="btn-undo">↩ Undo</button>
+      <button class="util-btn" id="btn-clear">Clear</button>
+      <div class="util-divider"></div>
+      <button class="util-btn active" data-grid="16" id="btn-g16">16×16</button>
+      <button class="util-btn"        data-grid="12" id="btn-g12">12×12</button>
+    </div>
+
+    <button class="save-btn" id="btn-save">Save ✨</button>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SAVE SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-save" class="screen">
+  <div class="save-page">
+    <div class="save-emoji">🖼</div>
+    <div class="save-title">Name your picture!</div>
+    <img class="save-preview" id="save-preview" src="" alt="Preview">
+    <input class="art-input" id="art-name" type="text"
+           placeholder="e.g. Rainbow House" maxlength="40"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="save-actions">
+      <button class="btn-secondary" id="btn-save-cancel">Cancel</button>
+      <button class="btn-primary"   id="btn-save-ok">Save it 💾</button>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     GALLERY SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-gallery" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" id="btn-gal-back">← Back</button>
+  </div>
+  <div class="gallery-scroll">
+    <div class="gallery-title">My Pictures 🖼</div>
+    <div class="art-grid" id="art-grid"></div>
+    <p class="gallery-empty hidden" id="gallery-empty">
+      No pictures saved yet.<br>Make something! 🎨
+    </p>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     LIGHTBOX
+     ══════════════════════════════════════════════════════════ -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightbox-close">✕</button>
+  <img id="lightbox-img" src="" alt="Artwork">
+</div>
+
+
+<script src="/shared/subdomain-nav.js"></script>
+<script>
+'use strict';
+
+/* ── Palette ────────────────────────────────────────────────
+   Classic pixel-art colours. Start on red — immediately visible
+   against the warm off-white empty tiles.                    */
+const PALETTE = [
+  '#000000', // black   (outlines, eyes)
+  '#FFFFFF', // white   (highlights, clouds)
+  '#FF3B30', // red     (hearts, apples)
+  '#FF9500', // orange  (pumpkins, sunsets)
+  '#FFCC00', // yellow  (stars, suns)
+  '#34C759', // green   (grass, trees)
+  '#007AFF', // blue    (sky, water)
+  '#5856D6', // indigo  (night sky)
+  '#FF2D55', // pink    (flowers, bows)
+  '#A2845E', // brown   (trunks, fur)
+  '#8E8E93', // grey    (rocks, roads)
+  '#C7C7CC', // silver  (snow, clouds)
+];
+
+/* Empty tile colour — warm off-white, feels like art paper */
+const EMPTY = '#f0ede8';
+
+/* Undo stack limit */
+const MAX_UNDO = 30;
+
+/* ── State ──────────────────────────────────────────────────
+   grid   = flat array, index = row*GRID + col, value = hex or null
+   GRID   = current grid dimension (12 or 16)                */
+let GRID      = 16;
+let grid      = Array(GRID * GRID).fill(null);
+let active    = PALETTE[2];   // red as default colour
+let isErasing = false;
+let history   = [];           // undo stack (copies of grid)
+let cellSize  = 0;            // px per cell, set by resizeCanvas()
+
+/* Painting drag state */
+let painting  = false;
+let lastCell  = -1;           // last painted cell index (dedup)
+
+/* Pending data URL for save screen */
+let pendingDataURL  = null;
+let pendingGridData = null;
+
+/* ── Elements ───────────────────────────────────────────────*/
+const canvas     = document.getElementById('canvas');
+const ctx        = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+
+/* ── Canvas sizing ──────────────────────────────────────────
+   Canvas internal size = cellSize * GRID + 1  (the +1 gives a
+   1-px transparent outer border on the right/bottom edges, so
+   every cell has a uniform 1-px gap on all four sides).
+   The transparent gaps show the dark page background as grid lines.*/
+function resizeCanvas() {
+  if (!canvasWrap.clientWidth || !canvasWrap.clientHeight) return;
+  const pad = 8;
+  const avail = Math.min(
+    canvasWrap.clientWidth  - pad,
+    canvasWrap.clientHeight - pad,
+    560                          // max canvas display size
+  );
+  const cs   = Math.max(14, Math.floor(avail / GRID));
+  if (cs === cellSize) return;
+  cellSize = cs;
+  const sz = cellSize * GRID + 1;
+  canvas.width  = sz;
+  canvas.height = sz;
+  canvas.style.width  = sz + 'px';
+  canvas.style.height = sz + 'px';
+  renderAll();
+}
+
+const ro = new ResizeObserver(resizeCanvas);
+ro.observe(canvasWrap);
+
+/* ── Rendering ──────────────────────────────────────────────
+   clearRect makes every pixel transparent first; then each cell
+   is filled leaving a 1-px transparent gap → dark grid lines.  */
+function renderAll() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let r = 0; r < GRID; r++) {
+    for (let c = 0; c < GRID; c++) {
+      paintPixel(r, c);
+    }
+  }
+}
+
+function paintPixel(r, c) {
+  const x = c * cellSize + 1;
+  const y = r * cellSize + 1;
+  const s = cellSize - 1;      // cell interior size (1-px gap on every edge)
+  ctx.fillStyle = grid[r * GRID + c] || EMPTY;
+  ctx.fillRect(x, y, s, s);
+}
+
+/* ── Pointer → grid cell ────────────────────────────────────*/
+function cellAt(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (canvas.width  / r.width);
+  const y = (e.clientY - r.top)  * (canvas.height / r.height);
+  const col = Math.floor(x / cellSize);
+  const row = Math.floor(y / cellSize);
+  if (row < 0 || row >= GRID || col < 0 || col >= GRID) return -1;
+  return row * GRID + col;
+}
+
+function applyPaint(e) {
+  const idx = cellAt(e);
+  if (idx < 0 || idx === lastCell) return;
+  lastCell = idx;
+  const newColor = isErasing ? null : active;
+  if (grid[idx] === newColor) return;
+  grid[idx] = newColor;
+  paintPixel(Math.floor(idx / GRID), idx % GRID);
+}
+
+/* ── Pointer events ─────────────────────────────────────────*/
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  pushHistory();          // snapshot before any changes this stroke
+  painting  = true;
+  lastCell  = -1;
+  applyPaint(e);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!painting) return;
+  e.preventDefault();
+  applyPaint(e);
+});
+
+canvas.addEventListener('pointerup',     () => { painting = false; lastCell = -1; });
+canvas.addEventListener('pointercancel', () => { painting = false; lastCell = -1; });
+
+/* ── Undo ───────────────────────────────────────────────────*/
+function pushHistory() {
+  history.push([...grid]);
+  if (history.length > MAX_UNDO) history.shift();
+}
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (!history.length) return;
+  grid = history.pop();
+  renderAll();
+});
+
+/* ── Clear ──────────────────────────────────────────────────*/
+document.getElementById('btn-clear').addEventListener('click', () => {
+  pushHistory();
+  grid = Array(GRID * GRID).fill(null);
+  renderAll();
+});
+
+/* ── Build palette ──────────────────────────────────────────*/
+const colorRow = document.getElementById('color-row');
+PALETTE.forEach(col => {
+  const btn = document.createElement('button');
+  btn.className       = 'swatch' + (col === active ? ' active' : '');
+  btn.style.background = col;
+  btn.dataset.color   = col;
+  // White needs a visible border at rest
+  if (col === '#FFFFFF') btn.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.15)';
+  colorRow.appendChild(btn);
+});
+
+colorRow.addEventListener('click', e => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  active    = sw.dataset.color;
+  isErasing = false;
+  syncControls();
+});
+
+/* ── Erase toggle ───────────────────────────────────────────*/
+const eraseBtn = document.getElementById('btn-erase');
+eraseBtn.addEventListener('click', () => {
+  isErasing = !isErasing;
+  syncControls();
+});
+
+function syncControls() {
+  /* Erase button */
+  eraseBtn.classList.toggle('erase-on', isErasing);
+  /* Palette swatches */
+  document.querySelectorAll('.swatch').forEach(s =>
+    s.classList.toggle('active', !isErasing && s.dataset.color === active));
+}
+
+/* ── Grid size toggle ───────────────────────────────────────
+   Changing grid size resets to a blank canvas and clears undo. */
+document.querySelectorAll('[data-grid]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const n = parseInt(btn.dataset.grid);
+    if (n === GRID) return;
+    GRID    = n;
+    grid    = Array(GRID * GRID).fill(null);
+    history = [];
+    document.querySelectorAll('[data-grid]')
+      .forEach(b => b.classList.toggle('active', b === btn));
+    cellSize = 0;           // force resize
+    resizeCanvas();
+  });
+});
+
+/* ── Save flow ──────────────────────────────────────────────*/
+document.getElementById('btn-save').addEventListener('click', () => {
+  pendingGridData = [...grid];
+  pendingDataURL  = makeThumbnail(pendingGridData, GRID, 160);
+  document.getElementById('save-preview').src = pendingDataURL;
+  document.getElementById('art-name').value   = '';
+  showScreen('save');
+  setTimeout(() => document.getElementById('art-name').focus(), 250);
+});
+
+document.getElementById('btn-save-cancel').addEventListener('click', () => {
+  pendingDataURL = pendingGridData = null;
+  showScreen('draw');
+});
+
+document.getElementById('btn-save-ok').addEventListener('click', () => {
+  if (!pendingGridData) { showScreen('draw'); return; }
+  const title   = document.getElementById('art-name').value.trim() || 'My Picture';
+  const gallery = loadGallery();
+  gallery.unshift({
+    id:        String(Date.now()),
+    title,
+    gridData:  pendingGridData,
+    gridSize:  GRID,
+    thumb:     makeThumbnail(pendingGridData, GRID, 96),  // compact PNG for storage
+    created:   Date.now(),
+  });
+  saveGallery(gallery);
+  pendingDataURL = pendingGridData = null;
+  showScreen('draw');
+});
+
+document.getElementById('art-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-save-ok').click();
+});
+
+/* ── Thumbnail generation ───────────────────────────────────
+   Renders a gridData array to a small canvas and returns a PNG
+   data URL.  image-rendering: pixelated in CSS makes it sharp.  */
+function makeThumbnail(gridData, gs, size) {
+  const tc  = document.createElement('canvas');
+  tc.width  = size;
+  tc.height = size;
+  const tc2 = tc.getContext('2d');
+  const cs  = size / gs;                // sub-pixel cell size; use Math.round for crisp edges
+  tc2.fillStyle = EMPTY;
+  tc2.fillRect(0, 0, size, size);
+  gridData.forEach((color, i) => {
+    if (!color) return;
+    const r = Math.floor(i / gs);
+    const c = i % gs;
+    tc2.fillStyle = color;
+    tc2.fillRect(
+      Math.round(c * cs), Math.round(r * cs),
+      Math.round((c + 1) * cs) - Math.round(c * cs),
+      Math.round((r + 1) * cs) - Math.round(r * cs)
+    );
+  });
+  return tc.toDataURL('image/png');    // PNG = lossless, pixel-perfect
+}
+
+/* ── Gallery ────────────────────────────────────────────────*/
+const STORE_KEY = 'kw-pixeltiles-gallery';
+
+function loadGallery() {
+  try   { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveGallery(arr) {
+  try   { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+  catch { /* storage full — fail silently */ }
+}
+
+document.getElementById('btn-gallery').addEventListener('click', () => {
+  renderGallery();
+  showScreen('gallery');
+});
+document.getElementById('btn-gal-back').addEventListener('click', () => showScreen('draw'));
+
+function renderGallery() {
+  const items = loadGallery();
+  const grid_ = document.getElementById('art-grid');
+  const empty = document.getElementById('gallery-empty');
+  grid_.innerHTML = '';
+  if (!items.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'art-card';
+    const date = new Date(item.created).toLocaleDateString(undefined,
+                  { month: 'short', day: 'numeric' });
+    card.innerHTML =
+      `<img src="${item.thumb}" alt="${esc(item.title)}" loading="lazy">` +
+      `<div class="art-card-meta">` +
+        `<div class="art-card-name">${esc(item.title)}</div>` +
+        `<div class="art-card-date">${date} · ${item.gridSize}×${item.gridSize}</div>` +
+      `</div>` +
+      `<div class="art-card-btns">` +
+        `<button class="art-card-btn edit" data-id="${item.id}" title="Edit">Edit</button>` +
+        `<button class="art-card-btn del"  data-id="${item.id}" title="Delete">✕</button>` +
+      `</div>`;
+
+    /* Tap card body → full view lightbox */
+    card.addEventListener('click', e => {
+      if (e.target.closest('.art-card-btn')) return;
+      openLightbox(makeThumbnail(item.gridData, item.gridSize, 512));
+    });
+
+    /* Edit: load into canvas */
+    card.querySelector('.edit').addEventListener('click', e => {
+      e.stopPropagation();
+      loadIntoEditor(item);
+    });
+
+    /* Delete */
+    card.querySelector('.del').addEventListener('click', e => {
+      e.stopPropagation();
+      saveGallery(loadGallery().filter(i => i.id !== item.id));
+      card.remove();
+      if (!document.querySelectorAll('.art-card').length) {
+        document.getElementById('gallery-empty').classList.remove('hidden');
+      }
+    });
+
+    grid_.appendChild(card);
+  });
+}
+
+/* ── Load saved picture into editor ────────────────────────*/
+function loadIntoEditor(item) {
+  const gs = item.gridSize || 16;
+  if (gs !== GRID) {
+    GRID  = gs;
+    history = [];
+    document.querySelectorAll('[data-grid]')
+      .forEach(b => b.classList.toggle('active', parseInt(b.dataset.grid) === GRID));
+    cellSize = 0;       // force resize
+  }
+  grid = [...item.gridData];
+  showScreen('draw');   // triggers resizeCanvas via setTimeout
+}
+
+function esc(s) {
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Lightbox ────────────────────────────────────────────── */
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lightbox-close').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('open');
+});
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+
+/* ── Screen management ───────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  if (id === 'draw') setTimeout(resizeCanvas, 30);
+}
+
+/* ── Init ────────────────────────────────────────────────── */
+syncControls();   // set initial swatch/erase state
+// ResizeObserver fires on first observation and sizes the canvas.
+</script>
+</body>
+</html>
