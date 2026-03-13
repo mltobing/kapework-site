@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Magic Mirror · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+/* ── Reset & tokens ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --bg:       #0a1628;
+  --surface:  #121e33;
+  --surface2: #1a2a44;
+  --cyan:     #00e5cc;
+  --cyan-dim: rgba(0,229,204,0.15);
+  --text:     #e8edf5;
+  --muted:    rgba(232,237,245,0.5);
+  --border:   rgba(232,237,245,0.08);
+}
+html, body {
+  height: 100%; background: var(--bg);
+  overscroll-behavior: none;
+}
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ── Screens ─────────────────────────────────────────────── */
+.screen        { display: none; }
+.screen.active { display: flex; flex-direction: column; height: 100dvh; }
+
+/* ── Draw screen fills full width ───────────────────────── */
+#screen-draw.active { align-items: stretch; }
+
+/* ── All other screens center content ───────────────────── */
+#screen-save.active,
+#screen-gallery.active { align-items: center; }
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top, 8px));
+  flex-shrink: 0; gap: 6px;
+}
+.back-btn {
+  background: none; border: none; color: var(--muted);
+  font-family: inherit; font-size: 0.9rem; font-weight: 700;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  transition: color 0.15s; text-decoration: none; flex-shrink: 0;
+}
+.back-btn:hover, .back-btn:active { color: var(--text); }
+.top-actions { display: flex; gap: 6px; }
+.icon-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--muted);
+  font-family: inherit; font-size: 0.78rem; font-weight: 700;
+  padding: 6px 10px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.icon-btn:hover { color: var(--text); border-color: rgba(232,237,245,0.18); }
+
+/* ── Canvas area ─────────────────────────────────────────── */
+#canvas-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 6px; overflow: hidden; min-height: 0;
+}
+#canvas {
+  display: block; cursor: crosshair; touch-action: none;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(232,237,245,0.06),
+    0 0 60px rgba(0,229,204,0.07);
+}
+
+/* ── Controls panel ──────────────────────────────────────── */
+.controls {
+  flex-shrink: 0; width: 100%;
+  padding: 8px 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+/* Color swatches ── 2 rows on narrow, 1 row on wide */
+.color-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 5px;
+}
+@media (max-width: 500px) {
+  .color-row { grid-template-columns: repeat(6, 1fr); }
+}
+.swatch {
+  aspect-ratio: 1; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+  min-height: 28px;
+}
+.swatch:hover  { transform: scale(1.18); }
+.swatch.active { border-color: #fff; transform: scale(1.12); box-shadow: 0 0 0 2px rgba(255,255,255,0.25); }
+
+/* Options row */
+.opts-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.opt-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.opt-label { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.opt-btns  { display: flex; gap: 3px; }
+.opt-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--muted);
+  font-family: inherit; font-size: 0.78rem; font-weight: 800;
+  padding: 5px 9px; cursor: pointer; transition: all 0.12s;
+  min-width: 32px; text-align: center;
+}
+.opt-btn:hover  { color: var(--text); border-color: rgba(232,237,245,0.2); }
+.opt-btn.active { background: var(--surface2); border-color: var(--cyan); color: var(--cyan); }
+
+.opts-spacer { flex: 1; }
+
+/* Save button */
+.save-btn {
+  width: 100%; background: var(--cyan); border: none; border-radius: 14px;
+  color: #0a1628; font-family: inherit; font-size: 1rem; font-weight: 800;
+  padding: 13px; cursor: pointer; transition: filter 0.15s;
+}
+.save-btn:hover { filter: brightness(1.08); }
+
+/* ── Save screen ─────────────────────────────────────────── */
+.save-page {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; width: 100%; max-width: 380px; flex: 1;
+  padding: 24px 24px max(24px, env(safe-area-inset-bottom, 24px));
+}
+.save-emoji  { font-size: 3.5rem; line-height: 1; }
+.save-title  { font-size: 1.6rem; font-weight: 900; text-align: center; }
+.save-preview {
+  width: 200px; height: 200px; border-radius: 14px; object-fit: cover;
+  border: 1px solid var(--border); box-shadow: 0 0 30px rgba(0,229,204,0.1);
+}
+.art-input {
+  width: 100%; background: var(--surface2);
+  border: 2px solid var(--border); border-radius: 16px;
+  color: var(--text); font-family: inherit; font-size: 1.2rem; font-weight: 700;
+  padding: 14px 18px; text-align: center; outline: none;
+  -webkit-user-select: text; user-select: text; transition: border-color 0.15s;
+}
+.art-input:focus       { border-color: var(--cyan); }
+.art-input::placeholder { color: var(--muted); font-weight: 400; }
+.save-actions { display: flex; gap: 10px; width: 100%; }
+.btn-secondary {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 14px; color: var(--muted); font-family: inherit;
+  font-size: 0.95rem; font-weight: 700; padding: 14px 0; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-secondary:hover { color: var(--text); }
+.btn-primary {
+  flex: 2; background: var(--cyan); border: none; border-radius: 14px;
+  color: #0a1628; font-family: inherit; font-size: 0.95rem; font-weight: 800;
+  padding: 14px 0; cursor: pointer; transition: filter 0.15s;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+
+/* ── Gallery screen ──────────────────────────────────────── */
+.gallery-scroll {
+  flex: 1; overflow-y: auto; width: 100%; max-width: 700px;
+  padding: 0 14px max(16px, env(safe-area-inset-bottom, 16px));
+  -webkit-overflow-scrolling: touch;
+}
+.gallery-title {
+  font-size: 1.4rem; font-weight: 900; text-align: center;
+  padding: 4px 0 14px;
+}
+.art-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.art-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  overflow: hidden; cursor: pointer; transition: all 0.15s; position: relative;
+}
+.art-card:hover { border-color: var(--cyan); box-shadow: 0 0 20px var(--cyan-dim); }
+.art-card:active { transform: scale(0.97); }
+.art-card img   { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
+.art-card-meta  { padding: 8px 10px 10px; }
+.art-card-name  { font-size: 0.82rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.art-card-date  { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+.art-card-del {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(6,10,20,0.75); border: 1px solid var(--border);
+  border-radius: 50%; color: var(--muted); font-size: 0.7rem; font-weight: 700;
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.12s; opacity: 0;
+}
+.art-card:hover .art-card-del { opacity: 1; }
+.art-card-del:hover { color: #ff5050; border-color: #ff5050; background: rgba(255,80,80,0.15); }
+.gallery-empty {
+  text-align: center; color: var(--muted);
+  font-size: 1rem; line-height: 1.7; padding: 52px 20px;
+}
+
+/* ── Lightbox ────────────────────────────────────────────── */
+.lightbox {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: rgba(6,10,20,0.93); align-items: center; justify-content: center;
+  padding: 20px;
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+  max-width: 100%; max-height: 80dvh;
+  border-radius: 16px; box-shadow: 0 0 60px rgba(0,229,204,0.12);
+}
+.lightbox-close {
+  position: absolute; top: 16px; right: 16px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; color: var(--text);
+  width: 40px; height: 40px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 700; transition: all 0.15s;
+}
+.lightbox-close:hover { border-color: var(--cyan); color: var(--cyan); }
+
+.hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     DRAW SCREEN  (always active on load)
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-draw" class="screen active">
+
+  <div class="top-bar">
+    <a class="back-btn" href="../">← Create</a>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-gallery">🖼 Gallery</button>
+      <button class="icon-btn" id="btn-undo">↩ Undo</button>
+      <button class="icon-btn" id="btn-clear">✕ Clear</button>
+    </div>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="controls">
+
+    <!-- Colour swatches -->
+    <div class="color-row" id="color-row"></div>
+
+    <!-- Size / Symmetry / Mirror -->
+    <div class="opts-row">
+      <div class="opt-group">
+        <span class="opt-label">Size</span>
+        <div class="opt-btns" id="size-btns">
+          <button class="opt-btn"        data-size="3">S</button>
+          <button class="opt-btn active" data-size="6">M</button>
+          <button class="opt-btn"        data-size="12">L</button>
+        </div>
+      </div>
+      <div class="opt-group">
+        <span class="opt-label">Sym</span>
+        <div class="opt-btns" id="sym-btns">
+          <button class="opt-btn"        data-sym="4">4</button>
+          <button class="opt-btn"        data-sym="6">6</button>
+          <button class="opt-btn active" data-sym="8">8</button>
+          <button class="opt-btn"        data-sym="12">12</button>
+        </div>
+      </div>
+      <div class="opt-group">
+        <span class="opt-label">Mirror</span>
+        <div class="opt-btns">
+          <button class="opt-btn active" id="btn-mirror">On</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" id="btn-save">Save ✨</button>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SAVE SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-save" class="screen">
+  <div class="save-page">
+    <div class="save-emoji">🪞</div>
+    <div class="save-title">Name your art!</div>
+    <img class="save-preview" id="save-preview" src="" alt="Preview">
+    <input class="art-input" id="art-name" type="text"
+           placeholder="e.g. Rainbow Spiral" maxlength="40"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="save-actions">
+      <button class="btn-secondary" id="btn-save-cancel">Cancel</button>
+      <button class="btn-primary"   id="btn-save-ok">Save it ✨</button>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     GALLERY SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-gallery" class="screen">
+  <div class="top-bar" style="width:100%;max-width:700px;">
+    <button class="back-btn" id="btn-gal-back">← Back</button>
+  </div>
+  <div class="gallery-scroll">
+    <div class="gallery-title">My Art 🪞</div>
+    <div class="art-grid" id="art-grid"></div>
+    <p class="gallery-empty hidden" id="gallery-empty">
+      No art saved yet.<br>Draw something magical! 🪞
+    </p>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     LIGHTBOX  (overlay, not a screen)
+     ══════════════════════════════════════════════════════════ -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightbox-close">✕</button>
+  <img id="lightbox-img" src="" alt="Artwork">
+</div>
+
+
+<script src="/shared/subdomain-nav.js"></script>
+<script>
+'use strict';
+
+/* ── Palette ────────────────────────────────────────────────
+   12 vibrant colours; start on yellow so the first stroke
+   immediately pops against the dark canvas.                  */
+const COLORS = [
+  '#FFD166', // yellow      (default)
+  '#FF6B6B', // red
+  '#FF9E4F', // orange
+  '#C8FF5A', // lime
+  '#7BE87B', // green
+  '#4ECDC4', // teal
+  '#5B9CF6', // blue
+  '#B09FE8', // purple
+  '#FF82C8', // pink
+  '#FF4B91', // hot pink
+  '#FFFFFF', // white
+  '#00e5cc', // kapework cyan
+];
+
+/* ── Drawing state ────────────────────────────────────────── */
+let color     = COLORS[0];
+let brushSize = 6;
+let segments  = 8;
+let useMirror = true;
+
+// Each stroke: { points: [{x,y}…], color, lineWidth, segments, mirror }
+let strokes   = [];
+let current   = null;    // stroke in progress
+let prevPt    = null;
+
+let pendingDataURL = null;
+
+/* ── Canvas elements ──────────────────────────────────────── */
+const canvas     = document.getElementById('canvas');
+const ctx        = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+
+/* ── Resize ───────────────────────────────────────────────── *
+   Keep the canvas square and as large as it can be within its
+   wrapper, capped at 740 px so strokes stay usable on desktop. */
+function resizeCanvas() {
+  const pad  = 12;
+  const size = Math.max(60, Math.min(
+    canvasWrap.clientWidth  - pad,
+    canvasWrap.clientHeight - pad,
+    740
+  ));
+  if (canvas.width === size && canvas.height === size) return;
+  canvas.width = canvas.height = size;
+  fillBg();
+  redrawAll();
+}
+
+const ro = new ResizeObserver(resizeCanvas);
+ro.observe(canvasWrap);
+
+/* ── Background ───────────────────────────────────────────── */
+function fillBg() {
+  ctx.fillStyle = '#060c16';    // near-black with a hint of blue
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+/* ── Core: draw one symmetric segment ────────────────────── *
+   For each of `segs` rotations:
+     - If mirror is on, alternate segments reflect across the
+       x-axis before rotating — creating the classic kaleidoscope
+       "wedge mirror" pattern.
+     - This means adjacent wedges are each other's mirror image.   */
+function drawSeg(p1, p2, col, lw, segs, mir) {
+  const cx   = canvas.width  / 2;
+  const cy   = canvas.height / 2;
+  const step = (Math.PI * 2) / segs;
+
+  const dx1 = p1.x - cx,  dy1 = p1.y - cy;
+  const dx2 = p2.x - cx,  dy2 = p2.y - cy;
+
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = lw;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+
+  for (let k = 0; k < segs; k++) {
+    const a  = k * step;
+    const c  = Math.cos(a),  s = Math.sin(a);
+    // Flip x for odd segments when mirror is active
+    const mx = (mir && k % 2 === 1) ? -1 : 1;
+
+    ctx.beginPath();
+    ctx.moveTo(cx + mx * dx1 * c - dy1 * s,
+               cy + mx * dx1 * s + dy1 * c);
+    ctx.lineTo(cx + mx * dx2 * c - dy2 * s,
+               cy + mx * dx2 * s + dy2 * c);
+    ctx.stroke();
+  }
+}
+
+/* ── Redraw all stored strokes (used after undo / resize) ─── */
+function redrawAll() {
+  fillBg();
+  for (const st of strokes) {
+    for (let i = 1; i < st.points.length; i++) {
+      drawSeg(st.points[i - 1], st.points[i],
+              st.color, st.lineWidth, st.segments, st.mirror);
+    }
+  }
+}
+
+/* ── Pointer position in canvas coordinates ──────────────── */
+function ptFrom(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (canvas.width  / r.width),
+    y: (e.clientY - r.top)  * (canvas.height / r.height),
+  };
+}
+
+/* ── Pointer events ───────────────────────────────────────── */
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  prevPt  = ptFrom(e);
+  current = { points: [{ ...prevPt }], color, lineWidth: brushSize, segments, mirror: useMirror };
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!current) return;
+  e.preventDefault();
+  const pt = ptFrom(e);
+  drawSeg(prevPt, pt, current.color, current.lineWidth, current.segments, current.mirror);
+  current.points.push({ ...pt });
+  prevPt = pt;
+});
+
+canvas.addEventListener('pointerup',     endStroke);
+canvas.addEventListener('pointercancel', endStroke);
+
+function endStroke() {
+  if (!current) return;
+  // Single tap: draw a small dot so tapping always produces something
+  if (current.points.length === 1) {
+    const tp = { x: prevPt.x + 0.1, y: prevPt.y + 0.1 };
+    drawSeg(prevPt, tp, current.color, current.lineWidth, current.segments, current.mirror);
+    current.points.push(tp);
+  }
+  strokes.push(current);
+  current = null;
+  prevPt  = null;
+}
+
+/* ── Build colour swatches ────────────────────────────────── */
+const colorRow = document.getElementById('color-row');
+COLORS.forEach(col => {
+  const sw = document.createElement('button');
+  sw.className    = 'swatch' + (col === color ? ' active' : '');
+  sw.style.background = col;
+  sw.dataset.color    = col;
+  colorRow.appendChild(sw);
+});
+
+colorRow.addEventListener('click', e => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  color = sw.dataset.color;
+  document.querySelectorAll('.swatch').forEach(s =>
+    s.classList.toggle('active', s.dataset.color === color));
+});
+
+/* ── Brush size ───────────────────────────────────────────── */
+document.getElementById('size-btns').addEventListener('click', e => {
+  const btn = e.target.closest('[data-size]');
+  if (!btn) return;
+  brushSize = parseInt(btn.dataset.size);
+  document.querySelectorAll('#size-btns .opt-btn')
+    .forEach(b => b.classList.toggle('active', b === btn));
+});
+
+/* ── Symmetry ─────────────────────────────────────────────── */
+document.getElementById('sym-btns').addEventListener('click', e => {
+  const btn = e.target.closest('[data-sym]');
+  if (!btn) return;
+  segments = parseInt(btn.dataset.sym);
+  document.querySelectorAll('#sym-btns .opt-btn')
+    .forEach(b => b.classList.toggle('active', b === btn));
+});
+
+/* ── Mirror toggle ────────────────────────────────────────── */
+document.getElementById('btn-mirror').addEventListener('click', function () {
+  useMirror = !useMirror;
+  this.textContent = useMirror ? 'On' : 'Off';
+  this.classList.toggle('active', useMirror);
+});
+
+/* ── Undo ─────────────────────────────────────────────────── */
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (!strokes.length) return;
+  strokes.pop();
+  redrawAll();
+});
+
+/* ── Clear ────────────────────────────────────────────────── */
+document.getElementById('btn-clear').addEventListener('click', () => {
+  strokes = [];
+  fillBg();
+});
+
+/* ── Save flow ────────────────────────────────────────────── */
+document.getElementById('btn-save').addEventListener('click', () => {
+  pendingDataURL = canvas.toDataURL('image/jpeg', 0.88);
+  document.getElementById('save-preview').src = pendingDataURL;
+  document.getElementById('art-name').value   = '';
+  showScreen('save');
+  setTimeout(() => document.getElementById('art-name').focus(), 250);
+});
+
+document.getElementById('btn-save-cancel').addEventListener('click', () => {
+  pendingDataURL = null;
+  showScreen('draw');
+});
+
+document.getElementById('btn-save-ok').addEventListener('click', () => {
+  if (!pendingDataURL) { showScreen('draw'); return; }
+  const title   = document.getElementById('art-name').value.trim() || 'Magic Mirror';
+  const gallery = loadGallery();
+  gallery.unshift({
+    id:      String(Date.now()),
+    title,
+    dataURL: pendingDataURL,
+    created: Date.now(),
+  });
+  saveGallery(gallery);
+  pendingDataURL = null;
+  showScreen('draw');
+});
+
+document.getElementById('art-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-save-ok').click();
+});
+
+/* ── Gallery ──────────────────────────────────────────────── */
+const STORE_KEY = 'kw-magicmirror-gallery';
+
+function loadGallery() {
+  try   { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveGallery(arr) {
+  try   { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
+  catch { /* storage full — fail silently */ }
+}
+
+document.getElementById('btn-gallery').addEventListener('click', () => {
+  renderGallery();
+  showScreen('gallery');
+});
+
+document.getElementById('btn-gal-back').addEventListener('click', () => {
+  showScreen('draw');
+});
+
+function renderGallery() {
+  const items = loadGallery();
+  const grid  = document.getElementById('art-grid');
+  const empty = document.getElementById('gallery-empty');
+  grid.innerHTML = '';
+  if (!items.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'art-card';
+    const date = new Date(item.created).toLocaleDateString(undefined,
+                  { month: 'short', day: 'numeric' });
+    card.innerHTML =
+      `<img src="${item.dataURL}" alt="${esc(item.title)}" loading="lazy">` +
+      `<div class="art-card-meta">` +
+        `<div class="art-card-name">${esc(item.title)}</div>` +
+        `<div class="art-card-date">${date}</div>` +
+      `</div>` +
+      `<button class="art-card-del" data-id="${item.id}" title="Delete">✕</button>`;
+
+    card.addEventListener('click', e => {
+      if (e.target.closest('.art-card-del')) return;
+      openLightbox(item.dataURL);
+    });
+
+    card.querySelector('.art-card-del').addEventListener('click', e => {
+      e.stopPropagation();
+      saveGallery(loadGallery().filter(i => i.id !== item.id));
+      card.remove();
+      if (!document.querySelectorAll('.art-card').length) {
+        document.getElementById('gallery-empty').classList.remove('hidden');
+      }
+    });
+
+    grid.appendChild(card);
+  });
+}
+
+function esc(s) {
+  return s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ── Lightbox ─────────────────────────────────────────────── */
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lightbox-close').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('open');
+});
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+
+/* ── Screen management ────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  if (id === 'draw') {
+    // Re-measure after the screen becomes visible
+    setTimeout(resizeCanvas, 30);
+  }
+}
+
+/* ── Init ─────────────────────────────────────────────────── */
+fillBg();   // canvas is sized by the ResizeObserver on first observation
+</script>
+</body>
+</html>
