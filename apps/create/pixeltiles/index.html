@@ -468,8 +468,8 @@ function resizeCanvas() {
   const pad = 8;
   const avail = Math.min(
     canvasWrap.clientWidth  - pad,
-    canvasWrap.clientHeight - pad,
-    560                          // max canvas display size
+    canvasWrap.clientHeight - pad
+    // No fixed cap — CSS and available space set the limit
   );
   const cs   = Math.max(14, Math.floor(avail / GRID));
   if (cs === cellSize) return;

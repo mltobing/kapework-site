@@ -38,18 +38,18 @@ body {
 }
 
 /* ── Screens ────────────────────────────────────────────── */
-.screen          { display: none; }
-.screen.active   { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; }
+.screen        { display: none; }
+.screen.active { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; }
 
 /* ── Page wrapper ───────────────────────────────────────── */
 .page {
   width: 100%;
-  max-width: 640px;
-  padding: 12px 12px env(safe-area-inset-bottom, 16px);
+  max-width: 680px;
+  padding: 12px 10px env(safe-area-inset-bottom, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex: 1;
 }
 
@@ -68,7 +68,6 @@ body {
   transition: color 0.15s; text-decoration: none;
 }
 .back-btn:hover, .back-btn:active { color: var(--text); }
-
 .tunes-btn {
   background: none;
   border: 1px solid var(--border);
@@ -85,7 +84,7 @@ body {
 .app-title  { font-size: 1.75rem; font-weight: 900; letter-spacing: -0.5px; }
 .app-sub    { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
 
-/* ── Piano ──────────────────────────────────────────────── */
+/* ── Piano area ─────────────────────────────────────────── */
 .piano-area {
   flex: 1;
   width: 100%;
@@ -93,37 +92,70 @@ body {
   align-items: center;
   justify-content: center;
   padding: 4px 0;
+  min-height: 0;
 }
+
+/* ── Piano: white + black keys ───────────────────────────
+   White keys are flex children.
+   Black keys are position:absolute overlaid at z-index:2.
+   The `box-shadow: 2px 0 0 …` trick draws separators between
+   white keys without changing the box model (so black-key
+   percentages stay exact).                                  */
 .piano {
+  position: relative;
   display: flex;
-  gap: 5px;
   width: 100%;
-  touch-action: none;   /* prevent scroll-hijack while tapping keys */
+  height: clamp(120px, 36vw, 240px);
+  touch-action: none;
 }
-.key {
+
+.key-white {
   flex: 1;
-  height: clamp(130px, 38vw, 220px);
+  height: 100%;
   border: none;
-  border-radius: 12px;
+  border-radius: 0 0 10px 10px;
   cursor: pointer;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: 10px;
+  padding-bottom: 7px;
   font-family: inherit;
-  font-size: clamp(0.65rem, 2.2vw, 0.9rem);
+  font-size: clamp(0.55rem, 2vw, 0.85rem);
   font-weight: 900;
-  color: rgba(0, 0, 0, 0.38);
-  /* Depth: bottom shadow + inner highlight */
-  box-shadow: 0 5px 0 rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28);
+  color: rgba(0,0,0,0.45);
+  /* Slot separator + bottom shadow + top highlight — no border used */
+  box-shadow: 2px 0 0 rgba(0,0,0,0.2),
+              0 5px 0 rgba(0,0,0,0.22),
+              inset 0 1px 0 rgba(255,255,255,0.30);
   transition: transform 0.07s ease, filter 0.07s ease, box-shadow 0.07s ease;
+  z-index: 1;
   will-change: transform;
-  position: relative;
 }
-.key.pressed {
-  transform: scaleY(0.92) translateY(4px);
-  filter: brightness(1.3) saturate(1.15);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15);
+.key-white.pressed {
+  transform: scaleY(0.93) translateY(4px);
+  filter: brightness(1.25);
+  box-shadow: 2px 0 0 rgba(0,0,0,0.2),
+              0 1px 0 rgba(0,0,0,0.15),
+              inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.key-black {
+  position: absolute;
+  top: 0;
+  height: 62%;
+  border: none;
+  border-radius: 0 0 7px 7px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.48),
+              inset 0 1px 0 rgba(255,255,255,0.12);
+  transition: transform 0.07s ease, filter 0.07s ease, box-shadow 0.07s ease;
+  z-index: 2;
+  will-change: transform;
+}
+.key-black.pressed {
+  transform: translateY(3px);
+  filter: brightness(1.5);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.35);
 }
 
 /* ── Record control ─────────────────────────────────────── */
@@ -153,8 +185,15 @@ body {
 }
 @keyframes pulse-ring {
   0%,100% { box-shadow: 0 0 0 0   rgba(255,60,60,0.35); }
-  50%      { box-shadow: 0 0 0 10px rgba(255,60,60,0);   }
+  50%      { box-shadow: 0 0 0 10px rgba(255,60,60,0);  }
 }
+
+/* ── Keyboard hint ──────────────────────────────────────── */
+.kb-hint {
+  font-size: 0.72rem; color: var(--muted);
+  text-align: center; letter-spacing: 0.02em; line-height: 1.6;
+}
+@media (pointer: coarse) { .kb-hint { display: none; } }
 
 /* ── Save screen ────────────────────────────────────────── */
 .save-page {
@@ -196,12 +235,8 @@ body {
 .btn-primary:hover { filter: brightness(1.08); }
 
 /* ── Gallery screen ─────────────────────────────────────── */
-.gallery-title {
-  font-size: 1.5rem; font-weight: 900; text-align: center; width: 100%;
-}
-.tunes-list {
-  width: 100%; display: flex; flex-direction: column; gap: 12px;
-}
+.gallery-title { font-size: 1.5rem; font-weight: 900; text-align: center; width: 100%; }
+.tunes-list { width: 100%; display: flex; flex-direction: column; gap: 12px; }
 .tune-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 18px; padding: 14px 16px;
@@ -212,59 +247,47 @@ body {
 .tune-card:active { transform: scale(0.98); }
 .tune-card-icon  { font-size: 1.6rem; flex-shrink: 0; }
 .tune-card-info  { flex: 1; min-width: 0; }
-.tune-card-name  {
-  font-size: 1rem; font-weight: 800;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.tune-card-name  { font-size: 1rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tune-card-meta  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
 .tune-card-btns  { display: flex; gap: 6px; flex-shrink: 0; }
-
 .btn-play {
   background: var(--cyan-dim); border: 1px solid var(--cyan); color: var(--cyan);
   border-radius: 999px; font-family: inherit; font-size: 0.85rem; font-weight: 800;
   padding: 7px 14px; cursor: pointer; transition: all 0.15s;
 }
-.btn-play:hover           { background: var(--cyan); color: #0a1628; }
-.btn-play.playing         { background: var(--cyan); color: #0a1628; }
+.btn-play:hover, .btn-play.playing { background: var(--cyan); color: #0a1628; }
 .btn-del {
   background: none; border: 1px solid var(--border); color: var(--muted);
   border-radius: 999px; font-family: inherit; font-size: 0.8rem; font-weight: 700;
   padding: 7px 10px; cursor: pointer; transition: all 0.15s;
 }
 .btn-del:hover { border-color: #ff5050; color: #ff5050; }
-
 .gallery-empty {
   text-align: center; color: var(--muted);
   font-size: 1rem; line-height: 1.7; padding: 40px 20px;
 }
 
-/* ── Keyboard hint (desktop only) ───────────────────────── */
-.kb-hint {
-  font-size: 0.75rem; color: var(--muted);
-  text-align: center; letter-spacing: 0.03em;
-}
-@media (pointer: coarse) { .kb-hint { display: none; } }
-
 .hidden { display: none !important; }
 
-/* ── iPad landscape: taller, wider keys ─────────────────── */
+/* ── iPad landscape: fill screen with tall keys ─────────── */
 @media (orientation: landscape) and (min-width: 768px) {
   .page {
     max-width: 100%;
-    padding: 6px 24px 8px;
+    padding: 6px 16px max(8px, env(safe-area-inset-bottom, 8px));
     gap: 6px;
   }
   .app-header { display: none; }
-  .piano { gap: 8px; }
-  .key {
-    height: clamp(200px, calc(100dvh - 110px), 500px);
-    border-radius: 16px;
-    font-size: clamp(0.8rem, 1.8vw, 1.1rem);
-    padding-bottom: 14px;
+  .piano {
+    height: clamp(200px, calc(100dvh - 110px), 520px);
   }
-  .controls { padding-bottom: 6px; }
-  .kb-hint  { display: none; }
-  .rec-btn  { padding: 12px 36px; }
+  .key-white {
+    border-radius: 0 0 14px 14px;
+    padding-bottom: 10px;
+    font-size: clamp(0.5rem, 1.1vw, 0.8rem);
+  }
+  .key-black { border-radius: 0 0 10px 10px; }
+  .kb-hint   { display: none; }
+  .rec-btn   { padding: 10px 32px; }
 }
   </style>
 </head>
@@ -283,7 +306,7 @@ body {
 
   <div class="app-header">
     <div class="app-title">🎹 Tap Piano</div>
-    <div class="app-sub">A tiny rainbow piano</div>
+    <div class="app-sub">A rainbow chromatic piano</div>
   </div>
 
   <div class="piano-area">
@@ -296,7 +319,10 @@ body {
     <button class="rec-btn" id="btn-record">● Record</button>
   </div>
 
-  <div class="kb-hint">Keyboard: A S D F G H J K</div>
+  <div class="kb-hint">
+    Natural keys: A&nbsp;S&nbsp;D&nbsp;F&nbsp;G&nbsp;H&nbsp;J&nbsp;K &nbsp;·&nbsp;
+    Sharps: W&nbsp;E&nbsp;&nbsp;T&nbsp;Y&nbsp;U
+  </div>
 
 </div>
 </section>
@@ -326,19 +352,14 @@ body {
      ══════════════════════════════════════════════════════════ -->
 <section id="screen-gallery" class="screen">
 <div class="page">
-
   <div class="top-bar">
     <button class="back-btn" id="btn-gallery-back">← Back</button>
   </div>
-
   <div class="gallery-title">My Tunes 🎵</div>
-
   <div class="tunes-list" id="tunes-list"></div>
-
   <p class="gallery-empty hidden" id="gallery-empty">
     No tunes saved yet.<br>Record something! 🎹
   </p>
-
 </div>
 </section>
 
@@ -347,25 +368,54 @@ body {
 <script>
 'use strict';
 
-/* ── Notes ──────────────────────────────────────────────── */
-const KEYS = [
-  { label: 'C', freq: 261.63, color: '#FF6B6B' },   // red
-  { label: 'D', freq: 293.66, color: '#FF9E4F' },   // orange
-  { label: 'E', freq: 329.63, color: '#FFD166' },   // yellow
-  { label: 'F', freq: 349.23, color: '#7BE87B' },   // green
-  { label: 'G', freq: 392.00, color: '#4ECDC4' },   // teal
-  { label: 'A', freq: 440.00, color: '#5B9CF6' },   // blue
-  { label: 'B', freq: 493.88, color: '#B09FE8' },   // purple
-  { label: 'C', freq: 523.25, color: '#FF82C8' },   // pink
+/* ── Note definitions ───────────────────────────────────────
+   One octave template: 12 chromatic notes (C to B).
+   White keys get a label (shown at the bottom of the key).
+   Black keys use deeper/darker tints of their neighbours.    */
+const OCTAVE_TMPL = [
+  { name:'C',  type:'white', freq:261.63, color:'#FF6B6B' },
+  { name:'C#', type:'black', freq:277.18, color:'#B83344' },
+  { name:'D',  type:'white', freq:293.66, color:'#FF9E4F' },
+  { name:'D#', type:'black', freq:311.13, color:'#BB7700' },
+  { name:'E',  type:'white', freq:329.63, color:'#FFD166' },
+  { name:'F',  type:'white', freq:349.23, color:'#7BE87B' },
+  { name:'F#', type:'black', freq:369.99, color:'#228844' },
+  { name:'G',  type:'white', freq:392.00, color:'#4ECDC4' },
+  { name:'G#', type:'black', freq:415.30, color:'#118899' },
+  { name:'A',  type:'white', freq:440.00, color:'#5B9CF6' },
+  { name:'A#', type:'black', freq:466.16, color:'#2244BB' },
+  { name:'B',  type:'white', freq:493.88, color:'#B09FE8' },
 ];
 
-/* ── Audio ──────────────────────────────────────────────── */
+/* Close the octave with a top-C; wrap the 2nd octave slightly lighter */
+function makeOctave(tmpl, freqMult, lightenAmt) {
+  return tmpl.map(n => ({
+    ...n,
+    freq:  Math.round(n.freq * freqMult * 100) / 100,
+    color: lightenAmt > 0 ? lighten(n.color, lightenAmt) : n.color,
+  }));
+}
+
+const TOP_C = { name:'C', type:'white', freq:523.25,  color:'#FF82C8' };
+const TOP_C2 = { name:'C', type:'white', freq:1046.50, color:'#FF82C8' };
+
+/* 1 octave = 13 notes (8 white + 5 black) */
+const ONE_OCT = [...OCTAVE_TMPL, TOP_C];
+
+/* 2 octaves = 25 notes (15 white + 10 black).
+   2nd octave uses slightly lighter colours to show it's higher. */
+const TWO_OCT = [...OCTAVE_TMPL, ...makeOctave(OCTAVE_TMPL, 2, 0.06), TOP_C2];
+
+/* Legacy freq map — so old saved tunes (index 0-7) still play correctly */
+const LEGACY = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+
+let currentNotes = null;
+
+/* ── Audio ──────────────────────────────────────────────────*/
 let audioCtx = null;
 
 function getCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
@@ -373,16 +423,13 @@ function getCtx() {
 function playNote(freq) {
   const ctx    = getCtx();
   const now    = ctx.currentTime;
-
   const osc1   = ctx.createOscillator();
   const osc2   = ctx.createOscillator();
   const gain1  = ctx.createGain();
   const gain2  = ctx.createGain();
   const master = ctx.createGain();
 
-  // Triangle gives a warm, slightly hollow tone (good toy piano character)
   osc1.type = 'triangle'; osc1.frequency.value = freq;
-  // Sine an octave up adds brightness without harshness
   osc2.type = 'sine';     osc2.frequency.value = freq * 2;
 
   osc1.connect(gain1); gain1.connect(master);
@@ -392,7 +439,6 @@ function playNote(freq) {
   gain1.gain.value = 0.72;
   gain2.gain.value = 0.22;
 
-  // Fast attack (10 ms) → no click; exponential decay → natural ring
   master.gain.setValueAtTime(0, now);
   master.gain.linearRampToValueAtTime(0.52, now + 0.010);
   master.gain.exponentialRampToValueAtTime(0.18, now + 0.20);
@@ -402,36 +448,7 @@ function playNote(freq) {
   osc2.start(now); osc2.stop(now + 1.5);
 }
 
-/* ── Screens ────────────────────────────────────────────── */
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('screen-' + id).classList.add('active');
-}
-
-/* ── Piano build ────────────────────────────────────────── */
-function buildPiano() {
-  const piano = document.getElementById('piano');
-  KEYS.forEach((k, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'key';
-    // Subtle gradient: lighter top, base colour at bottom
-    btn.style.background =
-      `linear-gradient(175deg, ${lighten(k.color, 0.13)} 0%, ${k.color} 100%)`;
-    btn.dataset.index = i;
-    btn.textContent   = k.label;
-    piano.appendChild(btn);
-  });
-
-  // pointerdown gives sub-50 ms response on both touch and mouse
-  piano.addEventListener('pointerdown', e => {
-    const key = e.target.closest('.key');
-    if (!key) return;
-    e.preventDefault();
-    triggerKey(parseInt(key.dataset.index), key);
-  });
-}
-
-/* lighten a #rrggbb hex colour by `amount` (0–1) */
+/* ── Colour utility ─────────────────────────────────────────*/
 function lighten(hex, amount) {
   const n = parseInt(hex.slice(1), 16);
   const r = Math.min(255, ((n >> 16) & 0xff) + Math.round(255 * amount));
@@ -440,42 +457,122 @@ function lighten(hex, amount) {
   return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
 }
 
+/* ── Build piano ────────────────────────────────────────────
+   Appends all white keys as flex children, then all black keys
+   as position:absolute overlays. The separation between keys
+   is drawn by the `box-shadow: 2px 0 0` on white keys — this
+   adds a dark stripe without affecting the box model, so black
+   key percentage positions remain exact.                     */
+function buildPiano(notes) {
+  currentNotes = notes;
+  const pianoEl = document.getElementById('piano');
+  pianoEl.innerHTML = '';
+
+  const nWhite   = notes.filter(n => n.type === 'white').length;
+  const wPct     = 100 / nWhite;
+  const bPct     = 0.62 * wPct;   // black key = 62% of white key width
+
+  let wIdx = 0;   // count of white keys placed so far
+
+  notes.forEach((note, i) => {
+    const el = document.createElement('button');
+    el.dataset.noteIndex = i;
+    el.dataset.freq = note.freq;
+
+    if (note.type === 'white') {
+      el.className = 'key key-white';
+      el.style.background =
+        `linear-gradient(175deg, ${lighten(note.color, 0.14)} 0%, ${note.color} 100%)`;
+      el.textContent = note.name;   // 'C', 'D', 'E' etc.
+      pianoEl.appendChild(el);
+      wIdx++;
+    } else {
+      // Black key: centered at the boundary between white key (wIdx-1) and wIdx
+      el.className = 'key key-black';
+      el.style.background =
+        `linear-gradient(175deg, ${lighten(note.color, 0.07)} 0%, ${note.color} 100%)`;
+      el.style.width = bPct + '%';
+      el.style.left  = (wIdx * wPct - bPct / 2) + '%';
+      pianoEl.appendChild(el);
+    }
+  });
+}
+
+/* ── Piano interaction ──────────────────────────────────────
+   Using elementsFromPoint in pointermove lets the user slide
+   across keys (a real piano feel) — touching a black key still
+   correctly hits the black key even though the pointer was
+   captured by the piano container.                           */
+const pianoEl = document.getElementById('piano');
+let lastKeyEl = null;
+
+pianoEl.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  pianoEl.setPointerCapture(e.pointerId);
+  lastKeyEl = null;
+  firePianoAt(e.clientX, e.clientY);
+});
+
+pianoEl.addEventListener('pointermove', e => {
+  if (!pianoEl.hasPointerCapture(e.pointerId)) return;
+  e.preventDefault();
+  firePianoAt(e.clientX, e.clientY);
+});
+
+pianoEl.addEventListener('pointerup',     () => { lastKeyEl = null; });
+pianoEl.addEventListener('pointercancel', () => { lastKeyEl = null; });
+
+function firePianoAt(cx, cy) {
+  /* Pick the topmost .key element at (cx, cy) — black keys sit at z:2
+     so they'll be returned first when under the pointer.              */
+  const els = document.elementsFromPoint(cx, cy);
+  const key = els.find(el => el.classList && el.classList.contains('key'));
+  if (!key || key === lastKeyEl) return;
+  if (lastKeyEl) lastKeyEl.classList.remove('pressed');
+  lastKeyEl = key;
+  triggerKey(parseInt(key.dataset.noteIndex), key);
+}
+
 function triggerKey(index, el) {
-  playNote(KEYS[index].freq);
+  const note = currentNotes[index];
+  if (!note) return;
+  playNote(note.freq);
   el.classList.add('pressed');
   setTimeout(() => el.classList.remove('pressed'), 140);
   if (isRecording) {
-    recorded.push({ note: index, t: performance.now() - recStart });
+    /* Store frequency so recordings survive piano layout changes */
+    recorded.push({ freq: note.freq, t: Math.round(performance.now() - recStart) });
   }
 }
 
-/* ── Recording ──────────────────────────────────────────── */
+/* ── Responsive octave: 1 on portrait/phone, 2 on iPad landscape ── */
+const tabletMQ = window.matchMedia('(orientation: landscape) and (min-width: 768px)');
+
+function rebuildPiano() {
+  buildPiano(tabletMQ.matches ? TWO_OCT : ONE_OCT);
+}
+tabletMQ.addEventListener('change', rebuildPiano);
+
+/* ── Recording ──────────────────────────────────────────────*/
 let isRecording = false;
 let recStart    = 0;
 let recorded    = [];
 
 const recBtn = document.getElementById('btn-record');
-
 recBtn.addEventListener('click', () => {
   if (!isRecording) {
-    /* start */
     isRecording = true;
     recStart    = performance.now();
     recorded    = [];
     recBtn.textContent = '■ Stop';
     recBtn.classList.add('recording');
   } else {
-    /* stop */
     isRecording = false;
     recBtn.textContent = '● Record';
     recBtn.classList.remove('recording');
-
-    if (recorded.length === 0) return;   // nothing to save — just reset
-
-    // Normalise so first note is at t = 0
+    if (!recorded.length) return;
     const t0 = recorded[0].t;
-    recorded  = recorded.map(n => ({ note: n.note, t: Math.round(n.t - t0) }));
-
+    recorded  = recorded.map(n => ({ ...n, t: n.t - t0 }));
     showScreen('save');
     const inp = document.getElementById('tune-name');
     inp.value = '';
@@ -483,17 +580,15 @@ recBtn.addEventListener('click', () => {
   }
 });
 
-/* ── Save ───────────────────────────────────────────────── */
+/* ── Storage ────────────────────────────────────────────────*/
 const STORE_KEY = 'kw-tappiano-tunes';
-
 function loadTunes() {
   try   { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
   catch { return []; }
 }
-function saveTunes(arr) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(arr));
-}
+function saveTunes(arr) { localStorage.setItem(STORE_KEY, JSON.stringify(arr)); }
 
+/* ── Save ───────────────────────────────────────────────────*/
 document.getElementById('btn-save-ok').addEventListener('click', () => {
   const name  = document.getElementById('tune-name').value.trim() || 'My Song';
   const tunes = loadTunes();
@@ -512,15 +607,12 @@ document.getElementById('tune-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-save-ok').click();
 });
 
-/* ── Gallery ────────────────────────────────────────────── */
+/* ── Gallery ────────────────────────────────────────────────*/
 document.getElementById('btn-my-tunes').addEventListener('click', () => {
-  renderGallery();
-  showScreen('gallery');
+  renderGallery(); showScreen('gallery');
 });
-
 document.getElementById('btn-gallery-back').addEventListener('click', () => {
-  stopPlayback();
-  showScreen('piano');
+  stopPlayback(); showScreen('piano');
 });
 
 function renderGallery() {
@@ -534,8 +626,7 @@ function renderGallery() {
   tunes.forEach(tune => {
     const card = document.createElement('div');
     card.className = 'tune-card';
-    const date = new Date(tune.created).toLocaleDateString(undefined,
-                  { month: 'short', day: 'numeric' });
+    const date   = new Date(tune.created).toLocaleDateString(undefined, { month:'short', day:'numeric' });
     const nLabel = tune.notes.length + ' note' + (tune.notes.length !== 1 ? 's' : '');
     card.innerHTML =
       `<div class="tune-card-icon">🎵</div>` +
@@ -552,15 +643,12 @@ function renderGallery() {
 }
 
 function esc(s) {
-  return s
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 document.getElementById('tunes-list').addEventListener('click', e => {
   const playBtn = e.target.closest('.btn-play');
   const delBtn  = e.target.closest('.btn-del');
-
   if (playBtn) {
     const tune = loadTunes().find(t => t.id === playBtn.dataset.id);
     if (tune) startPlayback(tune, playBtn);
@@ -571,7 +659,7 @@ document.getElementById('tunes-list').addEventListener('click', e => {
   }
 });
 
-/* ── Playback ───────────────────────────────────────────── */
+/* ── Playback ───────────────────────────────────────────────*/
 let pbTimers = [];
 
 function stopPlayback() {
@@ -586,20 +674,23 @@ function stopPlayback() {
 function startPlayback(tune, btn) {
   stopPlayback();
   if (!tune.notes.length) return;
-
   btn.classList.add('playing');
   btn.textContent = '♪ ...';
 
-  tune.notes.forEach(({ note, t }) => {
+  tune.notes.forEach(({ freq, note, t }) => {
+    /* Support legacy recordings that stored an index (0-7) instead of freq */
+    const f = freq !== undefined ? freq : (LEGACY[note] || null);
+    if (!f) return;
     pbTimers.push(setTimeout(() => {
-      playNote(KEYS[note].freq);
-      // Light up the piano key visually (piano may be off-screen — harmless)
-      const key = document.querySelector(`.key[data-index="${note}"]`);
-      if (key) { key.classList.add('pressed'); setTimeout(() => key.classList.remove('pressed'), 140); }
+      playNote(f);
+      const keyEl = document.querySelector(`.key[data-freq="${f}"]`);
+      if (keyEl) {
+        keyEl.classList.add('pressed');
+        setTimeout(() => keyEl.classList.remove('pressed'), 140);
+      }
     }, t));
   });
 
-  // Reset play button after the last note rings out
   const lastT = tune.notes[tune.notes.length - 1].t;
   pbTimers.push(setTimeout(() => {
     btn.classList.remove('playing');
@@ -607,19 +698,41 @@ function startPlayback(tune, btn) {
   }, lastT + 700));
 }
 
-/* ── Desktop keyboard support ───────────────────────────── */
-const KEYMAP = { a:0, s:1, d:2, f:3, g:4, h:5, j:6, k:7 };
+/* ── Desktop keyboard (QWERTY piano layout) ─────────────────
+   Natural keys: A S D F G H J K  →  C D E F G A B C
+   Sharp  keys: W E · T Y U ·    →  C# D# · F# G# A# ·      */
+const KEY_TO_FREQ = {
+  'a': 261.63,  // C4
+  'w': 277.18,  // C#4
+  's': 293.66,  // D4
+  'e': 311.13,  // D#4
+  'd': 329.63,  // E4
+  'f': 349.23,  // F4
+  't': 369.99,  // F#4
+  'g': 392.00,  // G4
+  'y': 415.30,  // G#4
+  'h': 440.00,  // A4
+  'u': 466.16,  // A#4
+  'j': 493.88,  // B4
+  'k': 523.25,  // C5
+};
 
 document.addEventListener('keydown', e => {
   if (e.repeat || e.target.tagName === 'INPUT') return;
-  const idx = KEYMAP[e.key.toLowerCase()];
-  if (idx === undefined) return;
-  const key = document.querySelector(`.key[data-index="${idx}"]`);
-  if (key) triggerKey(idx, key);
+  const freq = KEY_TO_FREQ[e.key.toLowerCase()];
+  if (!freq) return;
+  const keyEl = document.querySelector(`.key[data-freq="${freq}"]`);
+  if (keyEl) triggerKey(parseInt(keyEl.dataset.noteIndex), keyEl);
 });
 
-/* ── Init ───────────────────────────────────────────────── */
-buildPiano();
+/* ── Screen management ──────────────────────────────────────*/
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+/* ── Init ───────────────────────────────────────────────────*/
+rebuildPiano();
 </script>
 </body>
 </html>
