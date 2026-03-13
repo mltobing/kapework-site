@@ -4,34 +4,71 @@
 #
 # Subdomain routing strategy
 # ──────────────────────────
-# Each manually-added Netlify subdomain (e.g. make24.kapework.com) is mapped
-# to the matching folder under /apps.  No per-app rule needed — the :app
-# placeholder captures the subdomain name automatically.
+# Netlify does NOT support extracting a :placeholder from the host and reusing
+# it in the destination path.  The dynamic ":app" host-placeholder was silently
+# ignored, so every subdomain fell through to the root.
 #
-# To add a new app subdomain:
+# Fix: explicit per-subdomain rewrite rules.
+# Each subdomain gets two rules:
+#   a) /shared/*  → /shared/:splat   (shared assets: fonts, scripts, icons)
+#   b) /*         → /apps/<name>/:splat  (the app itself)
+#
+# To add a new subdomain in future:
 #   1. Create /apps/<name>/index.html
 #   2. Add <name>.kapework.com as a domain alias in the Netlify UI
-#   Done — no config changes required.
+#   3. Add two rules below following the same pattern
+#   4. Commit + push
 #
-# Rule order matters; Netlify evaluates top-to-bottom and stops on first match.
+# Rule order: Netlify evaluates top-to-bottom and stops on the first match.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# 1. Guard: www must never be caught by the wildcard below
+# ── www guard ────────────────────────────────────────────────────────────────
+# www is a plain alias for the root site — serve it normally.
 [[redirects]]
   from   = "https://www.kapework.com/*"
   to     = "/:splat"
   status = 200
 
-# 2. Shared assets must be reachable from every subdomain
-#    e.g. make24.kapework.com/shared/subdomain-nav.js → /shared/subdomain-nav.js
+# ── readysetread.kapework.com ─────────────────────────────────────────────────
 [[redirects]]
-  from   = "https://:app.kapework.com/shared/*"
+  from   = "https://readysetread.kapework.com/shared/*"
   to     = "/shared/:splat"
   status = 200
 
-# 3. App subdomains: <name>.kapework.com/* → /apps/<name>/:splat
-#    status 200 = transparent rewrite (URL in browser stays unchanged)
 [[redirects]]
-  from   = "https://:app.kapework.com/*"
-  to     = "/apps/:app/:splat"
+  from   = "https://readysetread.kapework.com/*"
+  to     = "/apps/readysetread/:splat"
+  status = 200
+
+# ── create.kapework.com ───────────────────────────────────────────────────────
+[[redirects]]
+  from   = "https://create.kapework.com/shared/*"
+  to     = "/shared/:splat"
+  status = 200
+
+[[redirects]]
+  from   = "https://create.kapework.com/*"
+  to     = "/apps/create/:splat"
+  status = 200
+
+# ── braingym.kapework.com ─────────────────────────────────────────────────────
+[[redirects]]
+  from   = "https://braingym.kapework.com/shared/*"
+  to     = "/shared/:splat"
+  status = 200
+
+[[redirects]]
+  from   = "https://braingym.kapework.com/*"
+  to     = "/apps/braingym/:splat"
+  status = 200
+
+# ── numbercrunch.kapework.com ─────────────────────────────────────────────────
+[[redirects]]
+  from   = "https://numbercrunch.kapework.com/shared/*"
+  to     = "/shared/:splat"
+  status = 200
+
+[[redirects]]
+  from   = "https://numbercrunch.kapework.com/*"
+  to     = "/apps/numbercrunch/:splat"
   status = 200
