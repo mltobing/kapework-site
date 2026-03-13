@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# netlify.toml — Kapework
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Subdomain routing strategy
+# ──────────────────────────
+# Each manually-added Netlify subdomain (e.g. make24.kapework.com) is mapped
+# to the matching folder under /apps.  No per-app rule needed — the :app
+# placeholder captures the subdomain name automatically.
+#
+# To add a new app subdomain:
+#   1. Create /apps/<name>/index.html
+#   2. Add <name>.kapework.com as a domain alias in the Netlify UI
+#   Done — no config changes required.
+#
+# Rule order matters; Netlify evaluates top-to-bottom and stops on first match.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 1. Guard: www must never be caught by the wildcard below
+[[redirects]]
+  from   = "https://www.kapework.com/*"
+  to     = "/:splat"
+  status = 200
+
+# 2. Shared assets must be reachable from every subdomain
+#    e.g. make24.kapework.com/shared/subdomain-nav.js → /shared/subdomain-nav.js
+[[redirects]]
+  from   = "https://:app.kapework.com/shared/*"
+  to     = "/shared/:splat"
+  status = 200
+
+# 3. App subdomains: <name>.kapework.com/* → /apps/<name>/:splat
+#    status 200 = transparent rewrite (URL in browser stays unchanged)
+[[redirects]]
+  from   = "https://:app.kapework.com/*"
+  to     = "/apps/:app/:splat"
+  status = 200
