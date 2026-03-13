@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Tap Piano · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+/* ── Reset & tokens ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --bg:       #0a1628;
+  --surface:  #121e33;
+  --surface2: #1a2a44;
+  --cyan:     #00e5cc;
+  --cyan-dim: rgba(0,229,204,0.15);
+  --text:     #e8edf5;
+  --muted:    rgba(232,237,245,0.5);
+  --border:   rgba(232,237,245,0.08);
+}
+html, body {
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+}
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ── Screens ────────────────────────────────────────────── */
+.screen          { display: none; }
+.screen.active   { display: flex; flex-direction: column; align-items: center; min-height: 100dvh; }
+
+/* ── Page wrapper ───────────────────────────────────────── */
+.page {
+  width: 100%;
+  max-width: 640px;
+  padding: 12px 12px env(safe-area-inset-bottom, 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+/* ── Top bar ────────────────────────────────────────────── */
+.top-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.back-btn {
+  background: none; border: none;
+  color: var(--muted); font-size: 0.9rem; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px;
+  transition: color 0.15s; text-decoration: none;
+}
+.back-btn:hover, .back-btn:active { color: var(--text); }
+
+.tunes-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted); font-family: inherit;
+  font-size: 0.85rem; font-weight: 700;
+  padding: 7px 14px; cursor: pointer;
+  transition: all 0.15s;
+}
+.tunes-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Header ─────────────────────────────────────────────── */
+.app-header { text-align: center; }
+.app-title  { font-size: 1.75rem; font-weight: 900; letter-spacing: -0.5px; }
+.app-sub    { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
+
+/* ── Piano ──────────────────────────────────────────────── */
+.piano-area {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+}
+.piano {
+  display: flex;
+  gap: 5px;
+  width: 100%;
+  touch-action: none;   /* prevent scroll-hijack while tapping keys */
+}
+.key {
+  flex: 1;
+  height: clamp(130px, 38vw, 220px);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10px;
+  font-family: inherit;
+  font-size: clamp(0.65rem, 2.2vw, 0.9rem);
+  font-weight: 900;
+  color: rgba(0, 0, 0, 0.38);
+  /* Depth: bottom shadow + inner highlight */
+  box-shadow: 0 5px 0 rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28);
+  transition: transform 0.07s ease, filter 0.07s ease, box-shadow 0.07s ease;
+  will-change: transform;
+  position: relative;
+}
+.key.pressed {
+  transform: scaleY(0.92) translateY(4px);
+  filter: brightness(1.3) saturate(1.15);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+/* ── Record control ─────────────────────────────────────── */
+.controls {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+.rec-btn {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: inherit; font-size: 1rem; font-weight: 800;
+  padding: 14px 44px; cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 9px;
+  min-width: 168px; justify-content: center;
+}
+.rec-btn:hover { border-color: rgba(232,237,245,0.25); }
+.rec-btn.recording {
+  background: rgba(255,60,60,0.1);
+  border-color: #ff5050;
+  color: #ff5050;
+  animation: pulse-ring 1.1s ease-in-out infinite;
+}
+@keyframes pulse-ring {
+  0%,100% { box-shadow: 0 0 0 0   rgba(255,60,60,0.35); }
+  50%      { box-shadow: 0 0 0 10px rgba(255,60,60,0);   }
+}
+
+/* ── Save screen ────────────────────────────────────────── */
+.save-page {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px;
+  min-height: 100dvh; width: 100%;
+  max-width: 420px;
+  padding: 32px 24px env(safe-area-inset-bottom, 32px);
+}
+.save-emoji  { font-size: 4rem; line-height: 1; }
+.save-title  { font-size: 1.7rem; font-weight: 900; text-align: center; }
+.save-hint   { font-size: 0.875rem; color: var(--muted); text-align: center; margin-top: -8px; }
+.tune-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 2px solid var(--border); border-radius: 16px;
+  color: var(--text);
+  font-family: inherit; font-size: 1.25rem; font-weight: 700;
+  padding: 16px 20px; text-align: center; outline: none;
+  -webkit-user-select: text; user-select: text;
+  transition: border-color 0.15s;
+}
+.tune-input:focus       { border-color: var(--cyan); }
+.tune-input::placeholder { color: var(--muted); font-weight: 400; }
+.save-actions { display: flex; gap: 12px; width: 100%; }
+.btn-secondary {
+  flex: 1;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 14px;
+  color: var(--muted); font-family: inherit; font-size: 1rem; font-weight: 700;
+  padding: 15px 0; cursor: pointer; transition: all 0.15s;
+}
+.btn-secondary:hover { color: var(--text); }
+.btn-primary {
+  flex: 2;
+  background: var(--cyan); border: none; border-radius: 14px;
+  color: #0a1628; font-family: inherit; font-size: 1rem; font-weight: 800;
+  padding: 15px 0; cursor: pointer; transition: filter 0.15s;
+}
+.btn-primary:hover { filter: brightness(1.08); }
+
+/* ── Gallery screen ─────────────────────────────────────── */
+.gallery-title {
+  font-size: 1.5rem; font-weight: 900; text-align: center; width: 100%;
+}
+.tunes-list {
+  width: 100%; display: flex; flex-direction: column; gap: 12px;
+}
+.tune-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  transition: all 0.15s; cursor: pointer;
+}
+.tune-card:hover { border-color: var(--cyan); box-shadow: 0 0 16px var(--cyan-dim); }
+.tune-card:active { transform: scale(0.98); }
+.tune-card-icon  { font-size: 1.6rem; flex-shrink: 0; }
+.tune-card-info  { flex: 1; min-width: 0; }
+.tune-card-name  {
+  font-size: 1rem; font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tune-card-meta  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+.tune-card-btns  { display: flex; gap: 6px; flex-shrink: 0; }
+
+.btn-play {
+  background: var(--cyan-dim); border: 1px solid var(--cyan); color: var(--cyan);
+  border-radius: 999px; font-family: inherit; font-size: 0.85rem; font-weight: 800;
+  padding: 7px 14px; cursor: pointer; transition: all 0.15s;
+}
+.btn-play:hover           { background: var(--cyan); color: #0a1628; }
+.btn-play.playing         { background: var(--cyan); color: #0a1628; }
+.btn-del {
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 999px; font-family: inherit; font-size: 0.8rem; font-weight: 700;
+  padding: 7px 10px; cursor: pointer; transition: all 0.15s;
+}
+.btn-del:hover { border-color: #ff5050; color: #ff5050; }
+
+.gallery-empty {
+  text-align: center; color: var(--muted);
+  font-size: 1rem; line-height: 1.7; padding: 40px 20px;
+}
+
+/* ── Keyboard hint (desktop only) ───────────────────────── */
+.kb-hint {
+  font-size: 0.75rem; color: var(--muted);
+  text-align: center; letter-spacing: 0.03em;
+}
+@media (pointer: coarse) { .kb-hint { display: none; } }
+
+.hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     PIANO SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-piano" class="screen active">
+<div class="page">
+
+  <div class="top-bar">
+    <a class="back-btn" href="../">← Create</a>
+    <button class="tunes-btn" id="btn-my-tunes">My Tunes 🎵</button>
+  </div>
+
+  <div class="app-header">
+    <div class="app-title">🎹 Tap Piano</div>
+    <div class="app-sub">A tiny rainbow piano</div>
+  </div>
+
+  <div class="piano-area">
+    <div class="piano" id="piano">
+      <!-- keys injected by JS -->
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="rec-btn" id="btn-record">● Record</button>
+  </div>
+
+  <div class="kb-hint">Keyboard: A S D F G H J K</div>
+
+</div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SAVE SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-save" class="screen">
+  <div class="save-page">
+    <div class="save-emoji">🎵</div>
+    <div class="save-title">Name your tune!</div>
+    <p class="save-hint">Give it a fun name so you can find it later</p>
+    <input class="tune-input" id="tune-name" type="text"
+           placeholder="e.g. Rainbow Song" maxlength="30"
+           autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="save-actions">
+      <button class="btn-secondary" id="btn-save-discard">Discard</button>
+      <button class="btn-primary"   id="btn-save-ok">Save it 💾</button>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     GALLERY SCREEN
+     ══════════════════════════════════════════════════════════ -->
+<section id="screen-gallery" class="screen">
+<div class="page">
+
+  <div class="top-bar">
+    <button class="back-btn" id="btn-gallery-back">← Back</button>
+  </div>
+
+  <div class="gallery-title">My Tunes 🎵</div>
+
+  <div class="tunes-list" id="tunes-list"></div>
+
+  <p class="gallery-empty hidden" id="gallery-empty">
+    No tunes saved yet.<br>Record something! 🎹
+  </p>
+
+</div>
+</section>
+
+
+<script src="/shared/subdomain-nav.js"></script>
+<script>
+'use strict';
+
+/* ── Notes ──────────────────────────────────────────────── */
+const KEYS = [
+  { label: 'C', freq: 261.63, color: '#FF6B6B' },   // red
+  { label: 'D', freq: 293.66, color: '#FF9E4F' },   // orange
+  { label: 'E', freq: 329.63, color: '#FFD166' },   // yellow
+  { label: 'F', freq: 349.23, color: '#7BE87B' },   // green
+  { label: 'G', freq: 392.00, color: '#4ECDC4' },   // teal
+  { label: 'A', freq: 440.00, color: '#5B9CF6' },   // blue
+  { label: 'B', freq: 493.88, color: '#B09FE8' },   // purple
+  { label: 'C', freq: 523.25, color: '#FF82C8' },   // pink
+];
+
+/* ── Audio ──────────────────────────────────────────────── */
+let audioCtx = null;
+
+function getCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playNote(freq) {
+  const ctx    = getCtx();
+  const now    = ctx.currentTime;
+
+  const osc1   = ctx.createOscillator();
+  const osc2   = ctx.createOscillator();
+  const gain1  = ctx.createGain();
+  const gain2  = ctx.createGain();
+  const master = ctx.createGain();
+
+  // Triangle gives a warm, slightly hollow tone (good toy piano character)
+  osc1.type = 'triangle'; osc1.frequency.value = freq;
+  // Sine an octave up adds brightness without harshness
+  osc2.type = 'sine';     osc2.frequency.value = freq * 2;
+
+  osc1.connect(gain1); gain1.connect(master);
+  osc2.connect(gain2); gain2.connect(master);
+  master.connect(ctx.destination);
+
+  gain1.gain.value = 0.72;
+  gain2.gain.value = 0.22;
+
+  // Fast attack (10 ms) → no click; exponential decay → natural ring
+  master.gain.setValueAtTime(0, now);
+  master.gain.linearRampToValueAtTime(0.52, now + 0.010);
+  master.gain.exponentialRampToValueAtTime(0.18, now + 0.20);
+  master.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+  osc1.start(now); osc1.stop(now + 1.5);
+  osc2.start(now); osc2.stop(now + 1.5);
+}
+
+/* ── Screens ────────────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+/* ── Piano build ────────────────────────────────────────── */
+function buildPiano() {
+  const piano = document.getElementById('piano');
+  KEYS.forEach((k, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'key';
+    // Subtle gradient: lighter top, base colour at bottom
+    btn.style.background =
+      `linear-gradient(175deg, ${lighten(k.color, 0.13)} 0%, ${k.color} 100%)`;
+    btn.dataset.index = i;
+    btn.textContent   = k.label;
+    piano.appendChild(btn);
+  });
+
+  // pointerdown gives sub-50 ms response on both touch and mouse
+  piano.addEventListener('pointerdown', e => {
+    const key = e.target.closest('.key');
+    if (!key) return;
+    e.preventDefault();
+    triggerKey(parseInt(key.dataset.index), key);
+  });
+}
+
+/* lighten a #rrggbb hex colour by `amount` (0–1) */
+function lighten(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, ((n >> 16) & 0xff) + Math.round(255 * amount));
+  const g = Math.min(255, ((n >>  8) & 0xff) + Math.round(255 * amount));
+  const b = Math.min(255,  (n        & 0xff) + Math.round(255 * amount));
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+}
+
+function triggerKey(index, el) {
+  playNote(KEYS[index].freq);
+  el.classList.add('pressed');
+  setTimeout(() => el.classList.remove('pressed'), 140);
+  if (isRecording) {
+    recorded.push({ note: index, t: performance.now() - recStart });
+  }
+}
+
+/* ── Recording ──────────────────────────────────────────── */
+let isRecording = false;
+let recStart    = 0;
+let recorded    = [];
+
+const recBtn = document.getElementById('btn-record');
+
+recBtn.addEventListener('click', () => {
+  if (!isRecording) {
+    /* start */
+    isRecording = true;
+    recStart    = performance.now();
+    recorded    = [];
+    recBtn.textContent = '■ Stop';
+    recBtn.classList.add('recording');
+  } else {
+    /* stop */
+    isRecording = false;
+    recBtn.textContent = '● Record';
+    recBtn.classList.remove('recording');
+
+    if (recorded.length === 0) return;   // nothing to save — just reset
+
+    // Normalise so first note is at t = 0
+    const t0 = recorded[0].t;
+    recorded  = recorded.map(n => ({ note: n.note, t: Math.round(n.t - t0) }));
+
+    showScreen('save');
+    const inp = document.getElementById('tune-name');
+    inp.value = '';
+    setTimeout(() => inp.focus(), 260);
+  }
+});
+
+/* ── Save ───────────────────────────────────────────────── */
+const STORE_KEY = 'kw-tappiano-tunes';
+
+function loadTunes() {
+  try   { return JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveTunes(arr) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(arr));
+}
+
+document.getElementById('btn-save-ok').addEventListener('click', () => {
+  const name  = document.getElementById('tune-name').value.trim() || 'My Song';
+  const tunes = loadTunes();
+  tunes.unshift({ id: String(Date.now()), name, notes: recorded, created: Date.now() });
+  saveTunes(tunes);
+  recorded = [];
+  showScreen('piano');
+});
+
+document.getElementById('btn-save-discard').addEventListener('click', () => {
+  recorded = [];
+  showScreen('piano');
+});
+
+document.getElementById('tune-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-save-ok').click();
+});
+
+/* ── Gallery ────────────────────────────────────────────── */
+document.getElementById('btn-my-tunes').addEventListener('click', () => {
+  renderGallery();
+  showScreen('gallery');
+});
+
+document.getElementById('btn-gallery-back').addEventListener('click', () => {
+  stopPlayback();
+  showScreen('piano');
+});
+
+function renderGallery() {
+  const tunes = loadTunes();
+  const list  = document.getElementById('tunes-list');
+  const empty = document.getElementById('gallery-empty');
+  list.innerHTML = '';
+  if (!tunes.length) { empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  tunes.forEach(tune => {
+    const card = document.createElement('div');
+    card.className = 'tune-card';
+    const date = new Date(tune.created).toLocaleDateString(undefined,
+                  { month: 'short', day: 'numeric' });
+    const nLabel = tune.notes.length + ' note' + (tune.notes.length !== 1 ? 's' : '');
+    card.innerHTML =
+      `<div class="tune-card-icon">🎵</div>` +
+      `<div class="tune-card-info">` +
+        `<div class="tune-card-name">${esc(tune.name)}</div>` +
+        `<div class="tune-card-meta">${date} &middot; ${nLabel}</div>` +
+      `</div>` +
+      `<div class="tune-card-btns">` +
+        `<button class="btn-play" data-id="${tune.id}">▶ Play</button>` +
+        `<button class="btn-del"  data-id="${tune.id}">✕</button>` +
+      `</div>`;
+    list.appendChild(card);
+  });
+}
+
+function esc(s) {
+  return s
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.getElementById('tunes-list').addEventListener('click', e => {
+  const playBtn = e.target.closest('.btn-play');
+  const delBtn  = e.target.closest('.btn-del');
+
+  if (playBtn) {
+    const tune = loadTunes().find(t => t.id === playBtn.dataset.id);
+    if (tune) startPlayback(tune, playBtn);
+  }
+  if (delBtn) {
+    saveTunes(loadTunes().filter(t => t.id !== delBtn.dataset.id));
+    renderGallery();
+  }
+});
+
+/* ── Playback ───────────────────────────────────────────── */
+let pbTimers = [];
+
+function stopPlayback() {
+  pbTimers.forEach(clearTimeout);
+  pbTimers = [];
+  document.querySelectorAll('.btn-play.playing').forEach(b => {
+    b.classList.remove('playing');
+    b.textContent = '▶ Play';
+  });
+}
+
+function startPlayback(tune, btn) {
+  stopPlayback();
+  if (!tune.notes.length) return;
+
+  btn.classList.add('playing');
+  btn.textContent = '♪ ...';
+
+  tune.notes.forEach(({ note, t }) => {
+    pbTimers.push(setTimeout(() => {
+      playNote(KEYS[note].freq);
+      // Light up the piano key visually (piano may be off-screen — harmless)
+      const key = document.querySelector(`.key[data-index="${note}"]`);
+      if (key) { key.classList.add('pressed'); setTimeout(() => key.classList.remove('pressed'), 140); }
+    }, t));
+  });
+
+  // Reset play button after the last note rings out
+  const lastT = tune.notes[tune.notes.length - 1].t;
+  pbTimers.push(setTimeout(() => {
+    btn.classList.remove('playing');
+    btn.textContent = '▶ Play';
+  }, lastT + 700));
+}
+
+/* ── Desktop keyboard support ───────────────────────────── */
+const KEYMAP = { a:0, s:1, d:2, f:3, g:4, h:5, j:6, k:7 };
+
+document.addEventListener('keydown', e => {
+  if (e.repeat || e.target.tagName === 'INPUT') return;
+  const idx = KEYMAP[e.key.toLowerCase()];
+  if (idx === undefined) return;
+  const key = document.querySelector(`.key[data-index="${idx}"]`);
+  if (key) triggerKey(idx, key);
+});
+
+/* ── Init ───────────────────────────────────────────────── */
+buildPiano();
+</script>
+</body>
+</html>
