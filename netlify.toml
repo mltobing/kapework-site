@@ -2,73 +2,31 @@
 # netlify.toml — Kapework
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# Subdomain routing strategy
-# ──────────────────────────
-# Netlify does NOT support extracting a :placeholder from the host and reusing
-# it in the destination path.  The dynamic ":app" host-placeholder was silently
-# ignored, so every subdomain fell through to the root.
+# Subdomain routing
+# ─────────────────
+# All subdomain → /apps/* routing is handled by the edge function at
+# netlify/edge-functions/subdomain-router.ts.
 #
-# Fix: explicit per-subdomain rewrite rules.
-# Each subdomain gets two rules:
-#   a) /shared/*  → /shared/:splat   (shared assets: fonts, scripts, icons)
-#   b) /*         → /apps/<name>/:splat  (the app itself)
+# The edge function rewrites <slug>.kapework.com requests transparently
+# (the subdomain stays in the address bar) to /apps/<slug>/... or
+# /apps/<slug>.html depending on app type.
 #
-# To add a new subdomain in future:
-#   1. Create /apps/<name>/index.html
-#   2. Add <name>.kapework.com as a domain alias in the Netlify UI
-#   3. Add two rules below following the same pattern
-#   4. Commit + push
-#
-# Rule order: Netlify evaluates top-to-bottom and stops on the first match.
+# Folder apps work automatically — no changes to this file needed when
+# adding a new folder-based app.  Single-file apps require one line added
+# to the SINGLE_FILE map in the edge function.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── www guard ────────────────────────────────────────────────────────────────
-# www is a plain alias for the root site — serve it normally.
+# ── Edge function: subdomain router ──────────────────────────────────────────
+# Catches every request so the router can inspect the hostname.
+[[edge_functions]]
+  function = "subdomain-router"
+  path     = "/*"
+
+# ── www guard ─────────────────────────────────────────────────────────────────
+# Belt-and-suspenders: edge function already passes www through unchanged,
+# but keeping this redirect ensures www always resolves to the root site
+# even if the edge function is bypassed or temporarily disabled.
 [[redirects]]
   from   = "https://www.kapework.com/*"
   to     = "/:splat"
-  status = 200
-
-# ── readysetread.kapework.com ─────────────────────────────────────────────────
-[[redirects]]
-  from   = "https://readysetread.kapework.com/shared/*"
-  to     = "/shared/:splat"
-  status = 200
-
-[[redirects]]
-  from   = "https://readysetread.kapework.com/*"
-  to     = "/apps/readysetread/:splat"
-  status = 200
-
-# ── create.kapework.com ───────────────────────────────────────────────────────
-[[redirects]]
-  from   = "https://create.kapework.com/shared/*"
-  to     = "/shared/:splat"
-  status = 200
-
-[[redirects]]
-  from   = "https://create.kapework.com/*"
-  to     = "/apps/create/:splat"
-  status = 200
-
-# ── braingym.kapework.com ─────────────────────────────────────────────────────
-[[redirects]]
-  from   = "https://braingym.kapework.com/shared/*"
-  to     = "/shared/:splat"
-  status = 200
-
-[[redirects]]
-  from   = "https://braingym.kapework.com/*"
-  to     = "/apps/braingym/:splat"
-  status = 200
-
-# ── numbercrunch.kapework.com ─────────────────────────────────────────────────
-[[redirects]]
-  from   = "https://numbercrunch.kapework.com/shared/*"
-  to     = "/shared/:splat"
-  status = 200
-
-[[redirects]]
-  from   = "https://numbercrunch.kapework.com/*"
-  to     = "/apps/numbercrunch/:splat"
   status = 200
