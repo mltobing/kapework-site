@@ -70,6 +70,12 @@ body {
 }
 .icon-btn:hover { color: var(--text); border-color: rgba(232,237,245,0.18); }
 
+/* ── Draw body: canvas + controls; becomes row in landscape ─ */
+.draw-body {
+  flex: 1; display: flex; flex-direction: column; width: 100%;
+  min-height: 0;
+}
+
 /* ── Canvas area ─────────────────────────────────────────── */
 #canvas-wrap {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -233,6 +239,45 @@ body {
 .lightbox-close:hover { border-color: var(--cyan); color: var(--cyan); }
 
 .hidden { display: none !important; }
+
+/* ── iPad landscape layout ───────────────────────────────── */
+@media (orientation: landscape) and (min-width: 768px) {
+  #screen-draw.active { align-items: stretch; }
+
+  .draw-body {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  #canvas-wrap {
+    flex: 1;
+    height: auto;
+  }
+
+  .controls {
+    width: 200px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 10px 14px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    border-left: 1px solid var(--border);
+  }
+
+  /* 4 cols × 3 rows in the sidebar */
+  .color-row {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .opts-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .opts-spacer { display: none; }
+
+  .save-btn { margin-top: auto; }
+}
   </style>
 </head>
 <body>
@@ -251,43 +296,47 @@ body {
     </div>
   </div>
 
-  <div id="canvas-wrap">
-    <canvas id="canvas"></canvas>
-  </div>
+  <div class="draw-body">
 
-  <div class="controls">
-
-    <!-- Colour swatches -->
-    <div class="color-row" id="color-row"></div>
-
-    <!-- Size / Symmetry / Mirror -->
-    <div class="opts-row">
-      <div class="opt-group">
-        <span class="opt-label">Size</span>
-        <div class="opt-btns" id="size-btns">
-          <button class="opt-btn"        data-size="3">S</button>
-          <button class="opt-btn active" data-size="6">M</button>
-          <button class="opt-btn"        data-size="12">L</button>
-        </div>
-      </div>
-      <div class="opt-group">
-        <span class="opt-label">Sym</span>
-        <div class="opt-btns" id="sym-btns">
-          <button class="opt-btn"        data-sym="4">4</button>
-          <button class="opt-btn"        data-sym="6">6</button>
-          <button class="opt-btn active" data-sym="8">8</button>
-          <button class="opt-btn"        data-sym="12">12</button>
-        </div>
-      </div>
-      <div class="opt-group">
-        <span class="opt-label">Mirror</span>
-        <div class="opt-btns">
-          <button class="opt-btn active" id="btn-mirror">On</button>
-        </div>
-      </div>
+    <div id="canvas-wrap">
+      <canvas id="canvas"></canvas>
     </div>
 
-    <button class="save-btn" id="btn-save">Save ✨</button>
+    <div class="controls">
+
+      <!-- Colour swatches -->
+      <div class="color-row" id="color-row"></div>
+
+      <!-- Size / Symmetry / Mirror -->
+      <div class="opts-row">
+        <div class="opt-group">
+          <span class="opt-label">Size</span>
+          <div class="opt-btns" id="size-btns">
+            <button class="opt-btn"        data-size="3">S</button>
+            <button class="opt-btn active" data-size="6">M</button>
+            <button class="opt-btn"        data-size="12">L</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <span class="opt-label">Sym</span>
+          <div class="opt-btns" id="sym-btns">
+            <button class="opt-btn"        data-sym="4">4</button>
+            <button class="opt-btn"        data-sym="6">6</button>
+            <button class="opt-btn active" data-sym="8">8</button>
+            <button class="opt-btn"        data-sym="12">12</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <span class="opt-label">Mirror</span>
+          <div class="opt-btns">
+            <button class="opt-btn active" id="btn-mirror">On</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="save-btn" id="btn-save">Save ✨</button>
+
+    </div>
 
   </div>
 </section>

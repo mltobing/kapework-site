@@ -66,6 +66,13 @@ body {
 }
 .icon-btn:hover { color: var(--text); border-color: rgba(232,237,245,0.18); }
 
+/* ── Draw body: canvas + controls side-by-side in landscape ─ */
+.draw-body {
+  flex: 1; width: 100%; max-width: 600px;
+  display: flex; flex-direction: column;
+  align-items: center; min-height: 0;
+}
+
 /* ── Canvas area ─────────────────────────────────────────── */
 #canvas-wrap {
   flex: 1; width: 100%; max-width: 600px;
@@ -74,22 +81,38 @@ body {
 }
 #canvas {
   display: block; cursor: crosshair; touch-action: none;
-  /* The transparent 1px gaps between cells show the dark bg as grid lines.
-     A subtle shadow frames the whole grid. */
   box-shadow: 0 0 0 1px rgba(232,237,245,0.07), 0 6px 32px rgba(0,0,0,0.5);
 }
+/* Bucket cursor in fill mode */
+#canvas.fill-cursor { cursor: cell; }
 
 /* ── Controls panel ──────────────────────────────────────── */
 .controls {
   flex-shrink: 0; width: 100%; max-width: 600px;
-  padding: 7px 14px;
+  padding: 6px 14px;
   padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 
-/* ── Palette ─────────────────────────────────────────────── *
-   Fixed 6-per-row grid, max 330px.
-   The +1 eraser lives in the util row.                       */
+/* ── Template row ────────────────────────────────────────── */
+.tpl-row {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; max-width: 330px; flex-wrap: wrap;
+}
+.tpl-label {
+  font-size: 0.7rem; color: var(--muted); font-weight: 700;
+  white-space: nowrap; flex-shrink: 0;
+}
+.tpl-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; font-size: 1.1rem;
+  padding: 4px 9px; cursor: pointer;
+  transition: border-color 0.12s, transform 0.1s;
+  line-height: 1.4;
+}
+.tpl-btn:hover { border-color: var(--cyan); transform: scale(1.1); }
+
+/* ── Palette ─────────────────────────────────────────────── */
 .color-row {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -124,6 +147,7 @@ body {
 .util-btn:hover     { color: var(--text); border-color: rgba(232,237,245,0.22); }
 .util-btn.active    { background: var(--surface2); border-color: var(--cyan); color: var(--cyan); }
 .util-btn.erase-on  { background: rgba(255,60,60,0.1); border-color: #ff5050; color: #ff5050; }
+.util-btn.fill-on   { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
 /* Divider */
 .util-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 
@@ -243,6 +267,46 @@ body {
 .lightbox-close:hover { border-color: var(--cyan); color: var(--cyan); }
 
 .hidden { display: none !important; }
+
+/* ── iPad landscape layout ───────────────────────────────── */
+@media (orientation: landscape) and (min-width: 768px) {
+  #screen-draw.active { align-items: stretch; }
+
+  .top-bar { max-width: none; }
+
+  .draw-body {
+    flex-direction: row;
+    align-items: stretch;
+    max-width: none;
+  }
+
+  #canvas-wrap {
+    flex: 1;
+    max-width: none;
+    height: auto;
+  }
+
+  .controls {
+    width: 190px;
+    flex-shrink: 0;
+    max-width: none;
+    padding: 10px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    overflow-y: auto;
+    border-left: 1px solid var(--border);
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .tpl-row  { max-width: none; }
+  .color-row {
+    max-width: none;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .util-row { max-width: none; justify-content: flex-start; }
+  .save-btn { max-width: none; margin-top: auto; }
+}
   </style>
 </head>
 <body>
@@ -257,26 +321,39 @@ body {
     <button class="icon-btn" id="btn-gallery">🖼 Gallery</button>
   </div>
 
-  <div id="canvas-wrap">
-    <canvas id="canvas"></canvas>
-  </div>
+  <div class="draw-body">
 
-  <div class="controls">
-
-    <!-- Colour palette: 12 swatches, 2 rows of 6 -->
-    <div class="color-row" id="color-row"></div>
-
-    <!-- Utility row: erase · undo · clear | grid 12 / 16 -->
-    <div class="util-row">
-      <button class="util-btn" id="btn-erase">✕ Erase</button>
-      <button class="util-btn" id="btn-undo">↩ Undo</button>
-      <button class="util-btn" id="btn-clear">Clear</button>
-      <div class="util-divider"></div>
-      <button class="util-btn active" data-grid="16" id="btn-g16">16×16</button>
-      <button class="util-btn"        data-grid="12" id="btn-g12">12×12</button>
+    <div id="canvas-wrap">
+      <canvas id="canvas"></canvas>
     </div>
 
-    <button class="save-btn" id="btn-save">Save ✨</button>
+    <div class="controls">
+
+      <!-- Starter templates row -->
+      <div class="tpl-row" id="tpl-row">
+        <span class="tpl-label">Start:</span>
+        <button class="tpl-btn" data-tpl="smiley" title="Smiley face outline">😊</button>
+        <button class="tpl-btn" data-tpl="heart"  title="Heart outline">❤️</button>
+        <button class="tpl-btn" data-tpl="house"  title="House outline">🏠</button>
+      </div>
+
+      <!-- Colour palette: 12 swatches, 2 rows of 6 -->
+      <div class="color-row" id="color-row"></div>
+
+      <!-- Utility row: fill · erase · undo · clear | grid 12 / 16 -->
+      <div class="util-row">
+        <button class="util-btn" id="btn-fill">🪣 Fill</button>
+        <button class="util-btn" id="btn-erase">✕ Erase</button>
+        <button class="util-btn" id="btn-undo">↩ Undo</button>
+        <button class="util-btn" id="btn-clear">Clear</button>
+        <div class="util-divider"></div>
+        <button class="util-btn active" data-grid="16" id="btn-g16">16×16</button>
+        <button class="util-btn"        data-grid="12" id="btn-g12">12×12</button>
+      </div>
+
+      <button class="save-btn" id="btn-save">Save ✨</button>
+
+    </div>
 
   </div>
 </section>
@@ -352,6 +429,9 @@ const PALETTE = [
 /* Empty tile colour — warm off-white, feels like art paper */
 const EMPTY = '#f0ede8';
 
+/* Template outline colour — muted slate, looks like pencil marks */
+const TPL_COLOR = '#8899aa';
+
 /* Undo stack limit */
 const MAX_UNDO = 30;
 
@@ -362,6 +442,7 @@ let GRID      = 16;
 let grid      = Array(GRID * GRID).fill(null);
 let active    = PALETTE[2];   // red as default colour
 let isErasing = false;
+let isFilling = false;
 let history   = [];           // undo stack (copies of grid)
 let cellSize  = 0;            // px per cell, set by resizeCanvas()
 
@@ -381,8 +462,7 @@ const canvasWrap = document.getElementById('canvas-wrap');
 /* ── Canvas sizing ──────────────────────────────────────────
    Canvas internal size = cellSize * GRID + 1  (the +1 gives a
    1-px transparent outer border on the right/bottom edges, so
-   every cell has a uniform 1-px gap on all four sides).
-   The transparent gaps show the dark page background as grid lines.*/
+   every cell has a uniform 1-px gap on all four sides).      */
 function resizeCanvas() {
   if (!canvasWrap.clientWidth || !canvasWrap.clientHeight) return;
   const pad = 8;
@@ -405,9 +485,7 @@ function resizeCanvas() {
 const ro = new ResizeObserver(resizeCanvas);
 ro.observe(canvasWrap);
 
-/* ── Rendering ──────────────────────────────────────────────
-   clearRect makes every pixel transparent first; then each cell
-   is filled leaving a 1-px transparent gap → dark grid lines.  */
+/* ── Rendering ──────────────────────────────────────────────*/
 function renderAll() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (let r = 0; r < GRID; r++) {
@@ -420,7 +498,7 @@ function renderAll() {
 function paintPixel(r, c) {
   const x = c * cellSize + 1;
   const y = r * cellSize + 1;
-  const s = cellSize - 1;      // cell interior size (1-px gap on every edge)
+  const s = cellSize - 1;
   ctx.fillStyle = grid[r * GRID + c] || EMPTY;
   ctx.fillRect(x, y, s, s);
 }
@@ -446,11 +524,54 @@ function applyPaint(e) {
   paintPixel(Math.floor(idx / GRID), idx % GRID);
 }
 
+/* ── Flood fill (BFS) ───────────────────────────────────────
+   Fills a contiguous region of identical-colour cells with the
+   active colour. Uses a Uint8Array visited map for performance. */
+function floodFill(startIdx) {
+  const targetColor = grid[startIdx];
+  const fillColor   = active;
+  if (targetColor === fillColor) return;
+
+  const queue   = [startIdx];
+  const visited = new Uint8Array(GRID * GRID);
+  visited[startIdx] = 1;
+
+  while (queue.length) {
+    const idx = queue.shift();
+    if (grid[idx] !== targetColor) continue;
+    grid[idx] = fillColor;
+    paintPixel(Math.floor(idx / GRID), idx % GRID);
+
+    const row = Math.floor(idx / GRID);
+    const col = idx % GRID;
+    const up    = row > 0      ? idx - GRID : -1;
+    const down  = row < GRID-1 ? idx + GRID : -1;
+    const left  = col > 0      ? idx - 1    : -1;
+    const right = col < GRID-1 ? idx + 1    : -1;
+
+    for (const n of [up, down, left, right]) {
+      if (n >= 0 && !visited[n] && grid[n] === targetColor) {
+        visited[n] = 1;
+        queue.push(n);
+      }
+    }
+  }
+}
+
 /* ── Pointer events ─────────────────────────────────────────*/
 canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId);
-  pushHistory();          // snapshot before any changes this stroke
+
+  if (isFilling) {
+    const idx = cellAt(e);
+    if (idx < 0) return;
+    pushHistory();
+    floodFill(idx);
+    return;
+  }
+
+  pushHistory();
   painting  = true;
   lastCell  = -1;
   applyPaint(e);
@@ -491,7 +612,6 @@ PALETTE.forEach(col => {
   btn.className       = 'swatch' + (col === active ? ' active' : '');
   btn.style.background = col;
   btn.dataset.color   = col;
-  // White needs a visible border at rest
   if (col === '#FFFFFF') btn.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.15)';
   colorRow.appendChild(btn);
 });
@@ -508,31 +628,158 @@ colorRow.addEventListener('click', e => {
 const eraseBtn = document.getElementById('btn-erase');
 eraseBtn.addEventListener('click', () => {
   isErasing = !isErasing;
+  if (isErasing) isFilling = false;
+  syncControls();
+});
+
+/* ── Fill toggle ────────────────────────────────────────────*/
+const fillBtn = document.getElementById('btn-fill');
+fillBtn.addEventListener('click', () => {
+  isFilling = !isFilling;
+  if (isFilling) isErasing = false;
   syncControls();
 });
 
 function syncControls() {
-  /* Erase button */
   eraseBtn.classList.toggle('erase-on', isErasing);
-  /* Palette swatches */
+  fillBtn.classList.toggle('fill-on', isFilling);
+  canvas.classList.toggle('fill-cursor', isFilling);
   document.querySelectorAll('.swatch').forEach(s =>
     s.classList.toggle('active', !isErasing && s.dataset.color === active));
 }
 
-/* ── Grid size toggle ───────────────────────────────────────
-   Changing grid size resets to a blank canvas and clears undo. */
+/* ── Grid size toggle ───────────────────────────────────────*/
 document.querySelectorAll('[data-grid]').forEach(btn => {
   btn.addEventListener('click', () => {
     const n = parseInt(btn.dataset.grid);
     if (n === GRID) return;
-    GRID    = n;
-    grid    = Array(GRID * GRID).fill(null);
-    history = [];
+    GRID      = n;
+    grid      = Array(GRID * GRID).fill(null);
+    history   = [];
+    isFilling = false;
+    isErasing = false;
     document.querySelectorAll('[data-grid]')
       .forEach(b => b.classList.toggle('active', b === btn));
     cellSize = 0;           // force resize
     resizeCanvas();
+    syncControls();
   });
+});
+
+/* ── Starter templates ──────────────────────────────────────
+   Each function returns a 256-element (16×16) grid array with
+   TPL_COLOR outline marks. Tapping a template loads it into the
+   16×16 grid so the child can colour it in.                  */
+
+function buildSmiley() {
+  const T = TPL_COLOR;
+  const g = Array(256).fill(null);
+  const s = (r, c) => { g[r * 16 + c] = T; };
+
+  // Outer circle
+  [5,6,7,8,9,10].forEach(c => { s(0,c); s(15,c); });
+  [3,4,11,12].forEach(c => { s(1,c); s(14,c); });
+  s(2,2); s(2,13); s(3,1); s(3,14);
+  for (let r = 4; r <= 11; r++) { s(r,0); s(r,15); }
+  s(12,1); s(12,14); s(13,2); s(13,13);
+
+  // Eyes (2×2 squares)
+  [5,6].forEach(r => [5,6,9,10].forEach(c => s(r,c)));
+
+  // Smile
+  s(9,4); s(9,11);
+  s(10,4); s(10,5); s(10,10); s(10,11);
+  [5,6,7,8,9,10].forEach(c => s(11,c));
+
+  return g;
+}
+
+function buildHeart() {
+  const T = TPL_COLOR;
+  const g = Array(256).fill(null);
+  const s = (r, c) => { g[r * 16 + c] = T; };
+
+  // Two top bumps
+  [3,4,11,12].forEach(c => s(0,c));
+  [2,5,10,13].forEach(c => s(1,c));
+  [1,6,9,14].forEach(c => s(2,c));
+  // V join at row 3
+  s(3,0); s(3,7); s(3,8); s(3,15);
+  // Body sides tapering to point
+  s(4,0); s(4,15);
+  s(5,1); s(5,14);
+  s(6,2); s(6,13);
+  s(7,3); s(7,12);
+  s(8,4); s(8,11);
+  s(9,5); s(9,10);
+  s(10,6); s(10,9);
+  // Tip
+  s(11,7); s(11,8);
+
+  return g;
+}
+
+function buildHouse() {
+  const T = TPL_COLOR;
+  const g = Array(256).fill(null);
+  const s = (r, c) => { g[r * 16 + c] = T; };
+
+  // Roof (triangle peak at row 0 cols 7-8, base at row 7)
+  s(0,7); s(0,8);
+  s(1,6); s(1,9);
+  s(2,5); s(2,10);
+  s(3,4); s(3,11);
+  s(4,3); s(4,12);
+  s(5,2); s(5,13);
+  s(6,1); s(6,14);
+  for (let c = 0; c <= 15; c++) s(7,c);  // eave line
+
+  // Walls (sides)
+  for (let r = 8; r <= 14; r++) { s(r,0); s(r,15); }
+
+  // Ground/base
+  for (let c = 0; c <= 15; c++) s(15,c);
+
+  // Left window (rows 9-10, cols 2-4)
+  [2,3,4].forEach(c => s(9,c));
+  s(10,2); s(10,4);
+  [2,3,4].forEach(c => s(11,c));
+
+  // Right window (rows 9-10, cols 11-13)
+  [11,12,13].forEach(c => s(9,c));
+  s(10,11); s(10,13);
+  [11,12,13].forEach(c => s(11,c));
+
+  // Door (rows 12-15, cols 6-9, open bottom = floor)
+  [6,7,8,9].forEach(c => s(12,c));
+  for (let r = 13; r <= 14; r++) { s(r,6); s(r,9); }
+
+  return g;
+}
+
+const TEMPLATES = { smiley: buildSmiley, heart: buildHeart, house: buildHouse };
+
+document.getElementById('tpl-row').addEventListener('click', e => {
+  const btn = e.target.closest('.tpl-btn');
+  if (!btn) return;
+  const builder = TEMPLATES[btn.dataset.tpl];
+  if (!builder) return;
+
+  // Templates are 16×16 — switch grid if needed
+  if (GRID !== 16) {
+    GRID = 16;
+    document.querySelectorAll('[data-grid]')
+      .forEach(b => b.classList.toggle('active', b.dataset.grid === '16'));
+    cellSize = 0;
+  }
+
+  pushHistory();
+  grid = builder();
+  isFilling = false;
+  isErasing = false;
+  syncControls();
+  resizeCanvas();   // no-op if cellSize unchanged, but forces re-render
+  renderAll();
 });
 
 /* ── Save flow ──────────────────────────────────────────────*/
@@ -559,7 +806,7 @@ document.getElementById('btn-save-ok').addEventListener('click', () => {
     title,
     gridData:  pendingGridData,
     gridSize:  GRID,
-    thumb:     makeThumbnail(pendingGridData, GRID, 96),  // compact PNG for storage
+    thumb:     makeThumbnail(pendingGridData, GRID, 96),
     created:   Date.now(),
   });
   saveGallery(gallery);
@@ -571,15 +818,13 @@ document.getElementById('art-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-save-ok').click();
 });
 
-/* ── Thumbnail generation ───────────────────────────────────
-   Renders a gridData array to a small canvas and returns a PNG
-   data URL.  image-rendering: pixelated in CSS makes it sharp.  */
+/* ── Thumbnail generation ───────────────────────────────────*/
 function makeThumbnail(gridData, gs, size) {
   const tc  = document.createElement('canvas');
   tc.width  = size;
   tc.height = size;
   const tc2 = tc.getContext('2d');
-  const cs  = size / gs;                // sub-pixel cell size; use Math.round for crisp edges
+  const cs  = size / gs;
   tc2.fillStyle = EMPTY;
   tc2.fillRect(0, 0, size, size);
   gridData.forEach((color, i) => {
@@ -593,7 +838,7 @@ function makeThumbnail(gridData, gs, size) {
       Math.round((r + 1) * cs) - Math.round(r * cs)
     );
   });
-  return tc.toDataURL('image/png');    // PNG = lossless, pixel-perfect
+  return tc.toDataURL('image/png');
 }
 
 /* ── Gallery ────────────────────────────────────────────────*/
@@ -638,19 +883,16 @@ function renderGallery() {
         `<button class="art-card-btn del"  data-id="${item.id}" title="Delete">✕</button>` +
       `</div>`;
 
-    /* Tap card body → full view lightbox */
     card.addEventListener('click', e => {
       if (e.target.closest('.art-card-btn')) return;
       openLightbox(makeThumbnail(item.gridData, item.gridSize, 512));
     });
 
-    /* Edit: load into canvas */
     card.querySelector('.edit').addEventListener('click', e => {
       e.stopPropagation();
       loadIntoEditor(item);
     });
 
-    /* Delete */
     card.querySelector('.del').addEventListener('click', e => {
       e.stopPropagation();
       saveGallery(loadGallery().filter(i => i.id !== item.id));
@@ -672,10 +914,10 @@ function loadIntoEditor(item) {
     history = [];
     document.querySelectorAll('[data-grid]')
       .forEach(b => b.classList.toggle('active', parseInt(b.dataset.grid) === GRID));
-    cellSize = 0;       // force resize
+    cellSize = 0;
   }
   grid = [...item.gridData];
-  showScreen('draw');   // triggers resizeCanvas via setTimeout
+  showScreen('draw');
 }
 
 function esc(s) {
@@ -704,8 +946,7 @@ function showScreen(id) {
 }
 
 /* ── Init ────────────────────────────────────────────────── */
-syncControls();   // set initial swatch/erase state
-// ResizeObserver fires on first observation and sizes the canvas.
+syncControls();
 </script>
 </body>
 </html>

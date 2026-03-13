@@ -246,6 +246,26 @@ body {
 @media (pointer: coarse) { .kb-hint { display: none; } }
 
 .hidden { display: none !important; }
+
+/* ── iPad landscape: taller, wider keys ─────────────────── */
+@media (orientation: landscape) and (min-width: 768px) {
+  .page {
+    max-width: 100%;
+    padding: 6px 24px 8px;
+    gap: 6px;
+  }
+  .app-header { display: none; }
+  .piano { gap: 8px; }
+  .key {
+    height: clamp(200px, calc(100dvh - 110px), 500px);
+    border-radius: 16px;
+    font-size: clamp(0.8rem, 1.8vw, 1.1rem);
+    padding-bottom: 14px;
+  }
+  .controls { padding-bottom: 6px; }
+  .kb-hint  { display: none; }
+  .rec-btn  { padding: 12px 36px; }
+}
   </style>
 </head>
 <body>
