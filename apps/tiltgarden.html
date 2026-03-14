@@ -15,7 +15,7 @@
   --bg:#0d100f;--surface:#161b17;--surface2:#1e2620;
   --accent:#7fbc98;--accent-d:rgba(127,188,152,0.13);--accent-b:rgba(127,188,152,0.22);
   --text:#dde8e2;--muted:rgba(221,232,226,0.48);--border:rgba(221,232,226,0.08);
-  --board-bg:#080d09;--cell-gap:rgba(255,255,255,0.04);
+  --board-bg:#080d09;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);overscroll-behavior:none}
 body{
@@ -41,30 +41,44 @@ body{
 .next-lbl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
 #next-canvas{display:block;border-radius:6px;background:var(--board-bg)}
 
-/* ── Board area ── */
+/* ── Board ── */
 .board-area{position:relative}
 .board-wrap{
   border-radius:14px;overflow:hidden;
   box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5);
-  transform-origin:center center;
+  transform-origin:center center;will-change:transform;
+  /* 3D perspective for the sway */
+  transform-style:preserve-3d;
+  perspective:700px;
 }
 #board{display:block;touch-action:none}
 
-/* ── Tilt animations ── */
-@keyframes sway-left{
-  0%  {transform:rotate(0deg) translateX(0)}
-  30% {transform:rotate(-7deg) translateX(-8px)}
-  68% {transform:rotate(-2deg) translateX(-3px)}
-  100%{transform:rotate(0deg) translateX(0)}
+/* ── Board animations ── 3D sway, gentle spring ── */
+@keyframes swayLeft{
+  0%  {transform:rotateY(0deg)  rotateZ(0deg)   translateX(0)}
+  24% {transform:rotateY(18deg) rotateZ(-4deg)  translateX(-7px)}
+  52% {transform:rotateY(6deg)  rotateZ(-1.5deg) translateX(-3px)}
+  74% {transform:rotateY(10deg) rotateZ(-2.5deg) translateX(-5px)}
+  88% {transform:rotateY(2deg)  rotateZ(-0.5deg) translateX(-1px)}
+  100%{transform:rotateY(0deg)  rotateZ(0deg)   translateX(0)}
 }
-@keyframes sway-right{
-  0%  {transform:rotate(0deg) translateX(0)}
-  30% {transform:rotate(7deg) translateX(8px)}
-  68% {transform:rotate(2deg) translateX(3px)}
-  100%{transform:rotate(0deg) translateX(0)}
+@keyframes swayRight{
+  0%  {transform:rotateY(0deg)   rotateZ(0deg)   translateX(0)}
+  24% {transform:rotateY(-18deg) rotateZ(4deg)   translateX(7px)}
+  52% {transform:rotateY(-6deg)  rotateZ(1.5deg) translateX(3px)}
+  74% {transform:rotateY(-10deg) rotateZ(2.5deg) translateX(5px)}
+  88% {transform:rotateY(-2deg)  rotateZ(0.5deg) translateX(1px)}
+  100%{transform:rotateY(0deg)   rotateZ(0deg)   translateX(0)}
 }
-.board-wrap.sway-left {animation:sway-left  0.6s ease-out}
-.board-wrap.sway-right{animation:sway-right 0.6s ease-out}
+.board-wrap.sway-left {animation:swayLeft  0.72s cubic-bezier(.36,.07,.19,.97)}
+.board-wrap.sway-right{animation:swayRight 0.72s cubic-bezier(.36,.07,.19,.97)}
+
+@keyframes settlePop{
+  0%  {transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+  40% {transform:scale(1.011);box-shadow:0 0 0 1.5px var(--accent),0 8px 36px rgba(127,188,152,0.22)}
+  100%{transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+}
+.board-wrap.settle-pop{animation:settlePop 0.28s ease-out}
 
 /* ── Session-end overlay ── */
 .end-overlay{
@@ -82,51 +96,28 @@ body{
 }
 .end-btn:active{transform:scale(0.96)}
 
-/* ── Play controls ── */
+/* ── Controls ── */
 .controls{width:100%;display:flex;gap:7px;align-items:center}
 .ctrl-btn{
-  flex:1;height:50px;background:var(--surface);border:1px solid var(--border);
-  border-radius:13px;color:var(--text);font-size:1.2rem;cursor:pointer;
+  flex:1;height:44px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;color:var(--text);font-size:1.15rem;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:transform 0.12s,background 0.12s;font-family:inherit;
 }
 .ctrl-btn:active{transform:scale(0.91);background:var(--surface2)}
 .ctrl-settle{
-  flex:1.6;font-size:0.88rem;font-weight:700;
-  background:var(--accent-d);border-color:var(--accent);color:var(--accent);
+  flex:1.4;font-size:1.1rem;font-weight:700;
+  background:var(--accent-d);border-color:rgba(127,188,152,0.3);color:var(--accent);
 }
 .ctrl-settle:active{background:var(--accent-b)}
 
-/* ── Rebalance panel ── */
-.rebal-panel{width:100%;display:flex;flex-direction:column;align-items:center;gap:7px}
-.rebal-prompt{font-size:0.76rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.07em}
-.rebal-row{width:100%;display:flex;gap:7px;align-items:center}
-.rebal-btn{
-  flex:1;height:52px;background:var(--accent-d);border:1px solid var(--accent);
-  border-radius:13px;color:var(--accent);font-size:1rem;font-weight:800;
-  cursor:pointer;transition:transform 0.12s,background 0.12s;font-family:inherit;
-}
-.rebal-btn:active{transform:scale(0.94);background:var(--accent-b)}
-.rebal-skip{
-  flex:0.55;height:42px;background:none;border:1px solid var(--border);
-  border-radius:13px;color:var(--muted);font-size:0.82rem;cursor:pointer;font-family:inherit;
-}
-.rebal-skip:active{color:var(--text)}
-
-/* ── Stats bar ── */
+/* ── Stats ── */
 .stats-bar{
   width:100%;display:flex;justify-content:space-around;
-  padding:8px 0;border-top:1px solid var(--border);
-  font-size:0.76rem;color:var(--muted);
+  padding:7px 0;border-top:1px solid var(--border);
+  font-size:0.74rem;color:var(--muted);
 }
 .stats-bar b{color:var(--text);margin-left:2px}
-
-/* ── Optional tilt enable ── */
-.tilt-enable-row{display:flex;justify-content:center}
-#btn-enable-tilt{
-  background:none;border:1px solid var(--border);border-radius:10px;
-  color:var(--muted);font-size:0.75rem;padding:5px 12px;cursor:pointer;font-family:inherit;
-}
 
 .hidden{display:none!important}
 </style>
@@ -137,7 +128,7 @@ body{
   <div class="game-header">
     <div class="title-wrap">
       <h1 class="game-title">Tilt Garden</h1>
-      <p class="game-sub">Gently place and rebalance drifting shapes.</p>
+      <p class="game-sub">Settle shapes gently and watch the board respond.</p>
     </div>
     <div class="hud">
       <div class="next-wrap">
@@ -165,24 +156,12 @@ body{
     </div>
   </div>
 
-  <div id="play-controls" class="controls">
+  <!-- Always-visible minimal controls -->
+  <div class="controls">
     <button id="btn-left"   class="ctrl-btn" aria-label="Move left">◀</button>
     <button id="btn-rotate" class="ctrl-btn" aria-label="Rotate">↺</button>
     <button id="btn-right"  class="ctrl-btn" aria-label="Move right">▶</button>
-    <button id="btn-settle" class="ctrl-settle ctrl-btn" aria-label="Settle piece">Settle ▼</button>
-  </div>
-
-  <div id="rebal-controls" class="rebal-panel hidden">
-    <p class="rebal-prompt">Rebalance?</p>
-    <div class="rebal-row">
-      <button id="btn-rebal-left"  class="rebal-btn">← Lean</button>
-      <button id="btn-rebal-skip"  class="rebal-skip">rest</button>
-      <button id="btn-rebal-right" class="rebal-btn">Lean →</button>
-    </div>
-  </div>
-
-  <div class="tilt-enable-row">
-    <button id="btn-enable-tilt">Enable phone tilt (optional)</button>
+    <button id="btn-settle" class="ctrl-settle ctrl-btn" aria-label="Settle piece">▼</button>
   </div>
 
   <div class="stats-bar">
@@ -192,21 +171,22 @@ body{
   </div>
 
 </div>
-
 <script>
 (function () {
   'use strict';
 
   // ─── Constants ──────────────────────────────────────────────────────────────
   const COLS = 8, ROWS = 12, CELL = 36;
-  const FALL_MS  = 5500;   // very slow — no pressure
-  const SWAY_MS  = 600;    // board sway animation duration
-  const CLEAR_MS = 380;    // gentle clear flash
-  const LOCK_MS  = 160;
+  const FALL_MS        = 5500;  // no pressure
+  const SWAY_MS        = 720;   // board sway duration
+  const SLIDE_MS       = 380;   // block slide animation
+  const CLEAR_MS       = 340;   // clear flash
+  const LOCK_MS        = 140;   // lock flash
+  const LEAN_WINDOW_MS = 700;   // post-settle swipe window
+  const HOLD_MS        = 360;   // long-press threshold
+  const NEXT_CELL      = 13;
 
-  const NEXT_CELL = 13;
-
-  // ─── Piece data — warm, soft palette ─────────────────────────────────────
+  // ─── Piece data — warm, soft palette ────────────────────────────────────
   const PIECES = {
     I:{color:'#8ecfb0',shapes:[[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],[[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,0,1,0]],[[0,0,0,0],[0,0,0,0],[1,1,1,1],[0,0,0,0]],[[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]]},
     O:{color:'#d4a96a',shapes:[[[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],[[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],[[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]],[[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]]]},
@@ -218,7 +198,7 @@ body{
   };
   const TYPES = Object.keys(PIECES);
 
-  // ─── Stats ────────────────────────────────────────────────────────────────
+  // ─── Stats ─────────────────────────────────────────────────────────────────
   const STATS_KEY = 'tiltgarden_v1';
   function loadStats() {
     try { return { totalPlaced:0, totalCleared:0, totalSessions:0, ...JSON.parse(localStorage.getItem(STATS_KEY)||'{}') }; }
@@ -227,37 +207,43 @@ body{
   function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch {} }
   const stats = loadStats();
 
-  // ─── Event tracker ────────────────────────────────────────────────────────
   function track(name, data) { console.log('[tiltgarden]', name, data); }
 
-  // ─── Canvas refs ──────────────────────────────────────────────────────────
+  // ─── Canvas / DOM refs ─────────────────────────────────────────────────────
   const canvas     = document.getElementById('board');
   const ctx        = canvas.getContext('2d');
   const nextCanvas = document.getElementById('next-canvas');
   const nctx       = nextCanvas.getContext('2d');
+  const placedEl   = document.getElementById('placed');
+  const endOverlay = document.getElementById('end-overlay');
+  const endDetail  = document.getElementById('end-detail');
+  const boardWrap  = document.getElementById('board-wrap');
+  const statPlaced = document.getElementById('stat-placed');
+  const statCleared= document.getElementById('stat-cleared');
+  const statSess   = document.getElementById('stat-sessions');
 
-  // ─── DOM refs ─────────────────────────────────────────────────────────────
-  const placedEl     = document.getElementById('placed');
-  const endOverlay   = document.getElementById('end-overlay');
-  const endDetail    = document.getElementById('end-detail');
-  const playControls = document.getElementById('play-controls');
-  const rebalControls= document.getElementById('rebal-controls');
-  const boardWrap    = document.getElementById('board-wrap');
-  const statPlaced   = document.getElementById('stat-placed');
-  const statCleared  = document.getElementById('stat-cleared');
-  const statSessions = document.getElementById('stat-sessions');
-
-  // ─── Session state ────────────────────────────────────────────────────────
+  // ─── Session state ─────────────────────────────────────────────────────────
   let board, piece, nextPiece, bag;
-  let placed, cleared, sessionOver, rebalPhase, animating;
-  let lastFall   = 0;
-  let lockFlashEnd  = 0;
-  let clearFlashEnd = 0;
+  let placed, cleared, sessionOver;
+  let animating      = false;
+  let leanWindowOpen = false;
+  let leanWindowEnd  = 0;
+  let leanWindowTimer= null;
+  let gravityPaused  = false;
+  let lastFall       = 0;
+  let lockFlashEnd   = 0;
+  let clearFlashEnd  = 0;
   let clearFlashRows = null;
+  let turnCount      = 0;
+  // Block slide animation
+  let blockAnim      = null;  // { moves:[{fx,fy,tx,ty,color}], start, dur }
+  // Particles + glow
+  let particles = [];
+  let clearGlow = null;
 
-  // ─── Bag / spawn ──────────────────────────────────────────────────────────
+  // ─── Bag / spawn ───────────────────────────────────────────────────────────
   function newBag() {
-    const a = TYPES.slice();
+    const a=TYPES.slice();
     for (let i=a.length-1;i>0;i--) { const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; }
     return a;
   }
@@ -266,56 +252,52 @@ body{
     return {type,rot:0,x:2,y:-1,shape:PIECES[type].shapes[0],color:PIECES[type].color};
   }
   function spawnNext() {
-    piece = {...nextPiece, y:-1};
-    nextPiece = makePiece(fromBag());
-    if (collides(piece, board)) { endSession(); }
+    piece={...nextPiece,y:-1};
+    nextPiece=makePiece(fromBag());
+    if (collides(piece,board)) endSession();
   }
 
-  // ─── Board helpers ────────────────────────────────────────────────────────
+  // ─── Board helpers ─────────────────────────────────────────────────────────
   function emptyBoard() { return Array.from({length:ROWS},()=>Array(COLS).fill(null)); }
-
-  function collides(p, b) {
+  function collides(p,b) {
     for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
       if (!p.shape[r][c]) continue;
-      const bx=p.x+c, by=p.y+r;
+      const bx=p.x+c,by=p.y+r;
       if (bx<0||bx>=COLS||by>=ROWS) return true;
-      if (by>=0 && b[by][bx]) return true;
+      if (by>=0&&b[by][bx]) return true;
     }
     return false;
   }
-
-  function lockPiece(p, b) {
+  function lockPiece(p,b) {
     for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
-      if (p.shape[r][c] && p.y+r>=0) b[p.y+r][p.x+c] = p.color;
+      if (p.shape[r][c]&&p.y+r>=0) b[p.y+r][p.x+c]=p.color;
     }
   }
-
   function clearLines(b) {
-    const found = [];
+    const found=[];
     for (let y=ROWS-1;y>=0;y--) {
       if (b[y].every(Boolean)) { found.push(y); b.splice(y,1); b.unshift(Array(COLS).fill(null)); y++; }
     }
     return found;
   }
 
-  // ─── Piece controls ───────────────────────────────────────────────────────
+  // ─── Piece controls ────────────────────────────────────────────────────────
   function tryMove(dx) {
-    if (sessionOver||rebalPhase||animating) return;
+    if (sessionOver||leanWindowOpen||animating) return;
     const t={...piece,x:piece.x+dx};
     if (!collides(t,board)) piece.x+=dx;
   }
   function tryRotate() {
-    if (sessionOver||rebalPhase||animating) return;
-    const newRot=(piece.rot+1)%4;
-    const newShape=PIECES[piece.type].shapes[newRot];
+    if (sessionOver||leanWindowOpen||animating) return;
+    const nr=(piece.rot+1)%4, ns=PIECES[piece.type].shapes[nr];
     const kicks=[0,1,-1,2,-2];
     for (const k of kicks) {
-      const t={...piece,rot:newRot,shape:newShape,x:piece.x+k};
+      const t={...piece,rot:nr,shape:ns,x:piece.x+k};
       if (!collides(t,board)) { Object.assign(piece,t); return; }
     }
   }
   function settle() {
-    if (sessionOver||rebalPhase||animating) return;
+    if (sessionOver||leanWindowOpen||animating) return;
     while (!collides({...piece,y:piece.y+1},board)) piece.y++;
     lockCurrentPiece();
   }
@@ -326,58 +308,111 @@ body{
     else piece.y++;
   }
 
+  // ─── Lock & lean window ────────────────────────────────────────────────────
   function lockCurrentPiece() {
     lockPiece(piece,board);
     placed++;
+    animating=true;
     lockFlashEnd=performance.now()+LOCK_MS;
-    const directClears=clearLines(board);
-    if (directClears.length) {
-      cleared+=directClears.length;
-      clearFlashRows=directClears;
-      clearFlashEnd=performance.now()+CLEAR_MS;
-      track('session_clear',{count:directClears.length,afterRebal:false,placed,cleared});
+
+    // Settle pop
+    boardWrap.classList.remove('settle-pop');
+    void boardWrap.offsetWidth;
+    boardWrap.classList.add('settle-pop');
+    boardWrap.addEventListener('animationend',()=>boardWrap.classList.remove('settle-pop'),{once:true});
+
+    // Direct line clears
+    const dc=clearLines(board);
+    if (dc.length) {
+      cleared+=dc.length;
+      clearFlashRows=dc; clearFlashEnd=performance.now()+CLEAR_MS;
+      clearGlow={rows:dc,end:performance.now()+460,color:'#8ecfb0'};
+      spawnParticles(dc,'#8ecfb0');
+      track('session_clear',{count:dc.length,afterLean:false,placed,cleared});
     }
     track('piece_place',{type:piece.type,placed,cleared});
+
     setTimeout(()=>{
       clearFlashRows=null;
-      rebalPhase=true;
-      playControls.classList.add('hidden');
-      rebalControls.classList.remove('hidden');
-    }, Math.max(LOCK_MS, directClears.length?CLEAR_MS:0)+30);
+      animating=false;
+      openLeanWindow();
+    }, Math.max(LOCK_MS, dc.length?CLEAR_MS:0)+30);
   }
 
-  // ─── Rebalance mechanics ──────────────────────────────────────────────────
-  function doRebal(dir) {
-    if (!rebalPhase||animating) return;
+  function openLeanWindow() {
+    leanWindowOpen=true;
+    leanWindowEnd=performance.now()+LEAN_WINDOW_MS;
+    turnCount++;
+    leanWindowTimer=setTimeout(autoCloseLeanWindow, LEAN_WINDOW_MS);
+  }
+  function closeLeanWindow() {
+    clearTimeout(leanWindowTimer); leanWindowTimer=null; leanWindowOpen=false;
+  }
+  function autoCloseLeanWindow() { leanWindowOpen=false; finishTurn(); }
+
+  // ─── Block slide move computation ──────────────────────────────────────────
+  // Returns [{fx,fy,tx,ty,color}] for animating from current board to post-tilt board
+  function computeMoves(dir) {
+    const moves=[];
+    // Step 1: row-compact
+    for (let y=0;y<ROWS;y++) {
+      const row=[];
+      for (let x=0;x<COLS;x++) { if (board[y][x]) row.push({x,color:board[y][x]}); }
+      row.sort((a,b)=>a.x-b.x);
+      row.forEach((b,i)=>{
+        const nx=dir<0?i:(COLS-row.length+i);
+        moves.push({fx:b.x,fy:y,midX:nx,origY:y,color:b.color});
+      });
+    }
+    // Step 2: column-gravity
+    const byCol={};
+    for (const m of moves) { if (!byCol[m.midX]) byCol[m.midX]=[]; byCol[m.midX].push(m); }
+    const final=[];
+    for (let x=0;x<COLS;x++) {
+      const col=(byCol[x]||[]).sort((a,b)=>a.origY-b.origY);
+      col.forEach((m,i)=>{ final.push({fx:m.fx,fy:m.fy,tx:m.midX,ty:ROWS-col.length+i,color:m.color}); });
+    }
+    return final;
+  }
+
+  // ─── Lean (tilt) mechanics ─────────────────────────────────────────────────
+  function doLean(dir) {
+    if (!leanWindowOpen||animating) return;
     animating=true;
-    rebalPhase=false;
-    rebalControls.classList.add('hidden');
-    track('rebalance',{dir,placed,cleared});
+    closeLeanWindow();
+    track('lean',{dir,placed,cleared});
+
+    // Compute animation moves BEFORE applying physics
+    const moves=computeMoves(dir);
+
+    // Board sway
     boardWrap.classList.add(dir<0?'sway-left':'sway-right');
-    const rem=()=>{ boardWrap.classList.remove('sway-left','sway-right'); boardWrap.removeEventListener('animationend',rem); };
-    boardWrap.addEventListener('animationend',rem);
+    boardWrap.addEventListener('animationend',()=>boardWrap.classList.remove('sway-left','sway-right'),{once:true});
+
+    // Apply physics — board is now in post-tilt state
+    applyLeanPhysics(dir);
+
+    // Animate blocks sliding to their new positions
+    blockAnim={moves, start:performance.now(), dur:SLIDE_MS};
+
+    // After slide, detect and flash any completed lines
     setTimeout(()=>{
-      applyRebalPhysics(dir);
+      blockAnim=null;
       const rc=clearLines(board);
       if (rc.length) {
         cleared+=rc.length;
-        clearFlashRows=rc;
-        clearFlashEnd=performance.now()+CLEAR_MS;
-        track('session_clear',{count:rc.length,afterRebal:true,placed,cleared});
-        setTimeout(finishTurn,CLEAR_MS+50);
-      } else { finishTurn(); }
-    }, SWAY_MS*0.5);
+        clearFlashRows=rc; clearFlashEnd=performance.now()+CLEAR_MS;
+        clearGlow={rows:rc,end:performance.now()+500,color:'#8ecfb0'};
+        spawnParticles(rc,'#8ecfb0');
+        track('session_clear',{count:rc.length,afterLean:true,placed,cleared});
+        setTimeout(()=>{ clearFlashRows=null; finishTurn(); }, CLEAR_MS+40);
+      } else {
+        finishTurn();
+      }
+    }, SLIDE_MS+32);
   }
 
-  function skipRebal() {
-    if (!rebalPhase||animating) return;
-    rebalPhase=false;
-    rebalControls.classList.add('hidden');
-    track('rebalance',{dir:0,placed,cleared});
-    finishTurn();
-  }
-
-  function applyRebalPhysics(dir) {
+  function applyLeanPhysics(dir) {
     for (let y=0;y<ROWS;y++) {
       const cells=board[y].filter(c=>c!==null);
       board[y]=dir<0?[...cells,...Array(COLS-cells.length).fill(null)]:[...Array(COLS-cells.length).fill(null),...cells];
@@ -392,72 +427,141 @@ body{
   function finishTurn() {
     clearFlashRows=null;
     animating=false;
-    if (!sessionOver) {
-      playControls.classList.remove('hidden');
-      spawnNext();
-      lastFall=performance.now();
-    }
+    if (!sessionOver) { spawnNext(); lastFall=performance.now(); }
   }
 
-  // ─── Session end — gentle, not harsh ──────────────────────────────────────
+  // ─── Session end ───────────────────────────────────────────────────────────
   function endSession() {
-    sessionOver=true;
-    rebalControls.classList.add('hidden');
-    playControls.classList.add('hidden');
-    endDetail.textContent = `Shapes placed: ${placed}   ·   Lines cleared: ${cleared}`;
-    stats.totalPlaced   += placed;
-    stats.totalCleared  += cleared;
-    stats.totalSessions += 1;
-    saveStats(stats);
-    updateStatsBar();
+    sessionOver=true; closeLeanWindow();
+    endDetail.textContent=`Shapes placed: ${placed}   ·   Lines cleared: ${cleared}`;
+    stats.totalPlaced+=placed; stats.totalCleared+=cleared; stats.totalSessions+=1;
+    saveStats(stats); updateStatsBar();
     endOverlay.classList.remove('hidden');
     track('session_end',{placed,cleared,totalSessions:stats.totalSessions});
   }
 
   function updateStatsBar() {
-    statPlaced.textContent   = stats.totalPlaced;
-    statCleared.textContent  = stats.totalCleared;
-    statSessions.textContent = stats.totalSessions;
+    statPlaced.textContent=stats.totalPlaced;
+    statCleared.textContent=stats.totalCleared;
+    statSess.textContent=stats.totalSessions;
   }
 
-  // ─── Start ────────────────────────────────────────────────────────────────
+  // ─── Start ─────────────────────────────────────────────────────────────────
   function startSession() {
-    board        = emptyBoard();
-    bag          = newBag();
-    placed       = 0;
-    cleared      = 0;
-    sessionOver  = false;
-    rebalPhase   = false;
-    animating    = false;
-    lockFlashEnd = 0;
-    clearFlashEnd= 0;
-    clearFlashRows=null;
-    nextPiece    = makePiece(fromBag());
-    spawnNext();
+    board=emptyBoard(); bag=newBag();
+    placed=0; cleared=0; sessionOver=false; animating=false;
+    leanWindowOpen=false; gravityPaused=false;
+    clearTimeout(leanWindowTimer); leanWindowTimer=null;
+    lockFlashEnd=0; clearFlashEnd=0; clearFlashRows=null;
+    clearGlow=null; particles=[]; blockAnim=null;
+    nextPiece=makePiece(fromBag()); spawnNext();
     endOverlay.classList.add('hidden');
-    rebalControls.classList.add('hidden');
-    playControls.classList.remove('hidden');
     lastFall=performance.now();
     track('session_start',{totalSessions:stats.totalSessions});
   }
 
-  // ─── Rendering ────────────────────────────────────────────────────────────
+  // ─── Easing ────────────────────────────────────────────────────────────────
+  function easeOutQuint(t) { return 1-Math.pow(1-t,5); }
+
+  // ─── Particle system ───────────────────────────────────────────────────────
+  function spawnParticles(rows, color) {
+    for (const row of rows) {
+      for (let x=0;x<COLS;x+=2) {
+        const ang=(Math.random()-0.5)*Math.PI*1.5;
+        const sp=Math.random()*2.2+0.6;
+        particles.push({
+          x:(x+0.5)*CELL, y:(row+0.5)*CELL,
+          vx:Math.cos(ang)*sp, vy:-Math.abs(Math.sin(ang)*sp)-0.4,
+          sz:Math.random()*2.8+0.6, color,
+          born:performance.now(), life:560+Math.random()*320
+        });
+      }
+    }
+  }
+  function drawParticles(now) {
+    particles=particles.filter(p=>now-p.born<p.life);
+    for (const p of particles) {
+      const t=(now-p.born)/p.life;
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.055;
+      ctx.globalAlpha=(1-t)*0.78;
+      ctx.fillStyle=p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.sz*(1-t*0.4),0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Clear glow ────────────────────────────────────────────────────────────
+  function drawClearGlow(now) {
+    if (!clearGlow||now>clearGlow.end) { clearGlow=null; return; }
+    const t=(clearGlow.end-now)/400;
+    const alpha=Math.sin(t*Math.PI)*0.42;
+    ctx.globalAlpha=alpha;
+    for (const row of clearGlow.rows) {
+      const g=ctx.createLinearGradient(0,row*CELL,canvas.width,row*CELL);
+      g.addColorStop(0,'transparent');
+      g.addColorStop(0.3,clearGlow.color);
+      g.addColorStop(0.7,clearGlow.color);
+      g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;
+      ctx.fillRect(0,row*CELL,canvas.width,CELL);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Lean window canvas hints ──────────────────────────────────────────────
+  function drawLeanHints(now) {
+    if (!leanWindowOpen) return;
+    const remaining=leanWindowEnd-now;
+    const alpha=Math.min(1,remaining/200)*0.24;
+    if (alpha<=0) return;
+
+    ctx.globalAlpha=alpha;
+    const gl=ctx.createLinearGradient(0,0,48,0);
+    gl.addColorStop(0,'#8ecfb0'); gl.addColorStop(1,'transparent');
+    ctx.fillStyle=gl; ctx.fillRect(0,0,48,canvas.height);
+
+    const gr=ctx.createLinearGradient(canvas.width,0,canvas.width-48,0);
+    gr.addColorStop(0,'#8ecfb0'); gr.addColorStop(1,'transparent');
+    ctx.fillStyle=gr; ctx.fillRect(canvas.width-48,0,48,canvas.height);
+
+    if (turnCount<=3) {
+      ctx.globalAlpha=Math.min(0.6,alpha*2.8);
+      ctx.fillStyle='rgba(255,255,255,0.65)';
+      ctx.font=`bold 12px 'DM Sans',sans-serif`;
+      ctx.textAlign='center';
+      ctx.fillText('← swipe to lean →',canvas.width/2,canvas.height/2+5);
+      ctx.textAlign='left';
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Rendering ─────────────────────────────────────────────────────────────
   const BG   = '#080d09';
   const GRID = 'rgba(255,255,255,0.04)';
 
-  function drawBlock(ctx2,px,py,sz,color,flash) {
+  function drawBlock(ctx2, px, py, sz, color, flash) {
     ctx2.fillStyle=BG;
     ctx2.fillRect(px,py,sz,sz);
-    if (!color) { ctx2.strokeStyle=GRID; ctx2.lineWidth=0.5; ctx2.strokeRect(px+0.5,py+0.5,sz-1,sz-1); return; }
+    if (!color) {
+      ctx2.strokeStyle=GRID; ctx2.lineWidth=0.5;
+      ctx2.strokeRect(px+0.5,py+0.5,sz-1,sz-1);
+      return;
+    }
+    // Base fill
     ctx2.fillStyle=flash?'#c8e8d8':color;
     ctx2.fillRect(px+2,py+2,sz-4,sz-4);
     if (!flash) {
-      // Soft inner glow top edge
-      ctx2.fillStyle='rgba(255,255,255,0.14)';
-      ctx2.fillRect(px+2,py+2,sz-4,3);
-      // Subtle bottom shade
-      ctx2.fillStyle='rgba(0,0,0,0.12)';
-      ctx2.fillRect(px+2,py+sz-5,sz-4,3);
+      // Diagonal gradient for tactile depth
+      const g=ctx2.createLinearGradient(px+2,py+2,px+sz-2,py+sz-2);
+      g.addColorStop(0,'rgba(255,255,255,0.17)');
+      g.addColorStop(1,'rgba(0,0,0,0.13)');
+      ctx2.fillStyle=g; ctx2.fillRect(px+2,py+2,sz-4,sz-4);
+      // Left + top edge highlights
+      ctx2.fillStyle='rgba(255,255,255,0.11)';
+      ctx2.fillRect(px+2,py+2,2,sz-4);
+      ctx2.fillRect(px+2,py+2,sz-4,2);
     }
   }
 
@@ -478,19 +582,35 @@ body{
   }
 
   function render() {
+    const now=performance.now();
     ctx.fillStyle=BG;
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    const now=performance.now();
     const flashSet=(clearFlashRows&&now<clearFlashEnd)?new Set(clearFlashRows):null;
     const lockFlash=now<lockFlashEnd;
 
-    for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) {
-      drawBlock(ctx,x*CELL,y*CELL,CELL,board[y][x],flashSet&&flashSet.has(y));
+    if (blockAnim) {
+      // ── Animated slide: draw blocks at interpolated positions ──
+      const t=Math.min(1,(now-blockAnim.start)/blockAnim.dur);
+      const ease=easeOutQuint(t);
+      // Empty grid background
+      for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) drawBlock(ctx,x*CELL,y*CELL,CELL,null,false);
+      // Sliding blocks
+      for (const m of blockAnim.moves) {
+        const cx=m.fx+(m.tx-m.fx)*ease;
+        const cy=m.fy+(m.ty-m.fy)*ease;
+        drawBlock(ctx,Math.round(cx*CELL),Math.round(cy*CELL),CELL,m.color,false);
+      }
+      if (t>=1) blockAnim=null;
+    } else {
+      // Normal board
+      for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) {
+        drawBlock(ctx,x*CELL,y*CELL,CELL,board[y][x],flashSet&&flashSet.has(y));
+      }
     }
 
-    if (!rebalPhase&&piece&&!sessionOver) {
-      // Ghost
+    // Ghost + active piece (while settling)
+    if (!leanWindowOpen && !animating && piece && !sessionOver) {
       let gy=piece.y;
       while (!collides({...piece,y:gy+1},board)) gy++;
       for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
@@ -498,59 +618,90 @@ body{
         const gx=piece.x+c,gyr=gy+r;
         if (gyr>=0&&gyr<ROWS) { ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(gx*CELL+2,gyr*CELL+2,CELL-4,CELL-4); }
       }
-      // Active piece
+      const alpha=gravityPaused?(0.58+0.42*Math.sin(now/210)):1;
+      ctx.globalAlpha=alpha;
       for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
         if (!piece.shape[r][c]) continue;
         const px2=piece.x+c,py2=piece.y+r;
         if (py2>=0) drawBlock(ctx,px2*CELL,py2*CELL,CELL,piece.color,lockFlash);
       }
+      ctx.globalAlpha=1;
     }
+
+    drawClearGlow(now);
+    drawLeanHints(now);
+    drawParticles(now);
 
     placedEl.textContent=placed;
   }
 
-  // ─── Optional device tilt (rebalance phase only) ──────────────────────────
-  let tiltEnabled=false,tiltBase=null,tiltLatch=false;
-
-  function enableDeviceTilt() {
-    const doEnable=()=>{
-      tiltEnabled=true;
-      document.getElementById('btn-enable-tilt').textContent='Phone tilt: on ✓';
-      document.getElementById('btn-enable-tilt').disabled=true;
-      window.addEventListener('deviceorientation',handleOrientation,{passive:true});
-    };
-    const req=typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission;
-    if (req) { DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted')doEnable();}).catch(()=>{}); }
-    else { doEnable(); }
+  // ─── Device orientation ────────────────────────────────────────────────────
+  let orientationReady=false;
+  function setupOrientation() {
+    if (orientationReady) return; orientationReady=true;
+    const listen=()=>window.addEventListener('deviceorientation',handleOrientation,{passive:true});
+    if (typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) {
+      DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted')listen();}).catch(()=>{});
+    } else { listen(); }
   }
-
+  let tiltBase=null,tiltLatch=false;
   function handleOrientation(e) {
-    if (!rebalPhase||animating) { tiltLatch=false;tiltBase=null;return; }
+    if (!leanWindowOpen||animating) { tiltLatch=false;tiltBase=null;return; }
     const gamma=e.gamma||0;
     if (tiltBase===null) { tiltBase=gamma;return; }
     const delta=gamma-tiltBase;
     if (!tiltLatch) {
-      if (delta<-22) { tiltLatch=true;doRebal(-1); }
-      else if (delta>22) { tiltLatch=true;doRebal(+1); }
+      if (delta<-22) { tiltLatch=true;doLean(-1); }
+      else if (delta>22) { tiltLatch=true;doLean(+1); }
     }
     if (Math.abs(delta)<7) { tiltLatch=false;tiltBase=null; }
   }
 
-  // ─── Touch on canvas ──────────────────────────────────────────────────────
-  let touchOrigin=null;
-  canvas.addEventListener('pointerdown',e=>{ touchOrigin={x:e.clientX,y:e.clientY,t:Date.now()}; canvas.setPointerCapture(e.pointerId); });
-  canvas.addEventListener('pointerup',e=>{
+  // ─── Touch / pointer ───────────────────────────────────────────────────────
+  let touchOrigin=null, holdTimer=null, pointerDelta=0;
+
+  canvas.addEventListener('pointerdown', e => {
+    touchOrigin={x:e.clientX,y:e.clientY,t:Date.now()};
+    pointerDelta=0;
+    canvas.setPointerCapture(e.pointerId);
+    setupOrientation();
+    holdTimer=setTimeout(()=>{
+      if (pointerDelta<8&&!sessionOver&&!leanWindowOpen&&!animating) {
+        gravityPaused=true;
+        if (navigator.vibrate) navigator.vibrate(10);
+      }
+    }, HOLD_MS);
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!touchOrigin) return;
+    const dx=e.clientX-touchOrigin.x,dy=e.clientY-touchOrigin.y;
+    pointerDelta=Math.sqrt(dx*dx+dy*dy);
+    if (pointerDelta>8) { clearTimeout(holdTimer);holdTimer=null; }
+  });
+
+  canvas.addEventListener('pointerup', e => {
+    clearTimeout(holdTimer); holdTimer=null;
+    if (gravityPaused) { gravityPaused=false;lastFall=performance.now();touchOrigin=null;return; }
     if (!touchOrigin) return;
     const dx=e.clientX-touchOrigin.x, dy=e.clientY-touchOrigin.y, dt=Date.now()-touchOrigin.t;
     touchOrigin=null;
-    if (Math.abs(dx)<10&&Math.abs(dy)<10&&dt<300) { tryRotate(); return; }
-    if (Math.abs(dy)>45&&dy>Math.abs(dx)*1.4)     { settle();    return; }
-    if (Math.abs(dx)>30&&Math.abs(dx)>Math.abs(dy)*1.4) tryMove(dx<0?-1:1);
+
+    // Lean window: horizontal swipe = lean
+    if (leanWindowOpen) {
+      if (Math.abs(dx)>22&&Math.abs(dx)>Math.abs(dy)*1.15) doLean(dx<0?-1:1);
+      return;
+    }
+
+    if (sessionOver||animating) return;
+    if (pointerDelta<10&&dt<300) { tryRotate();return; }
+    if (Math.abs(dy)>44&&dy>Math.abs(dx)*1.4) { settle();return; }
+    if (Math.abs(dx)>28&&Math.abs(dx)>Math.abs(dy)*1.4) tryMove(dx<0?-1:1);
   });
 
-  // ─── Buttons ──────────────────────────────────────────────────────────────
+  // ─── Button controls ───────────────────────────────────────────────────────
   let moveTimer=null;
-  const startRepeat=dx=>{ tryMove(dx); moveTimer=setInterval(()=>tryMove(dx),120); };
+  const startRepeat=dx=>{ tryMove(dx); moveTimer=setInterval(()=>tryMove(dx),112); };
   const stopRepeat=()=>{ clearInterval(moveTimer);moveTimer=null; };
 
   document.getElementById('btn-left').addEventListener('pointerdown',()=>startRepeat(-1));
@@ -558,28 +709,24 @@ body{
   document.addEventListener('pointerup',stopRepeat);
   document.getElementById('btn-rotate').addEventListener('click',tryRotate);
   document.getElementById('btn-settle').addEventListener('click',settle);
-  document.getElementById('btn-rebal-left').addEventListener('click',()=>doRebal(-1));
-  document.getElementById('btn-rebal-right').addEventListener('click',()=>doRebal(+1));
-  document.getElementById('btn-rebal-skip').addEventListener('click',skipRebal);
   document.getElementById('btn-tend').addEventListener('click',()=>{ track('restart',{}); startSession(); });
-  document.getElementById('btn-enable-tilt').addEventListener('click',enableDeviceTilt);
 
-  // ─── Loop ─────────────────────────────────────────────────────────────────
+  // ─── Game loop ─────────────────────────────────────────────────────────────
   function loop(ts) {
-    if (!sessionOver&&!rebalPhase&&!animating) autoFall(ts);
+    if (gravityPaused) lastFall=ts;
+    if (!sessionOver&&!leanWindowOpen&&!animating&&!gravityPaused) autoFall(ts);
     render();
     renderNextPiece();
     requestAnimationFrame(loop);
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Init ──────────────────────────────────────────────────────────────────
   updateStatsBar();
   startSession();
   requestAnimationFrame(loop);
 
 })();
 </script>
-
 <script src="/shared/subdomain-nav.js"></script>
 </body>
 </html>

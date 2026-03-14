@@ -15,7 +15,7 @@
   --bg:#0a1628;--surface:#121e33;--surface2:#1a2a44;
   --accent:#00e5cc;--accent-d:rgba(0,229,204,0.13);--accent-b:rgba(0,229,204,0.22);
   --text:#e8edf5;--muted:rgba(232,237,245,0.48);--border:rgba(232,237,245,0.08);
-  --board-bg:#07101f;--cell-gap:rgba(255,255,255,0.05);
+  --board-bg:#07101f;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);overscroll-behavior:none}
 body{
@@ -31,7 +31,6 @@ body{
 
 /* ── Header ── */
 .game-header{width:100%;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.title-wrap{}
 .game-title{font-size:1.35rem;font-weight:800;letter-spacing:-0.4px}
 .game-sub{font-size:0.74rem;color:var(--muted);margin-top:2px;line-height:1.35;max-width:190px}
 .hud{display:flex;gap:14px;align-items:flex-start;flex-shrink:0}
@@ -42,30 +41,41 @@ body{
 .next-lbl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
 #next-canvas{display:block;border-radius:6px;background:var(--board-bg)}
 
-/* ── Board area ── */
+/* ── Board ── */
 .board-area{position:relative}
 .board-wrap{
   border-radius:14px;overflow:hidden;
   box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5);
-  transform-origin:center center;
+  transform-origin:center center;will-change:transform;
 }
 #board{display:block;touch-action:none}
 
-/* ── Tilt animations ── */
+/* ── Board animations ── */
 @keyframes wobbleLeft{
-  0%{transform:rotate(0deg) translateX(0)}
-  28%{transform:rotate(-10deg) translateX(-12px)}
-  62%{transform:rotate(-3deg) translateX(-4px)}
+  0%  {transform:rotate(0deg) translateX(0)}
+  22% {transform:rotate(-11deg) translateX(-13px)}
+  55% {transform:rotate(-3.5deg) translateX(-5px)}
+  78% {transform:rotate(-6deg) translateX(-8px)}
+  90% {transform:rotate(-1deg) translateX(-1px)}
   100%{transform:rotate(0deg) translateX(0)}
 }
 @keyframes wobbleRight{
-  0%{transform:rotate(0deg) translateX(0)}
-  28%{transform:rotate(10deg) translateX(12px)}
-  62%{transform:rotate(3deg) translateX(4px)}
+  0%  {transform:rotate(0deg) translateX(0)}
+  22% {transform:rotate(11deg) translateX(13px)}
+  55% {transform:rotate(3.5deg) translateX(5px)}
+  78% {transform:rotate(6deg) translateX(8px)}
+  90% {transform:rotate(1deg) translateX(1px)}
   100%{transform:rotate(0deg) translateX(0)}
 }
-.board-wrap.tilt-left{animation:wobbleLeft 0.46s ease-out}
-.board-wrap.tilt-right{animation:wobbleRight 0.46s ease-out}
+.board-wrap.tilt-left {animation:wobbleLeft  0.52s cubic-bezier(.36,.07,.19,.97)}
+.board-wrap.tilt-right{animation:wobbleRight 0.52s cubic-bezier(.36,.07,.19,.97)}
+
+@keyframes lockPop{
+  0%  {transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+  35% {transform:scale(1.014);box-shadow:0 0 0 2px var(--accent),0 8px 40px rgba(0,229,204,0.25)}
+  100%{transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+}
+.board-wrap.lock-pop{animation:lockPop 0.24s ease-out}
 
 /* ── Game-over overlay ── */
 .go-overlay{
@@ -79,60 +89,32 @@ body{
 .go-best{font-size:0.78rem;color:var(--accent);margin-bottom:22px;font-weight:700}
 .go-btn{
   background:var(--accent);color:#07101f;border:none;border-radius:12px;
-  padding:12px 36px;font-size:1rem;font-weight:800;cursor:pointer;
-  font-family:inherit;
+  padding:12px 36px;font-size:1rem;font-weight:800;cursor:pointer;font-family:inherit;
 }
 .go-btn:active{transform:scale(0.96)}
 
-/* ── Play controls ── */
+/* ── Controls ── */
 .controls{width:100%;display:flex;gap:7px;align-items:center}
 .ctrl-btn{
-  flex:1;height:50px;background:var(--surface);border:1px solid var(--border);
-  border-radius:13px;color:var(--text);font-size:1.2rem;cursor:pointer;
+  flex:1;height:44px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;color:var(--text);font-size:1.15rem;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:transform 0.1s,background 0.1s;font-family:inherit;
 }
 .ctrl-btn:active{transform:scale(0.91);background:var(--surface2)}
 .ctrl-drop{
-  flex:1.6;font-size:0.88rem;font-weight:700;
-  background:var(--accent-d);border-color:var(--accent);color:var(--accent);
+  flex:1.4;font-size:1.1rem;font-weight:700;
+  background:var(--accent-d);border-color:rgba(0,229,204,0.3);color:var(--accent);
 }
 .ctrl-drop:active{background:var(--accent-b)}
-
-/* ── Tilt panel ── */
-.tilt-panel{width:100%;display:flex;flex-direction:column;align-items:center;gap:7px}
-.tilt-prompt{font-size:0.76rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:0.07em}
-.tilt-row{width:100%;display:flex;gap:7px;align-items:center}
-.tilt-btn{
-  flex:1;height:54px;background:var(--accent-d);border:1px solid var(--accent);
-  border-radius:13px;color:var(--accent);font-size:1rem;font-weight:800;
-  cursor:pointer;transition:transform 0.1s,background 0.1s;font-family:inherit;
-}
-.tilt-btn:active{transform:scale(0.94);background:var(--accent-b)}
-.tilt-skip{
-  flex:0.55;height:42px;background:none;border:1px solid var(--border);
-  border-radius:13px;color:var(--muted);font-size:0.82rem;cursor:pointer;
-  font-family:inherit;
-}
-.tilt-skip:active{color:var(--text)}
-.tilt-device{font-size:0.68rem;color:var(--muted)}
 
 /* ── Stats ── */
 .stats-bar{
   width:100%;display:flex;justify-content:space-around;
-  padding:8px 0;border-top:1px solid var(--border);
-  font-size:0.76rem;color:var(--muted);
+  padding:7px 0;border-top:1px solid var(--border);
+  font-size:0.74rem;color:var(--muted);
 }
 .stats-bar b{color:var(--text);margin-left:2px}
-
-/* ── Optional device-tilt enable ── */
-.tilt-enable-row{display:flex;justify-content:center}
-#btn-enable-tilt{
-  background:none;border:1px solid var(--border);border-radius:10px;
-  color:var(--muted);font-size:0.75rem;padding:5px 12px;cursor:pointer;
-  font-family:inherit;
-}
-#btn-enable-tilt:active{color:var(--text)}
 
 .hidden{display:none!important}
 </style>
@@ -165,31 +147,18 @@ body{
       <div class="go-inner">
         <div class="go-title">Game Over</div>
         <div class="go-detail" id="go-detail"></div>
-        <div class="go-best" id="go-best"></div>
+        <div class="go-best"  id="go-best"></div>
         <button class="go-btn" id="btn-replay">Play Again</button>
       </div>
     </div>
   </div>
 
-  <div id="play-controls" class="controls">
+  <!-- Lean, minimal controls — always visible -->
+  <div class="controls">
     <button id="btn-left"   class="ctrl-btn" aria-label="Move left">◀</button>
     <button id="btn-rotate" class="ctrl-btn" aria-label="Rotate">↺</button>
     <button id="btn-right"  class="ctrl-btn" aria-label="Move right">▶</button>
-    <button id="btn-drop"   class="ctrl-drop ctrl-btn" aria-label="Drop piece">Drop ▼</button>
-  </div>
-
-  <div id="tilt-controls" class="tilt-panel hidden">
-    <p class="tilt-prompt">Tip the board?</p>
-    <div class="tilt-row">
-      <button id="btn-tilt-left"  class="tilt-btn">← Tip</button>
-      <button id="btn-skip"       class="tilt-skip">skip</button>
-      <button id="btn-tilt-right" class="tilt-btn">Tip →</button>
-    </div>
-    <p class="tilt-device hidden" id="tilt-device-hint">or tilt your phone</p>
-  </div>
-
-  <div class="tilt-enable-row">
-    <button id="btn-enable-tilt">Enable phone tilt (optional)</button>
+    <button id="btn-drop"   class="ctrl-drop ctrl-btn" aria-label="Drop">▼</button>
   </div>
 
   <div class="stats-bar">
@@ -199,18 +168,19 @@ body{
   </div>
 
 </div>
-
 <script>
 (function () {
   'use strict';
 
   // ─── Constants ──────────────────────────────────────────────────────────────
   const COLS = 8, ROWS = 14, CELL = 36;
-  const FALL_MS   = 2800;   // ms between auto-fall steps — slow + thoughtful
-  const TILT_MS   = 460;    // board wobble animation duration
-  const CLEAR_MS  = 280;    // line-clear flash duration
-  const LOCK_MS   = 130;    // piece-lock flash duration
-  const NEXT_CELL = 13;     // cell size in the "next" preview
+  const FALL_MS        = 2800;  // slow + thoughtful
+  const TILT_MS        = 520;   // board wobble duration
+  const CLEAR_MS       = 260;   // clear flash duration
+  const LOCK_MS        = 120;   // lock flash duration
+  const TILT_WINDOW_MS = 500;   // window after lock to swipe-tip
+  const HOLD_MS        = 360;   // long-press threshold for pause gravity
+  const NEXT_CELL      = 13;
 
   // ─── Piece data ─────────────────────────────────────────────────────────────
   const PIECES = {
@@ -223,12 +193,10 @@ body{
     L:{color:'#fb923c',shapes:[[[0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],[[0,1,0,0],[0,1,0,0],[0,1,1,0],[0,0,0,0]],[[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0]],[[1,1,0,0],[0,1,0,0],[0,1,0,0],[0,0,0,0]]]}
   };
   const TYPES = Object.keys(PIECES);
-
-  // Points: direct clear / tilt-chain multiplier
-  const PTS   = [0, 100, 260, 520, 840];
+  const PTS = [0, 100, 260, 520, 840];
   const TILT_MULT = 1.6;
 
-  // ─── Stats (localStorage) ──────────────────────────────────────────────────
+  // ─── Stats ─────────────────────────────────────────────────────────────────
   const STATS_KEY = 'tiltrix_v2';
   function loadStats() {
     try { return { bestScore:0, bestLines:0, totalRuns:0, ...JSON.parse(localStorage.getItem(STATS_KEY)||'{}') }; }
@@ -237,55 +205,58 @@ body{
   function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch {} }
   const stats = loadStats();
 
-  // ─── Event tracker ────────────────────────────────────────────────────────
   function track(name, data) { console.log('[tiltrix]', name, data); }
 
-  // ─── Canvas refs ──────────────────────────────────────────────────────────
+  // ─── Canvas / DOM refs ─────────────────────────────────────────────────────
   const canvas     = document.getElementById('board');
   const ctx        = canvas.getContext('2d');
   const nextCanvas = document.getElementById('next-canvas');
   const nctx       = nextCanvas.getContext('2d');
+  const scoreEl    = document.getElementById('score');
+  const goOverlay  = document.getElementById('go-overlay');
+  const goDetail   = document.getElementById('go-detail');
+  const goBest     = document.getElementById('go-best');
+  const boardWrap  = document.getElementById('board-wrap');
+  const statBest   = document.getElementById('stat-best');
+  const statLines  = document.getElementById('stat-lines');
+  const statRuns   = document.getElementById('stat-runs');
 
-  // ─── DOM refs ─────────────────────────────────────────────────────────────
-  const scoreEl       = document.getElementById('score');
-  const goOverlay     = document.getElementById('go-overlay');
-  const goDetail      = document.getElementById('go-detail');
-  const goBest        = document.getElementById('go-best');
-  const playControls  = document.getElementById('play-controls');
-  const tiltControls  = document.getElementById('tilt-controls');
-  const tiltDevHint   = document.getElementById('tilt-device-hint');
-  const boardWrap     = document.getElementById('board-wrap');
-  const statBest      = document.getElementById('stat-best');
-  const statLines     = document.getElementById('stat-lines');
-  const statRuns      = document.getElementById('stat-runs');
-
-  // ─── Game state ───────────────────────────────────────────────────────────
+  // ─── Game state ────────────────────────────────────────────────────────────
   let board, piece, nextPiece, bag;
-  let score, lines, gameOver, tiltPhase, animating;
-  let lastFall   = 0;
-  let lockFlashEnd  = 0;
-  let clearFlashEnd = 0;
-  let clearFlashRows = null;
+  let score, lines, gameOver;
+  let animating       = false;  // blocks autoFall + input (lock delay, wobble, clear)
+  let tiltWindowOpen  = false;  // brief post-lock swipe window
+  let tiltWindowEnd   = 0;
+  let tiltWindowTimer = null;
+  let gravityPaused   = false;  // long-press hold
+  let lastFall        = 0;
+  let lockFlashEnd    = 0;
+  let clearFlashEnd   = 0;
+  let clearFlashRows  = null;
+  let turnCount       = 0;      // for first-run hint
+  // Particles
+  let particles = [];
+  // Clear glow
+  let clearGlow = null;  // { rows, end, color }
 
-  // ─── Bag / spawn ──────────────────────────────────────────────────────────
+  // ─── Bag / spawn ───────────────────────────────────────────────────────────
   function newBag() {
     const a = TYPES.slice();
-    for (let i = a.length-1; i > 0; i--) { const j = (Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; }
+    for (let i=a.length-1;i>0;i--) { const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; }
     return a;
   }
-  function fromBag() { if (!bag.length) bag = newBag(); return bag.pop(); }
+  function fromBag() { if (!bag.length) bag=newBag(); return bag.pop(); }
   function makePiece(type) {
     return { type, rot:0, x:2, y:-1, shape:PIECES[type].shapes[0], color:PIECES[type].color };
   }
   function spawnNext() {
-    piece = { ...nextPiece, y: -1 };
+    piece = { ...nextPiece, y:-1 };
     nextPiece = makePiece(fromBag());
-    if (collides(piece, board)) { endGame(); }
+    if (collides(piece, board)) endGame();
   }
 
-  // ─── Board helpers ────────────────────────────────────────────────────────
+  // ─── Board helpers ─────────────────────────────────────────────────────────
   function emptyBoard() { return Array.from({length:ROWS}, ()=>Array(COLS).fill(null)); }
-
   function collides(p, b) {
     for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
       if (!p.shape[r][c]) continue;
@@ -295,163 +266,237 @@ body{
     }
     return false;
   }
-
   function lockPiece(p, b) {
     for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
-      if (p.shape[r][c] && p.y+r>=0) b[p.y+r][p.x+c] = p.color;
+      if (p.shape[r][c] && p.y+r>=0) b[p.y+r][p.x+c]=p.color;
     }
   }
-
   function clearLines(b) {
-    const cleared = [];
+    const cleared=[];
     for (let y=ROWS-1;y>=0;y--) {
       if (b[y].every(Boolean)) { cleared.push(y); b.splice(y,1); b.unshift(Array(COLS).fill(null)); y++; }
     }
     return cleared;
   }
 
-  // ─── Piece controls ───────────────────────────────────────────────────────
+  // ─── Piece controls ────────────────────────────────────────────────────────
   function tryMove(dx) {
-    if (gameOver||tiltPhase||animating) return;
-    const t={...piece, x:piece.x+dx};
-    if (!collides(t, board)) piece.x += dx;
+    if (gameOver||tiltWindowOpen||animating) return;
+    const t={...piece,x:piece.x+dx};
+    if (!collides(t,board)) piece.x+=dx;
   }
-
   function tryRotate() {
-    if (gameOver||tiltPhase||animating) return;
-    const newRot = (piece.rot+1)%4;
-    const newShape = PIECES[piece.type].shapes[newRot];
-    const kicks = [0,1,-1,2,-2];
+    if (gameOver||tiltWindowOpen||animating) return;
+    const newRot=(piece.rot+1)%4, newShape=PIECES[piece.type].shapes[newRot];
+    const kicks=[0,1,-1,2,-2];
     for (const k of kicks) {
-      const t = {...piece, rot:newRot, shape:newShape, x:piece.x+k};
-      if (!collides(t, board)) { Object.assign(piece, t); return; }
+      const t={...piece,rot:newRot,shape:newShape,x:piece.x+k};
+      if (!collides(t,board)) { Object.assign(piece,t); return; }
     }
   }
-
   function hardDrop() {
-    if (gameOver||tiltPhase||animating) return;
-    while (!collides({...piece, y:piece.y+1}, board)) piece.y++;
+    if (gameOver||tiltWindowOpen||animating) return;
+    while (!collides({...piece,y:piece.y+1},board)) piece.y++;
     lockCurrentPiece();
   }
-
   function autoFall(ts) {
-    if (ts - lastFall < FALL_MS) return;
-    lastFall = ts;
-    if (collides({...piece, y:piece.y+1}, board)) { lockCurrentPiece(); }
-    else { piece.y++; }
+    if (ts-lastFall<FALL_MS) return;
+    lastFall=ts;
+    if (collides({...piece,y:piece.y+1},board)) lockCurrentPiece();
+    else piece.y++;
   }
 
+  // ─── Lock & tilt window ────────────────────────────────────────────────────
   function lockCurrentPiece() {
     lockPiece(piece, board);
+    animating = true;   // block autoFall during lock delay
     lockFlashEnd = performance.now() + LOCK_MS;
-    // Immediate line clears (standard)
+
+    // Lock pop
+    boardWrap.classList.remove('lock-pop');
+    void boardWrap.offsetWidth;
+    boardWrap.classList.add('lock-pop');
+    boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('lock-pop'), {once:true});
+
+    // Direct line clears
     const cleared = clearLines(board);
     if (cleared.length) {
-      score += PTS[Math.min(cleared.length, 4)];
+      score += PTS[Math.min(cleared.length,4)];
       lines += cleared.length;
       clearFlashRows = cleared;
       clearFlashEnd  = performance.now() + CLEAR_MS;
+      clearGlow      = { rows:cleared, end:performance.now()+380, color:'#00e5cc' };
+      spawnParticles(cleared, '#00e5cc');
       track('line_clear', {count:cleared.length, afterTilt:false, score, lines});
     }
     track('piece_place', {type:piece.type, score, lines});
-    // Enter tilt phase after lock flash resolves
+
+    // Open tilt window after flash settles
     setTimeout(() => {
       clearFlashRows = null;
-      tiltPhase = true;
-      playControls.classList.add('hidden');
-      tiltControls.classList.remove('hidden');
+      animating = false;
+      openTiltWindow();
     }, Math.max(LOCK_MS, cleared.length ? CLEAR_MS : 0) + 30);
   }
 
-  // ─── Tilt mechanics ───────────────────────────────────────────────────────
-  function doTilt(dir) {
-    if (!tiltPhase||animating) return;
-    animating = true;
-    tiltPhase = false;
-    tiltControls.classList.add('hidden');
-    track('board_tilt', {dir, score, lines});
-    // Visual wobble
-    boardWrap.classList.add(dir < 0 ? 'tilt-left' : 'tilt-right');
-    const removeClass = () => { boardWrap.classList.remove('tilt-left','tilt-right'); boardWrap.removeEventListener('animationend', removeClass); };
-    boardWrap.addEventListener('animationend', removeClass);
-    // Physics at midpoint of animation
-    setTimeout(() => {
-      applyTiltPhysics(dir);
-      const tiltCleared = clearLines(board);
-      if (tiltCleared.length) {
-        const pts = Math.round(PTS[Math.min(tiltCleared.length,4)] * TILT_MULT);
-        score += pts;
-        lines += tiltCleared.length;
-        clearFlashRows = tiltCleared;
-        clearFlashEnd  = performance.now() + CLEAR_MS;
-        track('line_clear', {count:tiltCleared.length, afterTilt:true, pts, score, lines});
-        setTimeout(finishTurn, CLEAR_MS + 40);
-      } else {
-        finishTurn();
-      }
-    }, TILT_MS * 0.45);
+  function openTiltWindow() {
+    tiltWindowOpen  = true;
+    tiltWindowEnd   = performance.now() + TILT_WINDOW_MS;
+    turnCount++;
+    tiltWindowTimer = setTimeout(autoCloseTiltWindow, TILT_WINDOW_MS);
   }
-
-  function skipTilt() {
-    if (!tiltPhase||animating) return;
-    tiltPhase = false;
-    tiltControls.classList.add('hidden');
-    track('board_tilt', {dir:0, score, lines});
+  function closeTiltWindow() {
+    clearTimeout(tiltWindowTimer);
+    tiltWindowTimer = null;
+    tiltWindowOpen  = false;
+  }
+  function autoCloseTiltWindow() {
+    tiltWindowOpen = false;
     finishTurn();
   }
 
+  // ─── Tilt mechanics ────────────────────────────────────────────────────────
+  function doTilt(dir) {
+    if (!tiltWindowOpen || animating) return;
+    animating = true;
+    closeTiltWindow();
+    track('board_tilt', {dir, score, lines});
+
+    boardWrap.classList.add(dir<0?'tilt-left':'tilt-right');
+    boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('tilt-left','tilt-right'), {once:true});
+
+    setTimeout(() => {
+      applyTiltPhysics(dir);
+      const tc = clearLines(board);
+      if (tc.length) {
+        const pts = Math.round(PTS[Math.min(tc.length,4)] * TILT_MULT);
+        score += pts; lines += tc.length;
+        clearFlashRows = tc; clearFlashEnd = performance.now()+CLEAR_MS;
+        clearGlow = { rows:tc, end:performance.now()+480, color:'#00e5cc' };
+        spawnParticles(tc, '#00e5cc');
+        track('line_clear', {count:tc.length, afterTilt:true, pts, score, lines});
+        setTimeout(finishTurn, CLEAR_MS+40);
+      } else {
+        finishTurn();
+      }
+    }, TILT_MS * 0.44);
+  }
+
   function applyTiltPhysics(dir) {
-    // Row-compact in tilt direction
     for (let y=0;y<ROWS;y++) {
-      const cells = board[y].filter(c=>c!==null);
-      board[y] = dir<0
-        ? [...cells, ...Array(COLS-cells.length).fill(null)]
-        : [...Array(COLS-cells.length).fill(null), ...cells];
+      const cells=board[y].filter(c=>c!==null);
+      board[y]=dir<0?[...cells,...Array(COLS-cells.length).fill(null)]:[...Array(COLS-cells.length).fill(null),...cells];
     }
-    // Column gravity (blocks fall to bottom)
     for (let x=0;x<COLS;x++) {
-      const col = [];
+      const col=[];
       for (let y=0;y<ROWS;y++) { if (board[y][x]) col.push(board[y][x]); }
-      for (let y=ROWS-1;y>=0;y--) { board[y][x] = col.length ? col.pop() : null; }
+      for (let y=ROWS-1;y>=0;y--) { board[y][x]=col.length?col.pop():null; }
     }
   }
 
   function finishTurn() {
     clearFlashRows = null;
     animating = false;
-    if (!gameOver) {
-      playControls.classList.remove('hidden');
-      spawnNext();
-      lastFall = performance.now();
-    }
+    if (!gameOver) { spawnNext(); lastFall=performance.now(); }
   }
 
-  // ─── Rendering ────────────────────────────────────────────────────────────
+  // ─── Particle system ───────────────────────────────────────────────────────
+  function spawnParticles(rows, color) {
+    for (const row of rows) {
+      for (let x=0;x<COLS;x+=2) {
+        const ang = (Math.random()-0.5)*Math.PI*1.4;
+        const sp  = Math.random()*2.4+0.8;
+        particles.push({
+          x:(x+0.5)*CELL, y:(row+0.5)*CELL,
+          vx:Math.cos(ang)*sp, vy:-Math.abs(Math.sin(ang)*sp)-0.6,
+          sz:Math.random()*2.4+0.5, color,
+          born:performance.now(), life:480+Math.random()*280
+        });
+      }
+    }
+  }
+  function drawParticles(now) {
+    particles = particles.filter(p=>now-p.born<p.life);
+    for (const p of particles) {
+      const t=(now-p.born)/p.life;
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.07;
+      ctx.globalAlpha=(1-t)*0.82;
+      ctx.fillStyle=p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.sz*(1-t*0.45), 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Clear glow ────────────────────────────────────────────────────────────
+  function drawClearGlow(now) {
+    if (!clearGlow||now>clearGlow.end) { clearGlow=null; return; }
+    const t=(clearGlow.end-now)/380;
+    const alpha=Math.sin(t*Math.PI)*0.48;
+    ctx.globalAlpha=alpha;
+    for (const row of clearGlow.rows) {
+      const g=ctx.createLinearGradient(0,row*CELL,canvas.width,row*CELL);
+      g.addColorStop(0,'transparent');
+      g.addColorStop(0.3,clearGlow.color);
+      g.addColorStop(0.7,clearGlow.color);
+      g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;
+      ctx.fillRect(0,row*CELL,canvas.width,CELL);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Tilt window canvas hints ───────────────────────────────────────────────
+  function drawTiltHints(now) {
+    if (!tiltWindowOpen) return;
+    const remaining=tiltWindowEnd-now;
+    const alpha=Math.min(1,remaining/180)*0.28;
+    if (alpha<=0) return;
+
+    // Edge gradient strips
+    ctx.globalAlpha=alpha;
+    const gl=ctx.createLinearGradient(0,0,52,0);
+    gl.addColorStop(0,'#00e5cc'); gl.addColorStop(1,'transparent');
+    ctx.fillStyle=gl; ctx.fillRect(0,0,52,canvas.height);
+
+    const gr=ctx.createLinearGradient(canvas.width,0,canvas.width-52,0);
+    gr.addColorStop(0,'#00e5cc'); gr.addColorStop(1,'transparent');
+    ctx.fillStyle=gr; ctx.fillRect(canvas.width-52,0,52,canvas.height);
+
+    // First-run coachmark
+    if (turnCount<=3) {
+      ctx.globalAlpha=Math.min(0.7,alpha*2.5);
+      ctx.fillStyle='rgba(255,255,255,0.75)';
+      ctx.font=`bold 12px 'DM Sans',sans-serif`;
+      ctx.textAlign='center';
+      ctx.fillText('← swipe to tip →', canvas.width/2, canvas.height/2+5);
+      ctx.textAlign='left';
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ─── Rendering ─────────────────────────────────────────────────────────────
   const BG   = '#07101f';
   const GRID = 'rgba(255,255,255,0.04)';
 
   function drawBlock(ctx2, px, py, sz, color, flash) {
-    ctx2.fillStyle = BG;
-    ctx2.fillRect(px, py, sz, sz);
-    if (!color) { ctx2.strokeStyle = GRID; ctx2.lineWidth = 0.5; ctx2.strokeRect(px+0.5,py+0.5,sz-1,sz-1); return; }
-    ctx2.fillStyle = flash ? '#ffffff' : color;
-    ctx2.fillRect(px+2, py+2, sz-4, sz-4);
+    ctx2.fillStyle=BG;
+    ctx2.fillRect(px,py,sz,sz);
+    if (!color) { ctx2.strokeStyle=GRID; ctx2.lineWidth=0.5; ctx2.strokeRect(px+0.5,py+0.5,sz-1,sz-1); return; }
+    ctx2.fillStyle=flash?'#ffffff':color;
+    ctx2.fillRect(px+2,py+2,sz-4,sz-4);
     if (!flash) {
-      // Top shine
-      ctx2.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx2.fillRect(px+2, py+2, sz-4, 4);
-      // Bottom shadow
-      ctx2.fillStyle = 'rgba(0,0,0,0.18)';
-      ctx2.fillRect(px+2, py+sz-6, sz-4, 4);
+      ctx2.fillStyle='rgba(255,255,255,0.18)'; ctx2.fillRect(px+2,py+2,sz-4,4);
+      ctx2.fillStyle='rgba(0,0,0,0.18)';       ctx2.fillRect(px+2,py+sz-6,sz-4,4);
     }
   }
 
   function renderNextPiece() {
-    nctx.fillStyle = BG;
+    nctx.fillStyle=BG;
     nctx.fillRect(0,0,nextCanvas.width,nextCanvas.height);
     if (!nextPiece) return;
-    const shape = nextPiece.shape;
-    // Find bounding box
+    const shape=nextPiece.shape;
     let minR=3,maxR=0,minC=3,maxC=0;
     for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
       if (shape[r][c]) { minR=Math.min(minR,r);maxR=Math.max(maxR,r);minC=Math.min(minC,c);maxC=Math.max(maxC,c); }
@@ -459,174 +504,193 @@ body{
     const bh=(maxR-minR+1)*NEXT_CELL, bw=(maxC-minC+1)*NEXT_CELL;
     const ox=Math.floor((nextCanvas.width-bw)/2), oy=Math.floor((nextCanvas.height-bh)/2);
     for (let r=minR;r<=maxR;r++) for (let c=minC;c<=maxC;c++) {
-      if (shape[r][c]) drawBlock(nctx, ox+(c-minC)*NEXT_CELL, oy+(r-minR)*NEXT_CELL, NEXT_CELL, nextPiece.color, false);
+      if (shape[r][c]) drawBlock(nctx,ox+(c-minC)*NEXT_CELL,oy+(r-minR)*NEXT_CELL,NEXT_CELL,nextPiece.color,false);
     }
   }
 
   function render(ts) {
-    ctx.fillStyle = BG;
+    const now=performance.now();
+    ctx.fillStyle=BG;
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    const now = performance.now();
-    const flashSet = (clearFlashRows && now < clearFlashEnd) ? new Set(clearFlashRows) : null;
-    const lockFlash = now < lockFlashEnd;
+    const flashSet=(clearFlashRows&&now<clearFlashEnd)?new Set(clearFlashRows):null;
+    const lockFlash=now<lockFlashEnd;
 
     // Board
     for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) {
-      drawBlock(ctx, x*CELL, y*CELL, CELL, board[y][x], flashSet && flashSet.has(y));
+      drawBlock(ctx,x*CELL,y*CELL,CELL,board[y][x],flashSet&&flashSet.has(y));
     }
 
-    // Ghost piece
-    if (!tiltPhase && piece && !gameOver) {
-      let gy = piece.y;
-      while (!collides({...piece,y:gy+1}, board)) gy++;
+    // Ghost + active piece (only while placing)
+    if (!tiltWindowOpen && !animating && piece && !gameOver) {
+      let gy=piece.y;
+      while (!collides({...piece,y:gy+1},board)) gy++;
       for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
         if (!piece.shape[r][c]) continue;
         const gx=piece.x+c, gyr=gy+r;
-        if (gyr>=0 && gyr<ROWS) {
-          ctx.fillStyle='rgba(255,255,255,0.07)';
-          ctx.fillRect(gx*CELL+2, gyr*CELL+2, CELL-4, CELL-4);
-        }
+        if (gyr>=0&&gyr<ROWS) { ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(gx*CELL+2,gyr*CELL+2,CELL-4,CELL-4); }
       }
-      // Active piece
+      // Piece pulses when gravity is held
+      const alpha=gravityPaused?(0.62+0.38*Math.sin(now/190)):1;
+      ctx.globalAlpha=alpha;
       for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
         if (!piece.shape[r][c]) continue;
         const px2=piece.x+c, py2=piece.y+r;
-        if (py2>=0) drawBlock(ctx, px2*CELL, py2*CELL, CELL, piece.color, lockFlash);
+        if (py2>=0) drawBlock(ctx,px2*CELL,py2*CELL,CELL,piece.color,lockFlash);
       }
+      ctx.globalAlpha=1;
     }
 
-    // Score
-    scoreEl.textContent = score;
+    drawClearGlow(now);
+    drawTiltHints(now);
+    drawParticles(now);
+
+    scoreEl.textContent=score;
   }
 
-  // ─── Game over ────────────────────────────────────────────────────────────
+  // ─── Game over ─────────────────────────────────────────────────────────────
   function endGame() {
-    gameOver = true;
-    tiltControls.classList.add('hidden');
-    playControls.classList.add('hidden');
-    goDetail.textContent = `Score ${score.toLocaleString()} · Lines ${lines}`;
-    const isNewBest = score > stats.bestScore;
-    if (isNewBest) stats.bestScore = score;
-    if (lines  > stats.bestLines) stats.bestLines = lines;
+    gameOver=true; closeTiltWindow();
+    goDetail.textContent=`Score ${score.toLocaleString()} · Lines ${lines}`;
+    const isNew=score>stats.bestScore;
+    if (isNew) stats.bestScore=score;
+    if (lines>stats.bestLines) stats.bestLines=lines;
     stats.totalRuns++;
-    saveStats(stats);
-    updateStatsBar();
-    goBest.textContent = isNewBest ? '✦ New best score!' : `Best ${stats.bestScore.toLocaleString()}`;
+    saveStats(stats); updateStatsBar();
+    goBest.textContent=isNew?'✦ New best score!':`Best ${stats.bestScore.toLocaleString()}`;
     goOverlay.classList.remove('hidden');
-    track('game_over', {score, lines, runs:stats.totalRuns});
+    track('game_over',{score,lines,runs:stats.totalRuns});
   }
 
   function updateStatsBar() {
-    statBest.textContent  = stats.bestScore.toLocaleString();
-    statLines.textContent = stats.bestLines;
-    statRuns.textContent  = stats.totalRuns;
+    statBest.textContent=stats.bestScore.toLocaleString();
+    statLines.textContent=stats.bestLines;
+    statRuns.textContent=stats.totalRuns;
   }
 
-  // ─── Start / restart ──────────────────────────────────────────────────────
+  // ─── Start / restart ───────────────────────────────────────────────────────
   function startGame() {
-    board      = emptyBoard();
-    bag        = newBag();
-    score      = 0;
-    lines      = 0;
-    gameOver   = false;
-    tiltPhase  = false;
-    animating  = false;
-    lockFlashEnd  = 0;
-    clearFlashEnd = 0;
-    clearFlashRows = null;
-    nextPiece  = makePiece(fromBag());
-    spawnNext();
+    board=emptyBoard(); bag=newBag();
+    score=0; lines=0; gameOver=false; animating=false;
+    tiltWindowOpen=false; gravityPaused=false;
+    clearTimeout(tiltWindowTimer); tiltWindowTimer=null;
+    lockFlashEnd=0; clearFlashEnd=0; clearFlashRows=null;
+    clearGlow=null; particles=[];
+    nextPiece=makePiece(fromBag()); spawnNext();
     goOverlay.classList.add('hidden');
-    tiltControls.classList.add('hidden');
-    playControls.classList.remove('hidden');
-    lastFall = performance.now();
-    track('game_start', {runs:stats.totalRuns});
+    lastFall=performance.now();
+    track('game_start',{runs:stats.totalRuns});
   }
 
-  // ─── Optional device tilt (tilt phase only) ───────────────────────────────
-  let tiltEnabled = false;
-  let tiltBase    = null;
-  let tiltLatch   = false;
+  // ─── Device orientation (auto-enable; iOS permission on first tap) ─────────
+  let orientationReady=false;
 
-  function enableDeviceTilt() {
-    const doEnable = () => {
-      tiltEnabled = true;
-      document.getElementById('btn-enable-tilt').textContent = 'Phone tilt: on ✓';
-      document.getElementById('btn-enable-tilt').disabled = true;
-      tiltDevHint.classList.remove('hidden');
-      window.addEventListener('deviceorientation', handleOrientation, {passive:true});
-    };
-    const req = typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission;
-    if (req) {
-      DeviceOrientationEvent.requestPermission().then(r => { if (r==='granted') doEnable(); }).catch(()=>{});
-    } else { doEnable(); }
-  }
-
-  function handleOrientation(e) {
-    if (!tiltPhase||animating) { tiltLatch=false; tiltBase=null; return; }
-    const gamma = e.gamma||0;
-    if (tiltBase===null) { tiltBase=gamma; return; }
-    const delta = gamma - tiltBase;
-    if (!tiltLatch) {
-      if (delta < -20)      { tiltLatch=true; doTilt(-1); }
-      else if (delta > 20)  { tiltLatch=true; doTilt(+1); }
+  function setupOrientation() {
+    if (orientationReady) return;
+    orientationReady=true;
+    const listen=()=>window.addEventListener('deviceorientation', handleOrientation, {passive:true});
+    if (typeof DeviceOrientationEvent!=='undefined' && DeviceOrientationEvent.requestPermission) {
+      DeviceOrientationEvent.requestPermission().then(r=>{ if(r==='granted') listen(); }).catch(()=>{});
+    } else {
+      listen();
     }
-    if (Math.abs(delta) < 6) { tiltLatch=false; tiltBase=null; }
   }
 
-  // ─── Touch controls on canvas ─────────────────────────────────────────────
-  let touchOrigin = null;
+  let tiltBase=null, tiltLatch=false;
+  function handleOrientation(e) {
+    if (!tiltWindowOpen||animating) { tiltLatch=false; tiltBase=null; return; }
+    const gamma=e.gamma||0;
+    if (tiltBase===null) { tiltBase=gamma; return; }
+    const delta=gamma-tiltBase;
+    if (!tiltLatch) {
+      if (delta<-20)     { tiltLatch=true; doTilt(-1); }
+      else if (delta>20) { tiltLatch=true; doTilt(+1); }
+    }
+    if (Math.abs(delta)<6) { tiltLatch=false; tiltBase=null; }
+  }
+
+  // ─── Touch / pointer ───────────────────────────────────────────────────────
+  let touchOrigin=null, holdTimer=null, pointerDelta=0;
+
   canvas.addEventListener('pointerdown', e => {
-    touchOrigin = {x:e.clientX, y:e.clientY, t:Date.now()};
+    touchOrigin={x:e.clientX,y:e.clientY,t:Date.now()};
+    pointerDelta=0;
     canvas.setPointerCapture(e.pointerId);
+
+    // Try to enable device orientation on first meaningful tap (iOS)
+    setupOrientation();
+
+    // Start long-press hold timer
+    holdTimer=setTimeout(()=>{
+      if (pointerDelta<8 && !gameOver && !tiltWindowOpen && !animating) {
+        gravityPaused=true;
+        if (navigator.vibrate) navigator.vibrate(10);
+      }
+    }, HOLD_MS);
   });
-  canvas.addEventListener('pointerup', e => {
+
+  canvas.addEventListener('pointermove', e => {
     if (!touchOrigin) return;
-    const dx = e.clientX - touchOrigin.x;
-    const dy = e.clientY - touchOrigin.y;
-    const dt = Date.now() - touchOrigin.t;
-    touchOrigin = null;
-    if (Math.abs(dx)<10 && Math.abs(dy)<10 && dt<300) { tryRotate(); return; }
-    if (Math.abs(dy)>45 && dy>Math.abs(dx)*1.4)       { hardDrop();  return; }
-    if (Math.abs(dx)>30 && Math.abs(dx)>Math.abs(dy)*1.4) { tryMove(dx<0?-1:1); }
+    const dx=e.clientX-touchOrigin.x, dy=e.clientY-touchOrigin.y;
+    pointerDelta=Math.sqrt(dx*dx+dy*dy);
+    if (pointerDelta>8) { clearTimeout(holdTimer); holdTimer=null; }
   });
 
-  // ─── Button controls ──────────────────────────────────────────────────────
-  let moveTimer = null;
-  function startRepeat(dx) {
-    tryMove(dx);
-    moveTimer = setInterval(()=>tryMove(dx), 110);
-  }
-  function stopRepeat() { clearInterval(moveTimer); moveTimer=null; }
+  canvas.addEventListener('pointerup', e => {
+    clearTimeout(holdTimer); holdTimer=null;
 
-  document.getElementById('btn-left').addEventListener('pointerdown', ()=>startRepeat(-1));
-  document.getElementById('btn-right').addEventListener('pointerdown', ()=>startRepeat(+1));
-  document.addEventListener('pointerup', stopRepeat);
-  document.getElementById('btn-rotate').addEventListener('click', tryRotate);
-  document.getElementById('btn-drop').addEventListener('click', hardDrop);
-  document.getElementById('btn-tilt-left').addEventListener('click', ()=>doTilt(-1));
-  document.getElementById('btn-tilt-right').addEventListener('click', ()=>doTilt(+1));
-  document.getElementById('btn-skip').addEventListener('click', skipTilt);
-  document.getElementById('btn-replay').addEventListener('click', ()=>{ track('restart',{}); startGame(); });
-  document.getElementById('btn-enable-tilt').addEventListener('click', enableDeviceTilt);
+    // Release gravity hold
+    if (gravityPaused) {
+      gravityPaused=false; lastFall=performance.now();
+      touchOrigin=null; return;
+    }
 
-  // ─── Game loop ────────────────────────────────────────────────────────────
+    if (!touchOrigin) return;
+    const dx=e.clientX-touchOrigin.x;
+    const dy=e.clientY-touchOrigin.y;
+    const dt=Date.now()-touchOrigin.t;
+    touchOrigin=null;
+
+    // Tilt window: horizontal swipe = tip
+    if (tiltWindowOpen) {
+      if (Math.abs(dx)>22 && Math.abs(dx)>Math.abs(dy)*1.15) doTilt(dx<0?-1:1);
+      return; // consume all other gestures
+    }
+
+    if (gameOver||animating) return;
+    if (pointerDelta<10 && dt<300) { tryRotate(); return; }
+    if (Math.abs(dy)>44 && dy>Math.abs(dx)*1.4) { hardDrop(); return; }
+    if (Math.abs(dx)>28 && Math.abs(dx)>Math.abs(dy)*1.4) tryMove(dx<0?-1:1);
+  });
+
+  // ─── Button controls ───────────────────────────────────────────────────────
+  let moveTimer=null;
+  const startRepeat=dx=>{ tryMove(dx); moveTimer=setInterval(()=>tryMove(dx),108); };
+  const stopRepeat=()=>{ clearInterval(moveTimer); moveTimer=null; };
+
+  document.getElementById('btn-left').addEventListener('pointerdown',()=>startRepeat(-1));
+  document.getElementById('btn-right').addEventListener('pointerdown',()=>startRepeat(+1));
+  document.addEventListener('pointerup',stopRepeat);
+  document.getElementById('btn-rotate').addEventListener('click',tryRotate);
+  document.getElementById('btn-drop').addEventListener('click',hardDrop);
+  document.getElementById('btn-replay').addEventListener('click',()=>{ track('restart',{}); startGame(); });
+
+  // ─── Game loop ─────────────────────────────────────────────────────────────
   function loop(ts) {
-    if (!gameOver && !tiltPhase && !animating) autoFall(ts);
+    if (gravityPaused) lastFall=ts;
+    if (!gameOver && !tiltWindowOpen && !animating && !gravityPaused) autoFall(ts);
     render(ts);
     renderNextPiece();
     requestAnimationFrame(loop);
   }
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
+  // ─── Init ──────────────────────────────────────────────────────────────────
   updateStatsBar();
   startGame();
   requestAnimationFrame(loop);
 
 })();
 </script>
-
 <script src="/shared/subdomain-nav.js"></script>
 </body>
 </html>
