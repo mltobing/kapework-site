@@ -23,8 +23,8 @@
     "url": "apps/braingym/",
     "released_at": "2026-02-22",
     "tags": ["puzzle","logic","word"],
-    "blurb": "Logic and word games: BlinkGrid, Longshot, Tiltrix, Rainbow Rules.",
-    "cover_emoji": "🧩"
+    "blurb": "Logic and puzzle games: BlinkGrid, Longshot, Tiltrix, Tilt Garden, Rainbow Rules.",
+    "cover_emoji": "◈"
   },
   {
     "slug": "create",
