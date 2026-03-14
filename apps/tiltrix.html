@@ -25,7 +25,7 @@ body{
   touch-action:manipulation;
 }
 .page{
-  width:100%;max-width:340px;
+  width:100%;max-width:400px;
   padding:10px 12px env(safe-area-inset-bottom,10px);
   display:flex;flex-direction:column;align-items:center;gap:10px;
 }
@@ -110,13 +110,20 @@ body{
 }
 .ctrl-drop:active{background:var(--accent-b)}
 
-/* ── Stats ── */
-.stats-bar{
-  width:100%;display:flex;justify-content:space-around;
-  padding:7px 0;border-top:1px solid var(--border);
-  font-size:0.74rem;color:var(--muted);
+/* ── Stats overflow menu ── */
+.menu-wrap{position:relative;display:flex;align-items:center}
+.menu-btn{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:4px 6px;line-height:1;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.menu-btn:active{opacity:0.7}
+.menu-dropdown{
+  position:absolute;right:0;top:calc(100%+8px);z-index:100;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;min-width:152px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.55);
+  display:none;
 }
-.stats-bar b{color:var(--text);margin-left:2px}
+.menu-dropdown.open{display:block}
+.menu-stat{display:flex;justify-content:space-between;gap:14px;font-size:0.8rem;color:var(--muted);padding:3px 0}
+.menu-stat b{color:var(--text)}
 
 .hidden{display:none!important}
 </style>
@@ -132,18 +139,26 @@ body{
     <div class="hud">
       <div class="next-wrap">
         <span class="next-lbl">Next</span>
-        <canvas id="next-canvas" width="56" height="56" aria-hidden="true"></canvas>
+        <canvas id="next-canvas" aria-hidden="true"></canvas>
       </div>
       <div class="hud-box">
         <span class="hud-val" id="score">0</span>
         <span class="hud-lbl">score</span>
+      </div>
+      <div class="menu-wrap">
+        <button class="menu-btn" id="btn-menu" aria-label="Stats">⋮</button>
+        <div class="menu-dropdown" id="menu-dropdown">
+          <div class="menu-stat">Best score <b id="stat-best">0</b></div>
+          <div class="menu-stat">Lines cleared <b id="stat-lines">0</b></div>
+          <div class="menu-stat">Runs <b id="stat-runs">0</b></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="board-area">
     <div id="board-wrap" class="board-wrap">
-      <canvas id="board" width="288" height="504" aria-label="Tiltrix game board"></canvas>
+      <canvas id="board" aria-label="Tiltrix game board"></canvas>
     </div>
     <div id="go-overlay" class="go-overlay hidden">
       <div class="go-inner">
@@ -163,11 +178,6 @@ body{
     <button id="btn-drop"   class="ctrl-drop ctrl-btn" aria-label="Drop">▼</button>
   </div>
 
-  <div class="stats-bar">
-    <span>Best&nbsp;<b id="stat-best">0</b></span>
-    <span>Lines&nbsp;<b id="stat-lines">0</b></span>
-    <span>Runs&nbsp;<b id="stat-runs">0</b></span>
-  </div>
 
 </div>
 <script>
@@ -175,14 +185,14 @@ body{
   'use strict';
 
   // ─── Constants ──────────────────────────────────────────────────────────────
-  const COLS = 8, ROWS = 14, CELL = 36;
+  const COLS = 8, ROWS = 14;
+  let CELL = 36, NEXT_CELL = 13;
   const FALL_MS        = 2800;  // slow + thoughtful
   const TILT_MS        = 520;   // board wobble duration
   const CLEAR_MS       = 260;   // clear flash duration
   const LOCK_MS        = 120;   // lock flash duration
   const TILT_WINDOW_MS = 500;   // window after lock to swipe-tip
   const HOLD_MS        = 360;   // long-press threshold for pause gravity
-  const NEXT_CELL      = 13;
 
   // ─── Piece data ─────────────────────────────────────────────────────────────
   const PIECES = {
@@ -218,10 +228,23 @@ body{
   const goOverlay  = document.getElementById('go-overlay');
   const goDetail   = document.getElementById('go-detail');
   const goBest     = document.getElementById('go-best');
-  const boardWrap  = document.getElementById('board-wrap');
-  const statBest   = document.getElementById('stat-best');
-  const statLines  = document.getElementById('stat-lines');
-  const statRuns   = document.getElementById('stat-runs');
+  const boardWrap    = document.getElementById('board-wrap');
+  const menuDropdown = document.getElementById('menu-dropdown');
+  const statBest     = document.getElementById('stat-best');
+  const statLines    = document.getElementById('stat-lines');
+  const statRuns     = document.getElementById('stat-runs');
+
+  // ─── Dynamic board sizing ──────────────────────────────────────────────────
+  (function() {
+    const fromW = Math.floor((Math.min(window.innerWidth, 400) - 24) / COLS);
+    const fromH = Math.floor((window.innerHeight - 152) / ROWS);
+    CELL      = Math.max(30, Math.min(50, Math.min(fromW, fromH)));
+    NEXT_CELL = Math.max(10, Math.round(CELL * 0.36));
+    canvas.width     = COLS * CELL;
+    canvas.height    = ROWS * CELL;
+    const ns = NEXT_CELL * 4 + 4;
+    nextCanvas.width = nextCanvas.height = ns;
+  })();
 
   // ─── Game state ────────────────────────────────────────────────────────────
   let board, piece, nextPiece, bag;
@@ -354,10 +377,11 @@ body{
 
   // ─── Tilt mechanics ────────────────────────────────────────────────────────
   function doTilt(dir) {
-    if (!tiltWindowOpen || animating) return;
+    if (animating || gameOver) return;
+    const wasWindow = tiltWindowOpen;
     animating = true;
-    closeTiltWindow();
-    track('board_tilt', {dir, score, lines});
+    if (wasWindow) closeTiltWindow();
+    track('board_tilt', {dir, fromWindow:wasWindow, score, lines});
 
     boardWrap.classList.add(dir<0?'tilt-left':'tilt-right');
     boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('tilt-left','tilt-right'), {once:true});
@@ -365,6 +389,11 @@ body{
     setTimeout(() => {
       applyTiltPhysics(dir);
       const tc = clearLines(board);
+      const afterClear = () => {
+        clearFlashRows = null;
+        if (wasWindow) { finishTurn(); }
+        else { animating = false; lastFall = performance.now(); }
+      };
       if (tc.length) {
         const pts = Math.round(PTS[Math.min(tc.length,4)] * TILT_MULT);
         score += pts; lines += tc.length;
@@ -373,9 +402,9 @@ body{
         spawnParticles(tc, '#00e5cc');
         if (tc.length >= 2) flashBoardBorder();
         track('line_clear', {count:tc.length, afterTilt:true, pts, score, lines});
-        setTimeout(finishTurn, CLEAR_MS+40);
+        setTimeout(afterClear, CLEAR_MS+40);
       } else {
-        finishTurn();
+        afterClear();
       }
     }, TILT_MS * 0.44);
   }
@@ -620,7 +649,7 @@ body{
 
   let tiltBase=null, tiltLatch=false;
   function handleOrientation(e) {
-    if (!tiltWindowOpen||animating) { tiltLatch=false; tiltBase=null; return; }
+    if (animating||gameOver) { tiltLatch=false; tiltBase=null; return; }
     const gamma=e.gamma||0;
     if (tiltBase===null) { tiltBase=gamma; return; }
     const delta=gamma-tiltBase;
@@ -668,16 +697,21 @@ body{
     }
 
     if (!touchOrigin) return;
-    const dx=e.clientX-touchOrigin.x;
-    const dy=e.clientY-touchOrigin.y;
-    const dt=Date.now()-touchOrigin.t;
-    touchOrigin=null;
+    const dx = e.clientX - touchOrigin.x;
+    const dy = e.clientY - touchOrigin.y;
+    const dt = Date.now() - touchOrigin.t;
+    const rect = canvas.getBoundingClientRect();
+    const startRelX = touchOrigin.x - rect.left;
+    touchOrigin = null;
 
-    // Tilt window: horizontal swipe = tip
-    if (tiltWindowOpen) {
-      if (Math.abs(dx)>18 && Math.abs(dx)>Math.abs(dy)*1.1) doTilt(dx<0?-1:1);
-      return; // consume all other gestures
+    // Edge-zone swipe OR tilt window = board tilt
+    const edgePx = rect.width * 0.15;
+    const isEdgeStart = startRelX < edgePx || startRelX > rect.width - edgePx;
+
+    if ((tiltWindowOpen || isEdgeStart) && Math.abs(dx)>18 && Math.abs(dx)>Math.abs(dy)*1.1) {
+      doTilt(dx<0?-1:1); return;
     }
+    if (tiltWindowOpen) return; // window open but not a tilt gesture — consume
 
     if (gameOver||animating) return;
     if (pointerDelta<10 && dt<300) { tryRotate(); return; }
@@ -707,6 +741,12 @@ body{
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────
+  document.getElementById('btn-menu').addEventListener('click', e => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle('open');
+  });
+  document.addEventListener('pointerdown', () => menuDropdown.classList.remove('open'));
+
   updateStatsBar();
   startGame();
   requestAnimationFrame(loop);
