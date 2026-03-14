@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0a1628">
 <title>Tiltrix · Kapework</title>
@@ -22,6 +22,7 @@ body{
   font-family:'DM Sans',system-ui,-apple-system,sans-serif;
   display:flex;flex-direction:column;align-items:center;
   min-height:100dvh;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
 }
 .page{
   width:100%;max-width:340px;
@@ -70,12 +71,13 @@ body{
 .board-wrap.tilt-left {animation:wobbleLeft  0.52s cubic-bezier(.36,.07,.19,.97)}
 .board-wrap.tilt-right{animation:wobbleRight 0.52s cubic-bezier(.36,.07,.19,.97)}
 
-@keyframes lockPop{
-  0%  {transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
-  35% {transform:scale(1.014);box-shadow:0 0 0 2px var(--accent),0 8px 40px rgba(0,229,204,0.25)}
-  100%{transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+/* border flash: only on multi-line clears */
+@keyframes multiClear{
+  0%  {box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+  32% {box-shadow:0 0 0 2px var(--accent),0 8px 52px rgba(0,229,204,0.42)}
+  100%{box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
 }
-.board-wrap.lock-pop{animation:lockPop 0.24s ease-out}
+.board-wrap.multi-clear{animation:multiClear 0.55s ease-out}
 
 /* ── Game-over overlay ── */
 .go-overlay{
@@ -312,12 +314,6 @@ body{
     animating = true;   // block autoFall during lock delay
     lockFlashEnd = performance.now() + LOCK_MS;
 
-    // Lock pop
-    boardWrap.classList.remove('lock-pop');
-    void boardWrap.offsetWidth;
-    boardWrap.classList.add('lock-pop');
-    boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('lock-pop'), {once:true});
-
     // Direct line clears
     const cleared = clearLines(board);
     if (cleared.length) {
@@ -325,8 +321,9 @@ body{
       lines += cleared.length;
       clearFlashRows = cleared;
       clearFlashEnd  = performance.now() + CLEAR_MS;
-      clearGlow      = { rows:cleared, end:performance.now()+380, color:'#00e5cc' };
+      clearGlow = { rows:cleared, end:performance.now()+380, color:'#00e5cc' };
       spawnParticles(cleared, '#00e5cc');
+      if (cleared.length >= 2) flashBoardBorder();
       track('line_clear', {count:cleared.length, afterTilt:false, score, lines});
     }
     track('piece_place', {type:piece.type, score, lines});
@@ -374,6 +371,7 @@ body{
         clearFlashRows = tc; clearFlashEnd = performance.now()+CLEAR_MS;
         clearGlow = { rows:tc, end:performance.now()+480, color:'#00e5cc' };
         spawnParticles(tc, '#00e5cc');
+        if (tc.length >= 2) flashBoardBorder();
         track('line_clear', {count:tc.length, afterTilt:true, pts, score, lines});
         setTimeout(finishTurn, CLEAR_MS+40);
       } else {
@@ -398,6 +396,14 @@ body{
     clearFlashRows = null;
     animating = false;
     if (!gameOver) { spawnNext(); lastFall=performance.now(); }
+  }
+
+  // ─── Board border flash (multi-line clear only) ────────────────────────────
+  function flashBoardBorder() {
+    boardWrap.classList.remove('multi-clear');
+    void boardWrap.offsetWidth;
+    boardWrap.classList.add('multi-clear');
+    boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('multi-clear'), {once:true});
   }
 
   // ─── Particle system ───────────────────────────────────────────────────────
@@ -449,31 +455,47 @@ body{
 
   // ─── Tilt window canvas hints ───────────────────────────────────────────────
   function drawTiltHints(now) {
-    if (!tiltWindowOpen) return;
-    const remaining=tiltWindowEnd-now;
-    const alpha=Math.min(1,remaining/180)*0.28;
-    if (alpha<=0) return;
+    // Edge affordances: always subtly visible while a piece is active,
+    // brighter + pulsing during the tilt window to invite the swipe.
+    const isWindow  = tiltWindowOpen;
+    const isPlaying = !gameOver && !animating && !!piece;
+    if (!isPlaying && !isWindow) return;
 
-    // Edge gradient strips
-    ctx.globalAlpha=alpha;
-    const gl=ctx.createLinearGradient(0,0,52,0);
+    const baseA   = isPlaying ? 0.10 : 0;
+    const winA    = isWindow  ? (0.20 + 0.09*Math.sin(now/230)) : 0;
+    const edgeA   = baseA + winA;
+    if (edgeA < 0.01) return;
+
+    // Gradient strips on left & right edges
+    ctx.globalAlpha = edgeA;
+    const gl = ctx.createLinearGradient(0,0,30,0);
     gl.addColorStop(0,'#00e5cc'); gl.addColorStop(1,'transparent');
-    ctx.fillStyle=gl; ctx.fillRect(0,0,52,canvas.height);
+    ctx.fillStyle = gl; ctx.fillRect(0,0,30,canvas.height);
 
-    const gr=ctx.createLinearGradient(canvas.width,0,canvas.width-52,0);
+    const gr = ctx.createLinearGradient(canvas.width,0,canvas.width-30,0);
     gr.addColorStop(0,'#00e5cc'); gr.addColorStop(1,'transparent');
-    ctx.fillStyle=gr; ctx.fillRect(canvas.width-52,0,52,canvas.height);
+    ctx.fillStyle = gr; ctx.fillRect(canvas.width-30,0,30,canvas.height);
 
-    // First-run coachmark
-    if (turnCount<=3) {
-      ctx.globalAlpha=Math.min(0.7,alpha*2.5);
-      ctx.fillStyle='rgba(255,255,255,0.75)';
-      ctx.font=`bold 12px 'DM Sans',sans-serif`;
-      ctx.textAlign='center';
+    // Chevron arrows — brighter than the strip
+    const chevA = Math.min(1, edgeA*2.8);
+    ctx.globalAlpha = chevA;
+    ctx.fillStyle = '#00e5cc';
+    ctx.font = 'bold 14px sans-serif';
+    const cy = (canvas.height/2+6)|0;
+    ctx.textAlign = 'left';  ctx.fillText('‹', 6, cy);
+    ctx.textAlign = 'right'; ctx.fillText('›', canvas.width-6, cy);
+    ctx.textAlign = 'left';
+
+    // First-run text hint (only while tilt window is open)
+    if (isWindow && turnCount<=3) {
+      ctx.globalAlpha = Math.min(0.65, winA*3);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = `bold 12px 'DM Sans',sans-serif`;
+      ctx.textAlign = 'center';
       ctx.fillText('← swipe to tip →', canvas.width/2, canvas.height/2+5);
-      ctx.textAlign='left';
+      ctx.textAlign = 'left';
     }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha = 1;
   }
 
   // ─── Rendering ─────────────────────────────────────────────────────────────
@@ -653,7 +675,7 @@ body{
 
     // Tilt window: horizontal swipe = tip
     if (tiltWindowOpen) {
-      if (Math.abs(dx)>22 && Math.abs(dx)>Math.abs(dy)*1.15) doTilt(dx<0?-1:1);
+      if (Math.abs(dx)>18 && Math.abs(dx)>Math.abs(dy)*1.1) doTilt(dx<0?-1:1);
       return; // consume all other gestures
     }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0d100f">
 <title>Tilt Garden · Kapework</title>
@@ -22,6 +22,7 @@ body{
   font-family:'DM Sans',system-ui,-apple-system,sans-serif;
   display:flex;flex-direction:column;align-items:center;
   min-height:100dvh;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
 }
 .page{
   width:100%;max-width:340px;
@@ -73,12 +74,13 @@ body{
 .board-wrap.sway-left {animation:swayLeft  0.72s cubic-bezier(.36,.07,.19,.97)}
 .board-wrap.sway-right{animation:swayRight 0.72s cubic-bezier(.36,.07,.19,.97)}
 
-@keyframes settlePop{
-  0%  {transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
-  40% {transform:scale(1.011);box-shadow:0 0 0 1.5px var(--accent),0 8px 36px rgba(127,188,152,0.22)}
-  100%{transform:scale(1);box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+/* border flash: only on multi-line clears */
+@keyframes multiClear{
+  0%  {box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
+  32% {box-shadow:0 0 0 2px var(--accent),0 8px 50px rgba(127,188,152,0.40)}
+  100%{box-shadow:0 0 0 1px var(--border),0 8px 32px rgba(0,0,0,0.5)}
 }
-.board-wrap.settle-pop{animation:settlePop 0.28s ease-out}
+.board-wrap.multi-clear{animation:multiClear 0.6s ease-out}
 
 /* ── Session-end overlay ── */
 .end-overlay{
@@ -315,12 +317,6 @@ body{
     animating=true;
     lockFlashEnd=performance.now()+LOCK_MS;
 
-    // Settle pop
-    boardWrap.classList.remove('settle-pop');
-    void boardWrap.offsetWidth;
-    boardWrap.classList.add('settle-pop');
-    boardWrap.addEventListener('animationend',()=>boardWrap.classList.remove('settle-pop'),{once:true});
-
     // Direct line clears
     const dc=clearLines(board);
     if (dc.length) {
@@ -328,6 +324,7 @@ body{
       clearFlashRows=dc; clearFlashEnd=performance.now()+CLEAR_MS;
       clearGlow={rows:dc,end:performance.now()+460,color:'#8ecfb0'};
       spawnParticles(dc,'#8ecfb0');
+      if (dc.length >= 2) flashBoardBorder();
       track('session_clear',{count:dc.length,afterLean:false,placed,cleared});
     }
     track('piece_place',{type:piece.type,placed,cleared});
@@ -404,6 +401,7 @@ body{
         clearFlashRows=rc; clearFlashEnd=performance.now()+CLEAR_MS;
         clearGlow={rows:rc,end:performance.now()+500,color:'#8ecfb0'};
         spawnParticles(rc,'#8ecfb0');
+        if (rc.length >= 2) flashBoardBorder();
         track('session_clear',{count:rc.length,afterLean:true,placed,cleared});
         setTimeout(()=>{ clearFlashRows=null; finishTurn(); }, CLEAR_MS+40);
       } else {
@@ -463,6 +461,14 @@ body{
   // ─── Easing ────────────────────────────────────────────────────────────────
   function easeOutQuint(t) { return 1-Math.pow(1-t,5); }
 
+  // ─── Board border flash (multi-line clear only) ────────────────────────────
+  function flashBoardBorder() {
+    boardWrap.classList.remove('multi-clear');
+    void boardWrap.offsetWidth;
+    boardWrap.classList.add('multi-clear');
+    boardWrap.addEventListener('animationend', ()=>boardWrap.classList.remove('multi-clear'), {once:true});
+  }
+
   // ─── Particle system ───────────────────────────────────────────────────────
   function spawnParticles(rows, color) {
     for (const row of rows) {
@@ -512,29 +518,47 @@ body{
 
   // ─── Lean window canvas hints ──────────────────────────────────────────────
   function drawLeanHints(now) {
-    if (!leanWindowOpen) return;
-    const remaining=leanWindowEnd-now;
-    const alpha=Math.min(1,remaining/200)*0.24;
-    if (alpha<=0) return;
+    // Edge affordances: always subtly visible while a piece is active,
+    // brighter + pulsing during the lean window to invite the swipe.
+    const isWindow  = leanWindowOpen;
+    const isPlaying = !sessionOver && !animating && !!piece;
+    if (!isPlaying && !isWindow) return;
 
-    ctx.globalAlpha=alpha;
-    const gl=ctx.createLinearGradient(0,0,48,0);
+    const baseA = isPlaying ? 0.10 : 0;
+    const winA  = isWindow  ? (0.20 + 0.09*Math.sin(now/230)) : 0;
+    const edgeA = baseA + winA;
+    if (edgeA < 0.01) return;
+
+    // Gradient strips on left & right edges
+    ctx.globalAlpha = edgeA;
+    const gl = ctx.createLinearGradient(0,0,30,0);
     gl.addColorStop(0,'#8ecfb0'); gl.addColorStop(1,'transparent');
-    ctx.fillStyle=gl; ctx.fillRect(0,0,48,canvas.height);
+    ctx.fillStyle = gl; ctx.fillRect(0,0,30,canvas.height);
 
-    const gr=ctx.createLinearGradient(canvas.width,0,canvas.width-48,0);
+    const gr = ctx.createLinearGradient(canvas.width,0,canvas.width-30,0);
     gr.addColorStop(0,'#8ecfb0'); gr.addColorStop(1,'transparent');
-    ctx.fillStyle=gr; ctx.fillRect(canvas.width-48,0,48,canvas.height);
+    ctx.fillStyle = gr; ctx.fillRect(canvas.width-30,0,30,canvas.height);
 
-    if (turnCount<=3) {
-      ctx.globalAlpha=Math.min(0.6,alpha*2.8);
-      ctx.fillStyle='rgba(255,255,255,0.65)';
-      ctx.font=`bold 12px 'DM Sans',sans-serif`;
-      ctx.textAlign='center';
-      ctx.fillText('← swipe to lean →',canvas.width/2,canvas.height/2+5);
-      ctx.textAlign='left';
+    // Chevron arrows — brighter than the strip
+    const chevA = Math.min(1, edgeA*2.8);
+    ctx.globalAlpha = chevA;
+    ctx.fillStyle = '#8ecfb0';
+    ctx.font = 'bold 14px sans-serif';
+    const cy = (canvas.height/2+6)|0;
+    ctx.textAlign = 'left';  ctx.fillText('‹', 6, cy);
+    ctx.textAlign = 'right'; ctx.fillText('›', canvas.width-6, cy);
+    ctx.textAlign = 'left';
+
+    // First-run text hint (only while lean window is open)
+    if (isWindow && turnCount<=3) {
+      ctx.globalAlpha = Math.min(0.65, winA*3);
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = `bold 12px 'DM Sans',sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('← swipe to lean →', canvas.width/2, canvas.height/2+5);
+      ctx.textAlign = 'left';
     }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha = 1;
   }
 
   // ─── Rendering ─────────────────────────────────────────────────────────────
@@ -689,7 +713,7 @@ body{
 
     // Lean window: horizontal swipe = lean
     if (leanWindowOpen) {
-      if (Math.abs(dx)>22&&Math.abs(dx)>Math.abs(dy)*1.15) doLean(dx<0?-1:1);
+      if (Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.1) doLean(dx<0?-1:1);
       return;
     }
 
