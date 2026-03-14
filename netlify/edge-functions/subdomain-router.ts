@@ -36,6 +36,7 @@ const SINGLE_FILE: Record<string, string> = {
   rainbowrules: "/apps/rainbowrules.html",
   tapsum:       "/apps/tapsum.html",
   tiltrix:      "/apps/tiltrix.html",
+  tiltgarden:   "/apps/tiltgarden.html",
 };
 
 // ─── Pass-through: prefixes already inside /apps or /shared ──────────────────
