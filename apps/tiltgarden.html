@@ -25,7 +25,7 @@ body{
   touch-action:manipulation;
 }
 .page{
-  width:100%;max-width:340px;
+  width:100%;max-width:400px;
   padding:10px 12px env(safe-area-inset-bottom,10px);
   display:flex;flex-direction:column;align-items:center;gap:10px;
 }
@@ -113,13 +113,20 @@ body{
 }
 .ctrl-settle:active{background:var(--accent-b)}
 
-/* ── Stats ── */
-.stats-bar{
-  width:100%;display:flex;justify-content:space-around;
-  padding:7px 0;border-top:1px solid var(--border);
-  font-size:0.74rem;color:var(--muted);
+/* ── Stats overflow menu ── */
+.menu-wrap{position:relative;display:flex;align-items:center}
+.menu-btn{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:4px 6px;line-height:1;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.menu-btn:active{opacity:0.7}
+.menu-dropdown{
+  position:absolute;right:0;top:calc(100%+8px);z-index:100;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;min-width:152px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.55);
+  display:none;
 }
-.stats-bar b{color:var(--text);margin-left:2px}
+.menu-dropdown.open{display:block}
+.menu-stat{display:flex;justify-content:space-between;gap:14px;font-size:0.8rem;color:var(--muted);padding:3px 0}
+.menu-stat b{color:var(--text)}
 
 .hidden{display:none!important}
 </style>
@@ -135,18 +142,26 @@ body{
     <div class="hud">
       <div class="next-wrap">
         <span class="next-lbl">Next</span>
-        <canvas id="next-canvas" width="56" height="56" aria-hidden="true"></canvas>
+        <canvas id="next-canvas" aria-hidden="true"></canvas>
       </div>
       <div class="hud-box">
         <span class="hud-val" id="placed">0</span>
         <span class="hud-lbl">placed</span>
+      </div>
+      <div class="menu-wrap">
+        <button class="menu-btn" id="btn-menu" aria-label="Stats">⋮</button>
+        <div class="menu-dropdown" id="menu-dropdown">
+          <div class="menu-stat">Placed <b id="stat-placed">0</b></div>
+          <div class="menu-stat">Cleared <b id="stat-cleared">0</b></div>
+          <div class="menu-stat">Sessions <b id="stat-sessions">0</b></div>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="board-area">
     <div id="board-wrap" class="board-wrap">
-      <canvas id="board" width="288" height="432" aria-label="Tilt Garden game board"></canvas>
+      <canvas id="board" aria-label="Tilt Garden game board"></canvas>
     </div>
     <div id="end-overlay" class="end-overlay hidden">
       <div class="end-inner">
@@ -166,11 +181,6 @@ body{
     <button id="btn-settle" class="ctrl-settle ctrl-btn" aria-label="Settle piece">▼</button>
   </div>
 
-  <div class="stats-bar">
-    <span>Placed&nbsp;<b id="stat-placed">0</b></span>
-    <span>Cleared&nbsp;<b id="stat-cleared">0</b></span>
-    <span>Sessions&nbsp;<b id="stat-sessions">0</b></span>
-  </div>
 
 </div>
 <script>
@@ -178,15 +188,15 @@ body{
   'use strict';
 
   // ─── Constants ──────────────────────────────────────────────────────────────
-  const COLS = 8, ROWS = 12, CELL = 36;
+  const COLS = 8, ROWS = 12;
+  let CELL = 36, NEXT_CELL = 13;
   const FALL_MS        = 5500;  // no pressure
   const SWAY_MS        = 720;   // board sway duration
-  const SLIDE_MS       = 380;   // block slide animation
+  const SLIDE_MS       = 1000;  // block slide animation — slow, gentle
   const CLEAR_MS       = 340;   // clear flash
   const LOCK_MS        = 140;   // lock flash
   const LEAN_WINDOW_MS = 700;   // post-settle swipe window
   const HOLD_MS        = 360;   // long-press threshold
-  const NEXT_CELL      = 13;
 
   // ─── Piece data — warm, soft palette ────────────────────────────────────
   const PIECES = {
@@ -219,10 +229,23 @@ body{
   const placedEl   = document.getElementById('placed');
   const endOverlay = document.getElementById('end-overlay');
   const endDetail  = document.getElementById('end-detail');
-  const boardWrap  = document.getElementById('board-wrap');
-  const statPlaced = document.getElementById('stat-placed');
-  const statCleared= document.getElementById('stat-cleared');
-  const statSess   = document.getElementById('stat-sessions');
+  const boardWrap    = document.getElementById('board-wrap');
+  const menuDropdown = document.getElementById('menu-dropdown');
+  const statPlaced   = document.getElementById('stat-placed');
+  const statCleared  = document.getElementById('stat-cleared');
+  const statSess     = document.getElementById('stat-sessions');
+
+  // ─── Dynamic board sizing ──────────────────────────────────────────────────
+  (function() {
+    const fromW = Math.floor((Math.min(window.innerWidth, 400) - 24) / COLS);
+    const fromH = Math.floor((window.innerHeight - 152) / ROWS);
+    CELL      = Math.max(30, Math.min(50, Math.min(fromW, fromH)));
+    NEXT_CELL = Math.max(10, Math.round(CELL * 0.36));
+    canvas.width     = COLS * CELL;
+    canvas.height    = ROWS * CELL;
+    const ns = NEXT_CELL * 4 + 4;
+    nextCanvas.width = nextCanvas.height = ns;
+  })();
 
   // ─── Session state ─────────────────────────────────────────────────────────
   let board, piece, nextPiece, bag;
@@ -348,7 +371,9 @@ body{
   function autoCloseLeanWindow() { leanWindowOpen=false; finishTurn(); }
 
   // ─── Block slide move computation ──────────────────────────────────────────
-  // Returns [{fx,fy,tx,ty,color}] for animating from current board to post-tilt board
+  // Returns [{fx,fy,midX,midY,tx,ty,color}]:
+  //   Phase 1 (0→0.5 t): fx,fy → midX,midY  (horizontal compact, row stays)
+  //   Phase 2 (0.5→1 t): midX,midY → tx,ty   (vertical gravity drop, col stays)
   function computeMoves(dir) {
     const moves=[];
     // Step 1: row-compact
@@ -358,7 +383,7 @@ body{
       row.sort((a,b)=>a.x-b.x);
       row.forEach((b,i)=>{
         const nx=dir<0?i:(COLS-row.length+i);
-        moves.push({fx:b.x,fy:y,midX:nx,origY:y,color:b.color});
+        moves.push({fx:b.x,fy:y,midX:nx,midY:y,color:b.color});
       });
     }
     // Step 2: column-gravity
@@ -366,18 +391,19 @@ body{
     for (const m of moves) { if (!byCol[m.midX]) byCol[m.midX]=[]; byCol[m.midX].push(m); }
     const final=[];
     for (let x=0;x<COLS;x++) {
-      const col=(byCol[x]||[]).sort((a,b)=>a.origY-b.origY);
-      col.forEach((m,i)=>{ final.push({fx:m.fx,fy:m.fy,tx:m.midX,ty:ROWS-col.length+i,color:m.color}); });
+      const col=(byCol[x]||[]).sort((a,b)=>a.midY-b.midY);
+      col.forEach((m,i)=>{ final.push({fx:m.fx,fy:m.fy,midX:m.midX,midY:m.midY,tx:m.midX,ty:ROWS-col.length+i,color:m.color}); });
     }
     return final;
   }
 
   // ─── Lean (tilt) mechanics ─────────────────────────────────────────────────
   function doLean(dir) {
-    if (!leanWindowOpen||animating) return;
+    if (animating||sessionOver) return;
+    const wasWindow=leanWindowOpen;
     animating=true;
-    closeLeanWindow();
-    track('lean',{dir,placed,cleared});
+    if (wasWindow) closeLeanWindow();
+    track('lean',{dir,fromWindow:wasWindow,placed,cleared});
 
     // Compute animation moves BEFORE applying physics
     const moves=computeMoves(dir);
@@ -389,13 +415,18 @@ body{
     // Apply physics — board is now in post-tilt state
     applyLeanPhysics(dir);
 
-    // Animate blocks sliding to their new positions
+    // Animate blocks sliding (phase 1: horizontal, phase 2: vertical drop)
     blockAnim={moves, start:performance.now(), dur:SLIDE_MS};
 
     // After slide, detect and flash any completed lines
     setTimeout(()=>{
       blockAnim=null;
       const rc=clearLines(board);
+      const afterClear=()=>{
+        clearFlashRows=null;
+        if (wasWindow) { finishTurn(); }
+        else { animating=false; lastFall=performance.now(); }
+      };
       if (rc.length) {
         cleared+=rc.length;
         clearFlashRows=rc; clearFlashEnd=performance.now()+CLEAR_MS;
@@ -403,9 +434,9 @@ body{
         spawnParticles(rc,'#8ecfb0');
         if (rc.length >= 2) flashBoardBorder();
         track('session_clear',{count:rc.length,afterLean:true,placed,cleared});
-        setTimeout(()=>{ clearFlashRows=null; finishTurn(); }, CLEAR_MS+40);
+        setTimeout(afterClear, CLEAR_MS+40);
       } else {
-        finishTurn();
+        afterClear();
       }
     }, SLIDE_MS+32);
   }
@@ -460,6 +491,7 @@ body{
 
   // ─── Easing ────────────────────────────────────────────────────────────────
   function easeOutQuint(t) { return 1-Math.pow(1-t,5); }
+  function easeInOutSine(t) { return -(Math.cos(Math.PI*t)-1)/2; }
 
   // ─── Board border flash (multi-line clear only) ────────────────────────────
   function flashBoardBorder() {
@@ -614,15 +646,19 @@ body{
     const lockFlash=now<lockFlashEnd;
 
     if (blockAnim) {
-      // ── Animated slide: draw blocks at interpolated positions ──
+      // ── Two-phase slide: Phase 1 horizontal, Phase 2 vertical drop ──
       const t=Math.min(1,(now-blockAnim.start)/blockAnim.dur);
-      const ease=easeOutQuint(t);
       // Empty grid background
       for (let y=0;y<ROWS;y++) for (let x=0;x<COLS;x++) drawBlock(ctx,x*CELL,y*CELL,CELL,null,false);
-      // Sliding blocks
       for (const m of blockAnim.moves) {
-        const cx=m.fx+(m.tx-m.fx)*ease;
-        const cy=m.fy+(m.ty-m.fy)*ease;
+        let cx, cy;
+        if (t < 0.5) {
+          const e=easeInOutSine(t*2);
+          cx=m.fx+(m.midX-m.fx)*e; cy=m.fy;       // slide sideways, stay in original row
+        } else {
+          const e=easeInOutSine((t-0.5)*2);
+          cx=m.midX; cy=m.midY+(m.ty-m.midY)*e;   // stay in final col, drop to gravity row
+        }
         drawBlock(ctx,Math.round(cx*CELL),Math.round(cy*CELL),CELL,m.color,false);
       }
       if (t>=1) blockAnim=null;
@@ -670,7 +706,7 @@ body{
   }
   let tiltBase=null,tiltLatch=false;
   function handleOrientation(e) {
-    if (!leanWindowOpen||animating) { tiltLatch=false;tiltBase=null;return; }
+    if (animating||sessionOver) { tiltLatch=false;tiltBase=null;return; }
     const gamma=e.gamma||0;
     if (tiltBase===null) { tiltBase=gamma;return; }
     const delta=gamma-tiltBase;
@@ -709,13 +745,17 @@ body{
     if (gravityPaused) { gravityPaused=false;lastFall=performance.now();touchOrigin=null;return; }
     if (!touchOrigin) return;
     const dx=e.clientX-touchOrigin.x, dy=e.clientY-touchOrigin.y, dt=Date.now()-touchOrigin.t;
+    const rect=canvas.getBoundingClientRect();
+    const startRelX=touchOrigin.x-rect.left;
     touchOrigin=null;
 
-    // Lean window: horizontal swipe = lean
-    if (leanWindowOpen) {
-      if (Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.1) doLean(dx<0?-1:1);
-      return;
+    // Edge-zone swipe OR lean window = board lean (tilt anytime)
+    const edgePx=rect.width*0.15;
+    const isEdgeStart=startRelX<edgePx||startRelX>rect.width-edgePx;
+    if ((leanWindowOpen||isEdgeStart)&&Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.1) {
+      doLean(dx<0?-1:1); return;
     }
+    if (leanWindowOpen) return; // window open but not lean gesture — consume
 
     if (sessionOver||animating) return;
     if (pointerDelta<10&&dt<300) { tryRotate();return; }
@@ -745,6 +785,12 @@ body{
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────
+  document.getElementById('btn-menu').addEventListener('click', e => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle('open');
+  });
+  document.addEventListener('pointerdown', () => menuDropdown.classList.remove('open'));
+
   updateStatsBar();
   startSession();
   requestAnimationFrame(loop);
