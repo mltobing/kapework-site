@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f8f6f3">
+<title>Color Pages · Kapework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg:        #f8f6f3;
+  --surface:   #ffffff;
+  --surface2:  #f0ede8;
+  --accent:    #5b4cdb;
+  --accent-soft: rgba(91,76,219,0.10);
+  --accent-hover: #4a3bc4;
+  --text:      #1a1a2e;
+  --text2:     #555568;
+  --muted:     #999aab;
+  --border:    rgba(0,0,0,0.06);
+  --shadow:    0 2px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+  --radius:    16px;
+  --radius-sm: 10px;
+  --safe-b:    env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  min-height: 100dvh;
+  -webkit-user-select: none;
+  user-select: none;
+}
+button { font: inherit; cursor: pointer; border: none; background: none; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── Screen system ──────────────────────────────────────────── */
+.screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.screen.active { display: flex; }
+
+/* ─── Shared: top bar ────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.top-bar .back-btn {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 0.15s;
+}
+.top-bar .back-btn:hover { color: var(--text); }
+.top-bar .title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+/* ─── Screen 1: Home ─────────────────────────────────────────── */
+.home-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  gap: 32px;
+  max-width: 420px;
+  margin: 0 auto;
+  width: 100%;
+}
+.home-logo {
+  width: 88px;
+  height: 88px;
+  background: var(--accent-soft);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6rem;
+}
+.home-header {
+  text-align: center;
+}
+.home-header h1 {
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+.home-header p {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 18px 24px;
+  border-radius: var(--radius);
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: var(--shadow);
+}
+.btn-primary:active { transform: scale(0.97); background: var(--accent-hover); }
+.btn-primary svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 18px 24px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  transition: border-color 0.15s, transform 0.1s;
+  box-shadow: var(--shadow);
+}
+.btn-secondary:active { transform: scale(0.97); border-color: var(--accent); }
+.btn-secondary svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+.home-footer {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  padding-bottom: 8px;
+}
+
+/* ─── Screen 2: Processing ───────────────────────────────────── */
+.processing-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  gap: 24px;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.processing-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-align: center;
+}
+.processing-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: -16px;
+}
+
+/* ─── Screen 3: Variant picker ───────────────────────────────── */
+.picker-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+  gap: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.picker-header {
+  text-align: center;
+  padding: 8px 0;
+}
+.picker-header h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.picker-header p {
+  font-size: 0.85rem;
+  color: var(--text2);
+  margin-top: 4px;
+}
+.variant-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+.variant-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.variant-card:active { transform: scale(0.98); }
+.variant-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+.variant-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.variant-thumb {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.variant-thumb canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.variant-info { flex: 1; }
+.variant-name {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.variant-desc {
+  font-size: 0.82rem;
+  color: var(--text2);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.variant-tag {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.picker-actions {
+  display: flex;
+  gap: 10px;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: calc(8px + var(--safe-b));
+}
+.picker-actions .btn-primary { flex: 1; padding: 16px; }
+.picker-actions .btn-ghost {
+  padding: 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--muted);
+  border-radius: var(--radius);
+}
+.picker-actions .btn-ghost:hover { color: var(--text); }
+
+/* ─── Screen 4: Coloring ─────────────────────────────────────── */
+.color-screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+.color-screen.active { display: flex; }
+
+.color-top-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+.color-top-bar .back-btn {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 8px;
+  border-radius: 8px;
+}
+.color-top-bar .title {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text2);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.icon-btn:hover { background: var(--surface2); }
+.icon-btn:active { background: var(--accent-soft); color: var(--accent); }
+.icon-btn.active { background: var(--accent-soft); color: var(--accent); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* Canvas area */
+.canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--surface2);
+  position: relative;
+  touch-action: none;
+}
+.canvas-wrapper canvas {
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  border-radius: 4px;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px calc(10px + var(--safe-b));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.color-palette {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px;
+}
+.color-palette::-webkit-scrollbar { display: none; }
+.color-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  flex-shrink: 0;
+  transition: transform 0.1s, border-color 0.15s;
+  cursor: pointer;
+  position: relative;
+}
+.color-swatch:active { transform: scale(0.9); }
+.color-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  transform: scale(1.1);
+}
+.color-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.tool-buttons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+.tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text2);
+  transition: background 0.15s, color 0.15s;
+}
+.tool-btn:hover { background: var(--surface2); }
+.tool-btn:active { background: var(--accent-soft); color: var(--accent); }
+.tool-btn.active { background: var(--accent-soft); color: var(--accent); }
+.tool-btn svg { width: 18px; height: 18px; }
+
+/* Brush size indicator */
+.brush-size-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+.brush-size-wrap input[type="range"] {
+  width: 80px;
+  accent-color: var(--accent);
+}
+
+/* ─── Action sheet (share/download) ──────────────────────────── */
+.action-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.action-sheet-backdrop.active { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } }
+
+.action-sheet {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(20px + var(--safe-b));
+  width: 100%;
+  max-width: 480px;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } }
+
+.action-sheet h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.action-sheet-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.12s;
+}
+.action-item:hover { background: var(--surface2); }
+.action-item:active { background: var(--accent-soft); }
+.action-item svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
+.action-cancel {
+  margin-top: 8px;
+  text-align: center;
+  padding: 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+}
+.action-cancel:hover { background: var(--surface2); }
+
+/* ─── Toast ──────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 200;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Utilities ──────────────────────────────────────────────── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); border: 0;
+}
+.hidden { display: none !important; }
+
+/* ─── Desktop tweaks ─────────────────────────────────────────── */
+@media (min-width: 600px) {
+  .variant-cards {
+    flex-direction: row;
+    max-width: 680px;
+  }
+  .variant-card {
+    flex-direction: column;
+    text-align: center;
+    flex: 1;
+  }
+  .variant-thumb {
+    width: 100%;
+    height: 140px;
+  }
+  .picker-actions {
+    max-width: 680px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- Hidden file input -->
+<input type="file" id="fileInput" accept="image/*" class="sr-only">
+
+<!-- ═══ Screen 1: Home ═══════════════════════════════════════ -->
+<div id="screenHome" class="screen active">
+  <div class="top-bar">
+    <a class="back-btn" href="../">← Create</a>
+  </div>
+  <div class="home-content">
+    <div class="home-logo">🖼️</div>
+    <div class="home-header">
+      <h1>Color Pages</h1>
+      <p>Turn any photo into a coloring page, then color it in!</p>
+    </div>
+    <div class="home-actions">
+      <button class="btn-primary" id="btnCamera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Take a Photo
+      </button>
+      <button class="btn-secondary" id="btnLibrary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        Choose a Photo
+      </button>
+    </div>
+    <div class="home-footer">Kapework · Color Pages</div>
+  </div>
+</div>
+
+<!-- ═══ Screen 2: Processing ═════════════════════════════════ -->
+<div id="screenProcessing" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" id="btnProcessingBack">← Back</button>
+  </div>
+  <div class="processing-content">
+    <div class="spinner"></div>
+    <div class="processing-text">Creating your coloring page…</div>
+    <div class="processing-sub">This takes a few seconds</div>
+  </div>
+</div>
+
+<!-- ═══ Screen 3: Variant Picker ═════════════════════════════ -->
+<div id="screenPicker" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" id="btnPickerBack">← Back</button>
+    <span class="title">Choose a Style</span>
+  </div>
+  <div class="picker-content">
+    <div class="picker-header">
+      <h2>Pick a coloring style</h2>
+      <p>Each one has a different level of detail</p>
+    </div>
+    <div class="variant-cards">
+      <button class="variant-card selected" data-variant="simple">
+        <div class="variant-thumb"><canvas id="thumbSimple"></canvas></div>
+        <div class="variant-info">
+          <div class="variant-name">Simple</div>
+          <div class="variant-desc">Balanced detail, great for most ages</div>
+          <div class="variant-tag">Ages 5+</div>
+        </div>
+      </button>
+      <button class="variant-card" data-variant="bold">
+        <div class="variant-thumb"><canvas id="thumbBold"></canvas></div>
+        <div class="variant-info">
+          <div class="variant-name">Bold</div>
+          <div class="variant-desc">Thicker lines, fewer small details</div>
+          <div class="variant-tag">Ages 3+</div>
+        </div>
+      </button>
+      <button class="variant-card" data-variant="easy">
+        <div class="variant-thumb"><canvas id="thumbEasy"></canvas></div>
+        <div class="variant-info">
+          <div class="variant-name">Extra Easy</div>
+          <div class="variant-desc">Big shapes, perfect for little ones</div>
+          <div class="variant-tag">Ages 2+</div>
+        </div>
+      </button>
+    </div>
+    <div class="picker-actions">
+      <button class="btn-ghost" id="btnPickerRestart">Start over</button>
+      <button class="btn-primary" id="btnPickerConfirm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        Color it in
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Screen 4: Coloring Canvas ════════════════════════════ -->
+<div id="screenColor" class="color-screen">
+  <div class="color-top-bar">
+    <button class="back-btn" id="btnColorBack">← Styles</button>
+    <span class="title" id="colorTitle">Coloring</span>
+    <button class="icon-btn" id="btnUndo" title="Undo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+    </button>
+    <button class="icon-btn" id="btnReset" title="Reset">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+    </button>
+    <button class="icon-btn" id="btnShare" title="Save & Share">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+    </button>
+  </div>
+
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <canvas id="colorCanvas"></canvas>
+  </div>
+
+  <div class="toolbar">
+    <div class="tool-row">
+      <div class="color-palette" id="palette"></div>
+    </div>
+    <div class="tool-row tool-buttons" id="toolButtons">
+      <button class="tool-btn active" data-tool="brush" title="Brush">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+        Brush
+      </button>
+      <button class="tool-btn" data-tool="fill" title="Fill">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 2-3 2-3s2 1.4 2 3Z"/></svg>
+        Fill
+      </button>
+      <div class="brush-size-wrap" id="brushSizeWrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>
+        <input type="range" id="brushSize" min="4" max="40" value="12">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Action sheet ═════════════════════════════════════════ -->
+<div class="action-sheet-backdrop" id="actionSheet">
+  <div class="action-sheet">
+    <h3>Save & Share</h3>
+    <div class="action-sheet-items">
+      <button class="action-item" id="actDownloadBW">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download coloring page
+      </button>
+      <button class="action-item" id="actDownloadColored">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download colored version
+      </button>
+      <button class="action-item" id="actPrint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print
+      </button>
+      <button class="action-item" id="actShareNative" class="hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share
+      </button>
+    </div>
+    <button class="action-cancel" id="actCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   Color Pages · Kapework
+   Turn photos into coloring pages for kids
+   ═══════════════════════════════════════════════════════════════ */
+
+(function() {
+'use strict';
+
+// ─── Constants ──────────────────────────────────────────────
+const MAX_IMG_SIZE = 900;
+const PRINT_SIZE = 1400;
+const COLORS = [
+  '#e53935', '#fb8c00', '#fdd835', '#43a047',
+  '#1e88e5', '#8e24aa', '#f06292', '#6d4c41',
+  '#000000', '#ffffff',
+];
+
+const VARIANT_CONFIG = {
+  simple: { blur: 1.2, threshold: 35, dilate: 1, simplify: 0 },
+  bold:   { blur: 2.0, threshold: 28, dilate: 2, simplify: 1 },
+  easy:   { blur: 3.5, threshold: 22, dilate: 3, simplify: 2 },
+};
+
+// ─── State ──────────────────────────────────────────────────
+let sourceImage = null;       // Original HTMLImageElement
+let variantCanvases = {};     // { simple, bold, easy } — offscreen canvases
+let selectedVariant = 'simple';
+let colorCanvas, colorCtx;
+let baseImageData = null;     // The clean template for reset
+let undoStack = [];
+const MAX_UNDO = 20;
+let currentTool = 'brush';
+let currentColor = COLORS[0];
+let brushRadius = 12;
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let canvasScale = 1;
+
+// ─── DOM refs ───────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const screens = {
+  home:       $('screenHome'),
+  processing: $('screenProcessing'),
+  picker:     $('screenPicker'),
+  color:      $('screenColor'),
+};
+const fileInput = $('fileInput');
+const toast = $('toast');
+const actionSheet = $('actionSheet');
+const paletteEl = $('palette');
+const canvasWrapper = $('canvasWrapper');
+colorCanvas = $('colorCanvas');
+colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+
+// ─── Screen management ──────────────────────────────────────
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+}
+
+// ─── Toast ──────────────────────────────────────────────────
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ─── Image loading ──────────────────────────────────────────
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function downscaleImage(img, maxSize) {
+  const canvas = document.createElement('canvas');
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+  if (w > maxSize || h > maxSize) {
+    const ratio = Math.min(maxSize / w, maxSize / h);
+    w = Math.round(w * ratio);
+    h = Math.round(h * ratio);
+  }
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  return { canvas, ctx, w, h };
+}
+
+// ─── Image processing pipeline ──────────────────────────────
+
+function getPixels(ctx, w, h) {
+  return ctx.getImageData(0, 0, w, h);
+}
+
+function toGrayscale(imageData) {
+  const d = imageData.data;
+  const gray = new Float32Array(d.length / 4);
+  for (let i = 0; i < gray.length; i++) {
+    const j = i * 4;
+    gray[i] = 0.299 * d[j] + 0.587 * d[j+1] + 0.114 * d[j+2];
+  }
+  return gray;
+}
+
+function gaussianBlur(gray, w, h, sigma) {
+  if (sigma < 0.5) return gray;
+  const radius = Math.ceil(sigma * 3);
+  const size = radius * 2 + 1;
+  const kernel = new Float32Array(size);
+  let sum = 0;
+  for (let i = 0; i < size; i++) {
+    const x = i - radius;
+    kernel[i] = Math.exp(-(x * x) / (2 * sigma * sigma));
+    sum += kernel[i];
+  }
+  for (let i = 0; i < size; i++) kernel[i] /= sum;
+
+  // Horizontal pass
+  const temp = new Float32Array(gray.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let val = 0;
+      for (let k = 0; k < size; k++) {
+        const sx = Math.min(Math.max(x + k - radius, 0), w - 1);
+        val += gray[y * w + sx] * kernel[k];
+      }
+      temp[y * w + x] = val;
+    }
+  }
+
+  // Vertical pass
+  const result = new Float32Array(gray.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let val = 0;
+      for (let k = 0; k < size; k++) {
+        const sy = Math.min(Math.max(y + k - radius, 0), h - 1);
+        val += temp[sy * w + x] * kernel[k];
+      }
+      result[y * w + x] = val;
+    }
+  }
+  return result;
+}
+
+function sobelEdgeDetect(gray, w, h) {
+  const edges = new Float32Array(gray.length);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      // Sobel kernels
+      const gx =
+        -gray[(y-1)*w+(x-1)] + gray[(y-1)*w+(x+1)]
+        -2*gray[y*w+(x-1)]   + 2*gray[y*w+(x+1)]
+        -gray[(y+1)*w+(x-1)] + gray[(y+1)*w+(x+1)];
+      const gy =
+        -gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)]
+        +gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)];
+      edges[i] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+  return edges;
+}
+
+function adaptiveThreshold(edges, w, h, blockSize, C) {
+  // Simple adaptive threshold: compare each pixel to local mean
+  const half = Math.floor(blockSize / 2);
+  const binary = new Uint8Array(edges.length);
+
+  // Build integral image for fast local mean
+  const integral = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let rowSum = 0;
+    for (let x = 0; x < w; x++) {
+      rowSum += edges[y * w + x];
+      integral[(y + 1) * (w + 1) + (x + 1)] = rowSum + integral[y * (w + 1) + (x + 1)];
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const y1 = Math.max(0, y - half);
+      const y2 = Math.min(h - 1, y + half);
+      const x1 = Math.max(0, x - half);
+      const x2 = Math.min(w - 1, x + half);
+
+      const area = (y2 - y1 + 1) * (x2 - x1 + 1);
+      const sum = integral[(y2+1)*(w+1)+(x2+1)]
+                - integral[y1*(w+1)+(x2+1)]
+                - integral[(y2+1)*(w+1)+x1]
+                + integral[y1*(w+1)+x1];
+      const mean = sum / area;
+      binary[y * w + x] = edges[y * w + x] > (mean - C) && edges[y * w + x] > C ? 1 : 0;
+    }
+  }
+  return binary;
+}
+
+function dilateEdges(binary, w, h, radius) {
+  if (radius < 1) return binary;
+  const result = new Uint8Array(binary.length);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let found = false;
+      for (let dy = -radius; dy <= radius && !found; dy++) {
+        for (let dx = -radius; dx <= radius && !found; dx++) {
+          if (dx*dx + dy*dy > radius*radius) continue;
+          const ny = y + dy, nx = x + dx;
+          if (ny >= 0 && ny < h && nx >= 0 && nx < w) {
+            if (binary[ny * w + nx]) found = true;
+          }
+        }
+      }
+      result[y * w + x] = found ? 1 : 0;
+    }
+  }
+  return result;
+}
+
+function binaryToCanvas(binary, w, h) {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(w, h);
+  const d = imgData.data;
+  for (let i = 0; i < binary.length; i++) {
+    const j = i * 4;
+    const v = binary[i] ? 0 : 255; // edges are black, background is white
+    d[j] = v; d[j+1] = v; d[j+2] = v; d[j+3] = 255;
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
+}
+
+function generateVariant(img, config) {
+  const { canvas, ctx, w, h } = downscaleImage(img, MAX_IMG_SIZE);
+  const imageData = getPixels(ctx, w, h);
+  let gray = toGrayscale(imageData);
+
+  // Pre-blur to reduce noise
+  gray = gaussianBlur(gray, w, h, config.blur);
+
+  // Additional simplification passes for easier variants
+  for (let i = 0; i < config.simplify; i++) {
+    gray = gaussianBlur(gray, w, h, config.blur * 0.8);
+  }
+
+  // Edge detection
+  let edges = sobelEdgeDetect(gray, w, h);
+
+  // Normalize edge magnitudes
+  let maxEdge = 0;
+  for (let i = 0; i < edges.length; i++) {
+    if (edges[i] > maxEdge) maxEdge = edges[i];
+  }
+  if (maxEdge > 0) {
+    for (let i = 0; i < edges.length; i++) {
+      edges[i] = (edges[i] / maxEdge) * 255;
+    }
+  }
+
+  // Adaptive threshold
+  const blockSize = Math.max(15, Math.round(Math.min(w, h) * 0.06));
+  const binary = adaptiveThreshold(edges, w, h, blockSize, config.threshold);
+
+  // Dilate for thicker lines
+  const dilated = dilateEdges(binary, w, h, config.dilate);
+
+  return binaryToCanvas(dilated, w, h);
+}
+
+async function processImage(img) {
+  sourceImage = img;
+  variantCanvases = {};
+
+  // Generate all three variants
+  // Use setTimeout to allow UI to update between heavy operations
+  return new Promise(resolve => {
+    setTimeout(() => {
+      variantCanvases.simple = generateVariant(img, VARIANT_CONFIG.simple);
+      setTimeout(() => {
+        variantCanvases.bold = generateVariant(img, VARIANT_CONFIG.bold);
+        setTimeout(() => {
+          variantCanvases.easy = generateVariant(img, VARIANT_CONFIG.easy);
+          resolve();
+        }, 30);
+      }, 30);
+    }, 30);
+  });
+}
+
+// ─── Variant picker ─────────────────────────────────────────
+function populateThumbnails() {
+  ['simple', 'bold', 'easy'].forEach(key => {
+    const thumbCanvas = $('thumb' + key.charAt(0).toUpperCase() + key.slice(1));
+    const src = variantCanvases[key];
+    thumbCanvas.width = src.width;
+    thumbCanvas.height = src.height;
+    thumbCanvas.getContext('2d').drawImage(src, 0, 0);
+  });
+}
+
+function selectVariant(variant) {
+  selectedVariant = variant;
+  document.querySelectorAll('.variant-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.variant === variant);
+  });
+}
+
+// ─── Coloring canvas setup ──────────────────────────────────
+function setupColorCanvas() {
+  const src = variantCanvases[selectedVariant];
+  colorCanvas.width = src.width;
+  colorCanvas.height = src.height;
+  colorCtx.drawImage(src, 0, 0);
+  baseImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+  undoStack = [];
+  fitCanvas();
+}
+
+function fitCanvas() {
+  const wrapRect = canvasWrapper.getBoundingClientRect();
+  const cw = colorCanvas.width;
+  const ch = colorCanvas.height;
+  const pad = 16;
+  const availW = wrapRect.width - pad * 2;
+  const availH = wrapRect.height - pad * 2;
+  canvasScale = Math.min(availW / cw, availH / ch, 1);
+  colorCanvas.style.width = Math.round(cw * canvasScale) + 'px';
+  colorCanvas.style.height = Math.round(ch * canvasScale) + 'px';
+}
+
+// ─── Drawing / Coloring ─────────────────────────────────────
+function pushUndo() {
+  if (undoStack.length >= MAX_UNDO) undoStack.shift();
+  undoStack.push(colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height));
+}
+
+function popUndo() {
+  if (undoStack.length === 0) return;
+  const state = undoStack.pop();
+  colorCtx.putImageData(state, 0, 0);
+}
+
+function getCanvasPos(e) {
+  const rect = colorCanvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return {
+    x: (touch.clientX - rect.left) / canvasScale,
+    y: (touch.clientY - rect.top) / canvasScale,
+  };
+}
+
+function drawBrush(x, y) {
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.fillStyle = currentColor;
+  colorCtx.beginPath();
+  colorCtx.arc(x, y, brushRadius / canvasScale, 0, Math.PI * 2);
+  colorCtx.fill();
+
+  // Redraw template lines on top so they stay visible
+  redrawTemplateLines();
+}
+
+function drawLine(x0, y0, x1, y1) {
+  const dist = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
+  const steps = Math.max(1, Math.ceil(dist / (brushRadius / canvasScale * 0.3)));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = x0 + (x1 - x0) * t;
+    const y = y0 + (y1 - y0) * t;
+    colorCtx.fillStyle = currentColor;
+    colorCtx.beginPath();
+    colorCtx.arc(x, y, brushRadius / canvasScale, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+  redrawTemplateLines();
+}
+
+function redrawTemplateLines() {
+  // Overlay template black lines to keep outlines visible
+  const current = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+  const base = baseImageData.data;
+  const cur = current.data;
+  for (let i = 0; i < base.length; i += 4) {
+    // If the base pixel is black (outline), ensure it stays black
+    if (base[i] < 60 && base[i+1] < 60 && base[i+2] < 60) {
+      cur[i] = 0; cur[i+1] = 0; cur[i+2] = 0; cur[i+3] = 255;
+    }
+  }
+  colorCtx.putImageData(current, 0, 0);
+}
+
+// ─── Flood fill ─────────────────────────────────────────────
+function floodFill(startX, startY, fillColor) {
+  const w = colorCanvas.width;
+  const h = colorCanvas.height;
+  const imgData = colorCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  const sx = Math.round(startX);
+  const sy = Math.round(startY);
+  if (sx < 0 || sx >= w || sy < 0 || sy >= h) return;
+
+  const startIdx = (sy * w + sx) * 4;
+  const sr = data[startIdx], sg = data[startIdx+1], sb = data[startIdx+2];
+
+  // Parse fill color
+  const fc = hexToRgb(fillColor);
+  if (!fc) return;
+
+  // Don't fill if already the same color
+  if (sr === fc.r && sg === fc.g && sb === fc.b) return;
+
+  // Don't fill black outlines
+  if (sr < 40 && sg < 40 && sb < 40) return;
+
+  const tolerance = 50;
+  const stack = [[sx, sy]];
+  const visited = new Uint8Array(w * h);
+
+  function matches(idx) {
+    const r = data[idx], g = data[idx+1], b = data[idx+2];
+    return Math.abs(r - sr) + Math.abs(g - sg) + Math.abs(b - sb) < tolerance;
+  }
+
+  while (stack.length > 0) {
+    const [x, y] = stack.pop();
+    const pos = y * w + x;
+    if (visited[pos]) continue;
+    const idx = pos * 4;
+    if (!matches(idx)) continue;
+
+    visited[pos] = 1;
+    data[idx] = fc.r;
+    data[idx+1] = fc.g;
+    data[idx+2] = fc.b;
+
+    if (x > 0) stack.push([x-1, y]);
+    if (x < w-1) stack.push([x+1, y]);
+    if (y > 0) stack.push([x, y-1]);
+    if (y < h-1) stack.push([x, y+1]);
+  }
+
+  colorCtx.putImageData(imgData, 0, 0);
+}
+
+function hexToRgb(hex) {
+  const m = hex.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return null;
+  return { r: parseInt(m[1],16), g: parseInt(m[2],16), b: parseInt(m[3],16) };
+}
+
+// ─── Canvas event handlers ──────────────────────────────────
+function onPointerDown(e) {
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+  isDrawing = true;
+
+  if (currentTool === 'fill') {
+    pushUndo();
+    floodFill(pos.x, pos.y, currentColor);
+    isDrawing = false;
+    return;
+  }
+
+  pushUndo();
+  lastX = pos.x;
+  lastY = pos.y;
+  drawBrush(pos.x, pos.y);
+}
+
+function onPointerMove(e) {
+  if (!isDrawing || currentTool !== 'brush') return;
+  e.preventDefault();
+  const pos = getCanvasPos(e);
+  drawLine(lastX, lastY, pos.x, pos.y);
+  lastX = pos.x;
+  lastY = pos.y;
+}
+
+function onPointerUp() {
+  isDrawing = false;
+}
+
+colorCanvas.addEventListener('mousedown', onPointerDown);
+colorCanvas.addEventListener('mousemove', onPointerMove);
+colorCanvas.addEventListener('mouseup', onPointerUp);
+colorCanvas.addEventListener('mouseleave', onPointerUp);
+colorCanvas.addEventListener('touchstart', onPointerDown, { passive: false });
+colorCanvas.addEventListener('touchmove', onPointerMove, { passive: false });
+colorCanvas.addEventListener('touchend', onPointerUp);
+colorCanvas.addEventListener('touchcancel', onPointerUp);
+
+// ─── Build palette ──────────────────────────────────────────
+COLORS.forEach((color, i) => {
+  const swatch = document.createElement('button');
+  swatch.className = 'color-swatch' + (i === 0 ? ' active' : '');
+  swatch.style.background = color;
+  if (color === '#ffffff') {
+    swatch.style.border = '2.5px solid #ddd';
+  }
+  swatch.title = color;
+  swatch.addEventListener('click', () => {
+    currentColor = color;
+    paletteEl.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    swatch.classList.add('active');
+  });
+  paletteEl.appendChild(swatch);
+});
+
+// ─── Tool switching ─────────────────────────────────────────
+document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentTool = btn.dataset.tool;
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    $('brushSizeWrap').style.display = currentTool === 'brush' ? 'flex' : 'none';
+  });
+});
+
+$('brushSize').addEventListener('input', e => {
+  brushRadius = parseInt(e.target.value, 10);
+});
+
+// ─── Export functions ───────────────────────────────────────
+function getExportCanvas(colored) {
+  // Re-generate at print quality
+  const src = colored ? colorCanvas : variantCanvases[selectedVariant];
+  const exportCanvas = document.createElement('canvas');
+
+  if (colored) {
+    // For colored version, use the canvas as-is (already at good resolution)
+    exportCanvas.width = colorCanvas.width;
+    exportCanvas.height = colorCanvas.height;
+    exportCanvas.getContext('2d').drawImage(colorCanvas, 0, 0);
+  } else {
+    // For B&W, regenerate at higher res if source is available
+    const hiRes = generateVariant(sourceImage, VARIANT_CONFIG[selectedVariant]);
+    exportCanvas.width = hiRes.width;
+    exportCanvas.height = hiRes.height;
+    exportCanvas.getContext('2d').drawImage(hiRes, 0, 0);
+  }
+  return exportCanvas;
+}
+
+function downloadCanvas(canvas, filename) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function printCanvas(canvas) {
+  const dataUrl = canvas.toDataURL('image/png');
+  const win = window.open('', '_blank');
+  if (!win) {
+    showToast('Pop-up blocked — please allow pop-ups');
+    return;
+  }
+  win.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head><title>Color Pages - Print</title>
+    <style>
+      @page { margin: 0.5in; }
+      body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+      img { max-width: 100%; max-height: 100vh; }
+    </style>
+    </head>
+    <body><img src="${dataUrl}" onload="window.print(); window.close();" /></body>
+    </html>
+  `);
+  win.document.close();
+}
+
+async function nativeShare(canvas) {
+  try {
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], 'coloring-page.png', { type: 'image/png' });
+    await navigator.share({ files: [file], title: 'My Coloring Page' });
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      showToast('Sharing failed — try downloading instead');
+    }
+  }
+}
+
+// ─── Action sheet ───────────────────────────────────────────
+function openActionSheet() {
+  // Show/hide native share
+  const shareBtn = $('actShareNative');
+  const canShare = navigator.share && navigator.canShare;
+  shareBtn.classList.toggle('hidden', !canShare);
+  actionSheet.classList.add('active');
+}
+
+function closeActionSheet() {
+  actionSheet.classList.remove('active');
+}
+
+$('btnShare').addEventListener('click', openActionSheet);
+$('actCancel').addEventListener('click', closeActionSheet);
+actionSheet.addEventListener('click', e => {
+  if (e.target === actionSheet) closeActionSheet();
+});
+
+$('actDownloadBW').addEventListener('click', () => {
+  closeActionSheet();
+  const canvas = getExportCanvas(false);
+  downloadCanvas(canvas, 'coloring-page.png');
+  showToast('Coloring page saved!');
+});
+
+$('actDownloadColored').addEventListener('click', () => {
+  closeActionSheet();
+  const canvas = getExportCanvas(true);
+  downloadCanvas(canvas, 'coloring-page-colored.png');
+  showToast('Colored version saved!');
+});
+
+$('actPrint').addEventListener('click', () => {
+  closeActionSheet();
+  const canvas = getExportCanvas(true);
+  printCanvas(canvas);
+});
+
+$('actShareNative').addEventListener('click', () => {
+  closeActionSheet();
+  const canvas = getExportCanvas(true);
+  nativeShare(canvas);
+});
+
+// ─── Navigation / Flow ──────────────────────────────────────
+async function handleImageSelected(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Please select an image file');
+    return;
+  }
+
+  showScreen('processing');
+
+  try {
+    const img = await loadImage(file);
+    await processImage(img);
+    populateThumbnails();
+    selectVariant('simple');
+    showScreen('picker');
+  } catch (err) {
+    console.error('Image processing failed:', err);
+    showToast('Could not process image — please try another photo');
+    showScreen('home');
+  }
+}
+
+// Camera button
+$('btnCamera').addEventListener('click', () => {
+  fileInput.setAttribute('capture', 'environment');
+  fileInput.click();
+});
+
+// Library button
+$('btnLibrary').addEventListener('click', () => {
+  fileInput.removeAttribute('capture');
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) {
+    handleImageSelected(fileInput.files[0]);
+  }
+  fileInput.value = '';
+});
+
+// Processing back
+$('btnProcessingBack').addEventListener('click', () => showScreen('home'));
+
+// Picker back
+$('btnPickerBack').addEventListener('click', () => showScreen('home'));
+$('btnPickerRestart').addEventListener('click', () => showScreen('home'));
+
+// Variant card clicks
+document.querySelectorAll('.variant-card').forEach(card => {
+  card.addEventListener('click', () => selectVariant(card.dataset.variant));
+});
+
+// Confirm variant
+$('btnPickerConfirm').addEventListener('click', () => {
+  setupColorCanvas();
+  const labels = { simple: 'Simple', bold: 'Bold', easy: 'Extra Easy' };
+  $('colorTitle').textContent = labels[selectedVariant];
+  showScreen('color');
+});
+
+// Color screen back
+$('btnColorBack').addEventListener('click', () => showScreen('picker'));
+
+// Undo
+$('btnUndo').addEventListener('click', popUndo);
+
+// Reset
+$('btnReset').addEventListener('click', () => {
+  if (baseImageData) {
+    pushUndo();
+    colorCtx.putImageData(baseImageData, 0, 0);
+    showToast('Canvas reset');
+  }
+});
+
+// Resize handler
+window.addEventListener('resize', () => {
+  if (screens.color.classList.contains('active')) {
+    fitCanvas();
+  }
+});
+
+// ─── Keyboard shortcuts (desktop) ───────────────────────────
+document.addEventListener('keydown', e => {
+  if (!screens.color.classList.contains('active')) return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+    e.preventDefault();
+    popUndo();
+  }
+});
+
+})();
+</script>
+
+<script src="/shared/subdomain-nav.js"></script>
+</body>
+</html>
