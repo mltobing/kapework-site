@@ -1254,9 +1254,10 @@ function fitCanvas() {
   const wrapRect = canvasWrapper.getBoundingClientRect();
   const cw = colorCanvas.width;
   const ch = colorCanvas.height;
+  if (!cw || !ch || wrapRect.width === 0 || wrapRect.height === 0) return;
   const pad = 16;
-  const availW = wrapRect.width - pad * 2;
-  const availH = wrapRect.height - pad * 2;
+  const availW = Math.max(wrapRect.width - pad * 2, 1);
+  const availH = Math.max(wrapRect.height - pad * 2, 1);
   canvasScale = Math.min(availW / cw, availH / ch, 1);
   const displayW = Math.round(cw * canvasScale) + 'px';
   const displayH = Math.round(ch * canvasScale) + 'px';
@@ -1778,10 +1779,10 @@ document.querySelectorAll('.variant-card').forEach(card => {
 });
 
 $('btnPickerConfirm').addEventListener('click', () => {
-  setupColorCanvas();
   const labels = { simple: 'Simple', bold: 'Bold', easy: 'Extra Easy' };
   $('colorTitle').textContent = labels[selectedVariant];
   showScreen('color');
+  setupColorCanvas();
 });
 
 // Color screen
