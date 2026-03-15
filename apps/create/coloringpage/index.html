@@ -103,9 +103,7 @@ a { color: inherit; text-decoration: none; }
   justify-content: center;
   font-size: 2.6rem;
 }
-.home-header {
-  text-align: center;
-}
+.home-header { text-align: center; }
 .home-header h1 {
   font-size: 1.65rem;
   font-weight: 900;
@@ -118,7 +116,6 @@ a { color: inherit; text-decoration: none; }
   color: var(--text2);
   line-height: 1.5;
 }
-
 .home-actions {
   display: flex;
   flex-direction: column;
@@ -260,10 +257,7 @@ a { color: inherit; text-decoration: none; }
   object-fit: contain;
 }
 .variant-info { flex: 1; }
-.variant-name {
-  font-size: 1rem;
-  font-weight: 800;
-}
+.variant-name { font-size: 1rem; font-weight: 800; }
 .variant-desc {
   font-size: 0.82rem;
   color: var(--text2);
@@ -282,7 +276,6 @@ a { color: inherit; text-decoration: none; }
   background: var(--accent-soft);
   color: var(--accent);
 }
-
 .picker-actions {
   display: flex;
   gap: 10px;
@@ -366,89 +359,216 @@ a { color: inherit; text-decoration: none; }
   border-radius: 4px;
 }
 
-/* Toolbar */
+/* ─── Toolbar ────────────────────────────────────────────────── */
 .toolbar {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 16px calc(10px + var(--safe-b));
+  padding: 10px 12px calc(10px + var(--safe-b));
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+/* Row: tool buttons + size dots */
 .tool-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.color-palette {
+
+.tool-btn {
+  background: var(--surface2);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text2);
   display: flex;
+  align-items: center;
   gap: 6px;
-  flex: 1;
-  justify-content: center;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 2px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
 }
-.color-palette::-webkit-scrollbar { display: none; }
+.tool-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.tool-btn:hover { color: var(--text); }
+.tool-btn:active { background: var(--accent-soft); }
+.tool-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* size dots — matching Color & Sign */
+.size-opts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 4px;
+}
+.size-dot {
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+.size-dot:active { transform: scale(0.85); }
+.size-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.2);
+}
+
+/* Colour palette row */
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.palette-row::-webkit-scrollbar { display: none; }
+
 .color-swatch {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  border: 2.5px solid transparent;
+  border: 3px solid transparent;
   flex-shrink: 0;
-  transition: transform 0.1s, border-color 0.15s;
   cursor: pointer;
-  position: relative;
+  transition: transform 0.1s, border-color 0.1s;
 }
 .color-swatch:active { transform: scale(0.9); }
 .color-swatch.active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-  transform: scale(1.1);
-}
-.color-swatch::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: inherit;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
 }
 
-.tool-buttons {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-}
-.tool-btn {
+/* Action row at bottom of toolbar */
+.action-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  gap: 8px;
+}
+.action-row .btn-finish {
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  height: 44px;
+  padding: 0 20px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-left: auto;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.action-row .btn-finish:hover { opacity: 0.88; }
+.action-row .btn-finish:active { opacity: 0.75; transform: scale(0.97); }
+
+/* ─── Screen 5: Sign & Save ──────────────────────────────────── */
+.sign-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.sign-artwork {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  flex-shrink: 0;
+}
+.sign-artwork img {
+  width: 100%;
+  display: block;
+}
+.sign-label {
+  font-size: 0.85rem;
+  color: var(--muted);
   font-weight: 700;
-  color: var(--text2);
-  transition: background 0.15s, color 0.15s;
+  align-self: flex-start;
+  max-width: 320px;
+  width: 100%;
+  margin: 0 auto;
 }
-.tool-btn:hover { background: var(--surface2); }
-.tool-btn:active { background: var(--accent-soft); color: var(--accent); }
-.tool-btn.active { background: var(--accent-soft); color: var(--accent); }
-.tool-btn svg { width: 18px; height: 18px; }
-
-/* Brush size indicator */
-.brush-size-wrap {
+.sign-canvas-wrap {
+  width: 100%;
+  max-width: 320px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  position: relative;
+  border: 1.5px solid var(--border);
+}
+#signCanvas {
+  display: block;
+  width: 100%;
+  height: 80px;
+  touch-action: none;
+  cursor: crosshair;
+}
+.sign-clear-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: rgba(0,0,0,0.08);
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.sign-clear-btn:hover { background: rgba(0,0,0,0.12); }
+.sign-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
+  gap: 10px;
+  width: 100%;
+  max-width: 320px;
+  padding-bottom: calc(12px + var(--safe-b));
 }
-.brush-size-wrap input[type="range"] {
-  width: 80px;
-  accent-color: var(--accent);
+.sign-actions .btn-skip {
+  flex: 1;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text2);
+  height: 48px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: border-color 0.15s;
 }
+.sign-actions .btn-skip:hover { border-color: var(--accent); }
+.sign-actions .btn-save {
+  flex: 2;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  height: 48px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.sign-actions .btn-save:hover { opacity: 0.88; }
+.sign-actions .btn-save:active { transform: scale(0.97); }
 
 /* ─── Action sheet (share/download) ──────────────────────────── */
 .action-sheet-backdrop {
@@ -671,23 +791,58 @@ a { color: inherit; text-decoration: none; }
   </div>
 
   <div class="toolbar">
+    <!-- Row 1: Tools + size dots -->
     <div class="tool-row">
-      <div class="color-palette" id="palette"></div>
-    </div>
-    <div class="tool-row tool-buttons" id="toolButtons">
-      <button class="tool-btn active" data-tool="brush" title="Brush">
+      <button class="tool-btn active" data-tool="brush">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
         Brush
       </button>
-      <button class="tool-btn" data-tool="fill" title="Fill">
+      <button class="tool-btn" data-tool="airbrush">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7" stroke-dasharray="2 3"/><circle cx="12" cy="12" r="10" opacity="0.3" stroke-dasharray="1 3"/></svg>
+        Spray
+      </button>
+      <button class="tool-btn" data-tool="fill">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 2-3 2-3s2 1.4 2 3Z"/></svg>
         Fill
       </button>
-      <div class="brush-size-wrap" id="brushSizeWrap">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>
-        <input type="range" id="brushSize" min="4" max="40" value="12">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+      <button class="tool-btn" data-tool="eraser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+        Erase
+      </button>
+      <div class="size-opts" id="sizeOpts">
+        <div class="size-dot"        data-size="6"  style="width:10px;height:10px;" title="Fine"></div>
+        <div class="size-dot active" data-size="16" style="width:18px;height:18px;" title="Medium"></div>
+        <div class="size-dot"        data-size="34" style="width:26px;height:26px;" title="Thick"></div>
       </div>
+    </div>
+
+    <!-- Row 2: Colour palette -->
+    <div class="palette-row" id="palette"></div>
+
+    <!-- Row 3: Sign it -->
+    <div class="action-row">
+      <button class="btn-finish" id="btnSignIt">Sign it →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Screen 5: Sign & Save ════════════════════════════════ -->
+<div id="screenSign" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" id="btnSignBack">← Colour</button>
+  </div>
+  <div class="sign-content">
+    <div class="sign-artwork">
+      <img id="signPreview" src="" alt="Your coloured picture">
+    </div>
+    <div class="sign-label">Sign your name ✍️</div>
+    <div class="sign-canvas-wrap">
+      <canvas id="signCanvas"></canvas>
+      <button class="sign-clear-btn" id="btnSignClear">clear</button>
+    </div>
+    <div class="sign-actions">
+      <button class="btn-skip" id="btnSkipSign">Skip</button>
+      <button class="btn-save" id="btnSave">Save it 💾</button>
     </div>
   </div>
 </div>
@@ -709,7 +864,7 @@ a { color: inherit; text-decoration: none; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print
       </button>
-      <button class="action-item" id="actShareNative" class="hidden">
+      <button class="action-item hidden" id="actShareNative">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
         Share
       </button>
@@ -732,11 +887,20 @@ a { color: inherit; text-decoration: none; }
 
 // ─── Constants ──────────────────────────────────────────────
 const MAX_IMG_SIZE = 900;
-const PRINT_SIZE = 1400;
-const COLORS = [
-  '#e53935', '#fb8c00', '#fdd835', '#43a047',
-  '#1e88e5', '#8e24aa', '#f06292', '#6d4c41',
-  '#000000', '#ffffff',
+
+const PALETTE = [
+  { hex: '#FF3333', label: 'Red' },
+  { hex: '#FF8800', label: 'Orange' },
+  { hex: '#FFD700', label: 'Yellow' },
+  { hex: '#44CC00', label: 'Lime' },
+  { hex: '#00BB88', label: 'Teal' },
+  { hex: '#1188FF', label: 'Blue' },
+  { hex: '#8833CC', label: 'Purple' },
+  { hex: '#FF44AA', label: 'Pink' },
+  { hex: '#884411', label: 'Brown' },
+  { hex: '#FFB3BA', label: 'Blush' },
+  { hex: '#FFFFFF', label: 'White' },
+  { hex: '#333333', label: 'Black' },
 ];
 
 const VARIANT_CONFIG = {
@@ -746,19 +910,20 @@ const VARIANT_CONFIG = {
 };
 
 // ─── State ──────────────────────────────────────────────────
-let sourceImage = null;       // Original HTMLImageElement
-let variantCanvases = {};     // { simple, bold, easy } — offscreen canvases
+let sourceImage = null;
+let variantCanvases = {};
 let selectedVariant = 'simple';
 let colorCanvas, colorCtx;
-let baseImageData = null;     // The clean template for reset
+let baseImageData = null;     // Clean template for reset
 let undoStack = [];
 const MAX_UNDO = 20;
-let currentTool = 'brush';
-let currentColor = COLORS[0];
-let brushRadius = 12;
+let currentTool = 'brush';    // 'brush' | 'airbrush' | 'fill' | 'eraser'
+let currentColor = PALETTE[0].hex;
+let brushSize = 16;
 let isDrawing = false;
 let lastX = 0, lastY = 0;
 let canvasScale = 1;
+let airbrushInterval = null;
 
 // ─── DOM refs ───────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -767,6 +932,7 @@ const screens = {
   processing: $('screenProcessing'),
   picker:     $('screenPicker'),
   color:      $('screenColor'),
+  sign:       $('screenSign'),
 };
 const fileInput = $('fileInput');
 const toast = $('toast');
@@ -776,10 +942,16 @@ const canvasWrapper = $('canvasWrapper');
 colorCanvas = $('colorCanvas');
 colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
 
+// Sign canvas
+const signCanvas = $('signCanvas');
+const signCtx = signCanvas.getContext('2d');
+const SIGN_W = 800, SIGN_H = 160;
+
 // ─── Screen management ──────────────────────────────────────
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  window.scrollTo(0, 0);
 }
 
 // ─── Toast ──────────────────────────────────────────────────
@@ -850,7 +1022,6 @@ function gaussianBlur(gray, w, h, sigma) {
   }
   for (let i = 0; i < size; i++) kernel[i] /= sum;
 
-  // Horizontal pass
   const temp = new Float32Array(gray.length);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -863,7 +1034,6 @@ function gaussianBlur(gray, w, h, sigma) {
     }
   }
 
-  // Vertical pass
   const result = new Float32Array(gray.length);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -882,8 +1052,6 @@ function sobelEdgeDetect(gray, w, h) {
   const edges = new Float32Array(gray.length);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      // Sobel kernels
       const gx =
         -gray[(y-1)*w+(x-1)] + gray[(y-1)*w+(x+1)]
         -2*gray[y*w+(x-1)]   + 2*gray[y*w+(x+1)]
@@ -891,18 +1059,16 @@ function sobelEdgeDetect(gray, w, h) {
       const gy =
         -gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)]
         +gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)];
-      edges[i] = Math.sqrt(gx * gx + gy * gy);
+      edges[y * w + x] = Math.sqrt(gx * gx + gy * gy);
     }
   }
   return edges;
 }
 
 function adaptiveThreshold(edges, w, h, blockSize, C) {
-  // Simple adaptive threshold: compare each pixel to local mean
   const half = Math.floor(blockSize / 2);
   const binary = new Uint8Array(edges.length);
 
-  // Build integral image for fast local mean
   const integral = new Float64Array((w + 1) * (h + 1));
   for (let y = 0; y < h; y++) {
     let rowSum = 0;
@@ -918,7 +1084,6 @@ function adaptiveThreshold(edges, w, h, blockSize, C) {
       const y2 = Math.min(h - 1, y + half);
       const x1 = Math.max(0, x - half);
       const x2 = Math.min(w - 1, x + half);
-
       const area = (y2 - y1 + 1) * (x2 - x1 + 1);
       const sum = integral[(y2+1)*(w+1)+(x2+1)]
                 - integral[y1*(w+1)+(x2+1)]
@@ -961,7 +1126,7 @@ function binaryToCanvas(binary, w, h) {
   const d = imgData.data;
   for (let i = 0; i < binary.length; i++) {
     const j = i * 4;
-    const v = binary[i] ? 0 : 255; // edges are black, background is white
+    const v = binary[i] ? 0 : 255;
     d[j] = v; d[j+1] = v; d[j+2] = v; d[j+3] = 255;
   }
   ctx.putImageData(imgData, 0, 0);
@@ -973,18 +1138,14 @@ function generateVariant(img, config) {
   const imageData = getPixels(ctx, w, h);
   let gray = toGrayscale(imageData);
 
-  // Pre-blur to reduce noise
   gray = gaussianBlur(gray, w, h, config.blur);
 
-  // Additional simplification passes for easier variants
   for (let i = 0; i < config.simplify; i++) {
     gray = gaussianBlur(gray, w, h, config.blur * 0.8);
   }
 
-  // Edge detection
   let edges = sobelEdgeDetect(gray, w, h);
 
-  // Normalize edge magnitudes
   let maxEdge = 0;
   for (let i = 0; i < edges.length; i++) {
     if (edges[i] > maxEdge) maxEdge = edges[i];
@@ -995,11 +1156,8 @@ function generateVariant(img, config) {
     }
   }
 
-  // Adaptive threshold
   const blockSize = Math.max(15, Math.round(Math.min(w, h) * 0.06));
   const binary = adaptiveThreshold(edges, w, h, blockSize, config.threshold);
-
-  // Dilate for thicker lines
   const dilated = dilateEdges(binary, w, h, config.dilate);
 
   return binaryToCanvas(dilated, w, h);
@@ -1009,8 +1167,6 @@ async function processImage(img) {
   sourceImage = img;
   variantCanvases = {};
 
-  // Generate all three variants
-  // Use setTimeout to allow UI to update between heavy operations
   return new Promise(resolve => {
     setTimeout(() => {
       variantCanvases.simple = generateVariant(img, VARIANT_CONFIG.simple);
@@ -1066,7 +1222,7 @@ function fitCanvas() {
   colorCanvas.style.height = Math.round(ch * canvasScale) + 'px';
 }
 
-// ─── Drawing / Coloring ─────────────────────────────────────
+// ─── Undo ───────────────────────────────────────────────────
 function pushUndo() {
   if (undoStack.length >= MAX_UNDO) undoStack.shift();
   undoStack.push(colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height));
@@ -1078,6 +1234,7 @@ function popUndo() {
   colorCtx.putImageData(state, 0, 0);
 }
 
+// ─── Canvas coordinates ─────────────────────────────────────
 function getCanvasPos(e) {
   const rect = colorCanvas.getBoundingClientRect();
   const touch = e.touches ? e.touches[0] : e;
@@ -1087,44 +1244,94 @@ function getCanvasPos(e) {
   };
 }
 
-function drawBrush(x, y) {
-  colorCtx.globalCompositeOperation = 'source-over';
-  colorCtx.fillStyle = currentColor;
-  colorCtx.beginPath();
-  colorCtx.arc(x, y, brushRadius / canvasScale, 0, Math.PI * 2);
-  colorCtx.fill();
-
-  // Redraw template lines on top so they stay visible
-  redrawTemplateLines();
+// ─── Effective brush radius (scaled to canvas resolution) ───
+function effectiveRadius() {
+  return brushSize / canvasScale;
 }
 
-function drawLine(x0, y0, x1, y1) {
-  const dist = Math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2);
-  const steps = Math.max(1, Math.ceil(dist / (brushRadius / canvasScale * 0.3)));
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const x = x0 + (x1 - x0) * t;
-    const y = y0 + (y1 - y0) * t;
-    colorCtx.fillStyle = currentColor;
-    colorCtx.beginPath();
-    colorCtx.arc(x, y, brushRadius / canvasScale, 0, Math.PI * 2);
-    colorCtx.fill();
-  }
-  redrawTemplateLines();
-}
-
+// ─── Redraw template lines on top ───────────────────────────
 function redrawTemplateLines() {
-  // Overlay template black lines to keep outlines visible
   const current = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
   const base = baseImageData.data;
   const cur = current.data;
   for (let i = 0; i < base.length; i += 4) {
-    // If the base pixel is black (outline), ensure it stays black
     if (base[i] < 60 && base[i+1] < 60 && base[i+2] < 60) {
       cur[i] = 0; cur[i+1] = 0; cur[i+2] = 0; cur[i+3] = 255;
     }
   }
   colorCtx.putImageData(current, 0, 0);
+}
+
+// ─── Brush drawing ──────────────────────────────────────────
+function drawBrushDot(x, y) {
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.fillStyle = currentColor;
+  colorCtx.beginPath();
+  colorCtx.arc(x, y, effectiveRadius(), 0, Math.PI * 2);
+  colorCtx.fill();
+}
+
+function drawBrushLine(x0, y0, x1, y1) {
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.strokeStyle = currentColor;
+  colorCtx.lineWidth = effectiveRadius() * 2;
+  colorCtx.lineCap = 'round';
+  colorCtx.lineJoin = 'round';
+  colorCtx.beginPath();
+  colorCtx.moveTo(x0, y0);
+  colorCtx.lineTo(x1, y1);
+  colorCtx.stroke();
+}
+
+// ─── Airbrush / Spray ───────────────────────────────────────
+function sprayAt(x, y) {
+  const r = effectiveRadius() * 1.5;
+  const density = Math.max(8, Math.round(r * 1.2));
+  const fc = hexToRgb(currentColor);
+  if (!fc) return;
+
+  const imgData = colorCtx.getImageData(
+    Math.max(0, Math.floor(x - r)),
+    Math.max(0, Math.floor(y - r)),
+    Math.min(colorCanvas.width - Math.floor(x - r), Math.ceil(r * 2)),
+    Math.min(colorCanvas.height - Math.floor(y - r), Math.ceil(r * 2))
+  );
+
+  // Just use dots for simplicity and performance
+  colorCtx.fillStyle = currentColor;
+  colorCtx.globalAlpha = 0.15;
+  for (let i = 0; i < density; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * r;
+    const px = x + Math.cos(angle) * dist;
+    const py = y + Math.sin(angle) * dist;
+    const dotR = 0.5 + Math.random() * 1.5;
+    colorCtx.beginPath();
+    colorCtx.arc(px, py, dotR, 0, Math.PI * 2);
+    colorCtx.fill();
+  }
+  colorCtx.globalAlpha = 1;
+}
+
+// ─── Eraser ─────────────────────────────────────────────────
+function eraseDot(x, y) {
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.fillStyle = '#ffffff';
+  colorCtx.beginPath();
+  colorCtx.arc(x, y, effectiveRadius(), 0, Math.PI * 2);
+  colorCtx.fill();
+}
+
+function eraseLine(x0, y0, x1, y1) {
+  colorCtx.globalCompositeOperation = 'source-over';
+  colorCtx.strokeStyle = '#ffffff';
+  colorCtx.lineWidth = effectiveRadius() * 2;
+  colorCtx.lineCap = 'round';
+  colorCtx.lineJoin = 'round';
+  colorCtx.beginPath();
+  colorCtx.moveTo(x0, y0);
+  colorCtx.lineTo(x1, y1);
+  colorCtx.stroke();
 }
 
 // ─── Flood fill ─────────────────────────────────────────────
@@ -1141,14 +1348,10 @@ function floodFill(startX, startY, fillColor) {
   const startIdx = (sy * w + sx) * 4;
   const sr = data[startIdx], sg = data[startIdx+1], sb = data[startIdx+2];
 
-  // Parse fill color
   const fc = hexToRgb(fillColor);
   if (!fc) return;
 
-  // Don't fill if already the same color
   if (sr === fc.r && sg === fc.g && sb === fc.b) return;
-
-  // Don't fill black outlines
   if (sr < 40 && sg < 40 && sb < 40) return;
 
   const tolerance = 50;
@@ -1156,8 +1359,7 @@ function floodFill(startX, startY, fillColor) {
   const visited = new Uint8Array(w * h);
 
   function matches(idx) {
-    const r = data[idx], g = data[idx+1], b = data[idx+2];
-    return Math.abs(r - sr) + Math.abs(g - sg) + Math.abs(b - sb) < tolerance;
+    return Math.abs(data[idx] - sr) + Math.abs(data[idx+1] - sg) + Math.abs(data[idx+2] - sb) < tolerance;
   }
 
   while (stack.length > 0) {
@@ -1196,6 +1398,7 @@ function onPointerDown(e) {
   if (currentTool === 'fill') {
     pushUndo();
     floodFill(pos.x, pos.y, currentColor);
+    redrawTemplateLines();
     isDrawing = false;
     return;
   }
@@ -1203,20 +1406,55 @@ function onPointerDown(e) {
   pushUndo();
   lastX = pos.x;
   lastY = pos.y;
-  drawBrush(pos.x, pos.y);
+
+  if (currentTool === 'brush') {
+    drawBrushDot(pos.x, pos.y);
+    redrawTemplateLines();
+  } else if (currentTool === 'airbrush') {
+    sprayAt(pos.x, pos.y);
+    airbrushInterval = setInterval(() => {
+      if (isDrawing) sprayAt(lastX, lastY);
+    }, 50);
+  } else if (currentTool === 'eraser') {
+    eraseDot(pos.x, pos.y);
+    redrawTemplateLines();
+  }
 }
 
 function onPointerMove(e) {
-  if (!isDrawing || currentTool !== 'brush') return;
+  if (!isDrawing) return;
   e.preventDefault();
   const pos = getCanvasPos(e);
-  drawLine(lastX, lastY, pos.x, pos.y);
+
+  if (currentTool === 'brush') {
+    drawBrushLine(lastX, lastY, pos.x, pos.y);
+    redrawTemplateLines();
+  } else if (currentTool === 'airbrush') {
+    // Spray along the path
+    const dist = Math.sqrt((pos.x - lastX) ** 2 + (pos.y - lastY) ** 2);
+    const steps = Math.max(1, Math.ceil(dist / (effectiveRadius() * 0.5)));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      sprayAt(lastX + (pos.x - lastX) * t, lastY + (pos.y - lastY) * t);
+    }
+  } else if (currentTool === 'eraser') {
+    eraseLine(lastX, lastY, pos.x, pos.y);
+    redrawTemplateLines();
+  }
+
   lastX = pos.x;
   lastY = pos.y;
 }
 
 function onPointerUp() {
+  if (isDrawing && currentTool === 'airbrush') {
+    redrawTemplateLines();
+  }
   isDrawing = false;
+  if (airbrushInterval) {
+    clearInterval(airbrushInterval);
+    airbrushInterval = null;
+  }
 }
 
 colorCanvas.addEventListener('mousedown', onPointerDown);
@@ -1229,55 +1467,159 @@ colorCanvas.addEventListener('touchend', onPointerUp);
 colorCanvas.addEventListener('touchcancel', onPointerUp);
 
 // ─── Build palette ──────────────────────────────────────────
-COLORS.forEach((color, i) => {
-  const swatch = document.createElement('button');
-  swatch.className = 'color-swatch' + (i === 0 ? ' active' : '');
-  swatch.style.background = color;
-  if (color === '#ffffff') {
-    swatch.style.border = '2.5px solid #ddd';
-  }
-  swatch.title = color;
-  swatch.addEventListener('click', () => {
-    currentColor = color;
-    paletteEl.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-    swatch.classList.add('active');
+function buildPalette() {
+  paletteEl.innerHTML = '';
+  PALETTE.forEach(c => {
+    const swatch = document.createElement('button');
+    swatch.className = 'color-swatch' + (c.hex === currentColor ? ' active' : '');
+    swatch.style.background = c.hex;
+    if (c.hex === '#FFFFFF') swatch.style.border = '3px solid #ddd';
+    swatch.title = c.label;
+    swatch.setAttribute('aria-label', c.label);
+    swatch.addEventListener('click', () => {
+      currentColor = c.hex;
+      // Switch to brush if on eraser
+      if (currentTool === 'eraser') {
+        currentTool = 'brush';
+        updateToolUI();
+      }
+      buildPalette();
+    });
+    paletteEl.appendChild(swatch);
   });
-  paletteEl.appendChild(swatch);
-});
+}
+buildPalette();
 
 // ─── Tool switching ─────────────────────────────────────────
+function updateToolUI() {
+  document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tool === currentTool);
+  });
+  // Show/hide size dots for fill tool (no size needed)
+  $('sizeOpts').style.display = currentTool === 'fill' ? 'none' : 'flex';
+}
+
 document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
     currentTool = btn.dataset.tool;
-    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    $('brushSizeWrap').style.display = currentTool === 'brush' ? 'flex' : 'none';
+    updateToolUI();
   });
 });
 
-$('brushSize').addEventListener('input', e => {
-  brushRadius = parseInt(e.target.value, 10);
+// Size dots
+$('sizeOpts').addEventListener('click', e => {
+  const dot = e.target.closest('.size-dot');
+  if (!dot) return;
+  brushSize = parseInt(dot.dataset.size);
+  document.querySelectorAll('.size-dot').forEach(d => d.classList.remove('active'));
+  dot.classList.add('active');
 });
+
+// ─── Sign canvas ────────────────────────────────────────────
+function initSignCanvas() {
+  signCanvas.width = SIGN_W;
+  signCanvas.height = SIGN_H;
+  signCtx.fillStyle = '#ffffff';
+  signCtx.fillRect(0, 0, SIGN_W, SIGN_H);
+}
+
+function signLineWidth() {
+  const rect = signCanvas.getBoundingClientRect();
+  return 4 * (SIGN_W / (rect.width || SIGN_W));
+}
+
+let signDrawing = false, signLastX = 0, signLastY = 0;
+
+function getSignPoint(e) {
+  const rect = signCanvas.getBoundingClientRect();
+  const scaleX = SIGN_W / rect.width;
+  const scaleY = SIGN_H / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top) * scaleY,
+  };
+}
+
+signCanvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  signDrawing = true;
+  const p = getSignPoint(e);
+  signLastX = p.x; signLastY = p.y;
+  signCtx.beginPath();
+  signCtx.arc(p.x, p.y, signLineWidth() / 2, 0, Math.PI * 2);
+  signCtx.fillStyle = '#1a1a2e';
+  signCtx.fill();
+}, { passive: false });
+
+signCanvas.addEventListener('pointermove', e => {
+  e.preventDefault();
+  if (!signDrawing) return;
+  const p = getSignPoint(e);
+  signCtx.beginPath();
+  signCtx.moveTo(signLastX, signLastY);
+  signCtx.lineTo(p.x, p.y);
+  signCtx.strokeStyle = '#1a1a2e';
+  signCtx.lineWidth = signLineWidth();
+  signCtx.lineCap = 'round';
+  signCtx.lineJoin = 'round';
+  signCtx.stroke();
+  signLastX = p.x; signLastY = p.y;
+}, { passive: false });
+
+signCanvas.addEventListener('pointerup', () => { signDrawing = false; });
+signCanvas.addEventListener('pointerleave', () => { signDrawing = false; });
+signCanvas.addEventListener('pointercancel', () => { signDrawing = false; });
+
+$('btnSignClear').addEventListener('click', () => {
+  signCtx.fillStyle = '#ffffff';
+  signCtx.fillRect(0, 0, SIGN_W, SIGN_H);
+});
+
+// ─── Composite: drawing + optional signature ────────────────
+function buildComposite(includeSignature) {
+  const cw = colorCanvas.width;
+  const ch = colorCanvas.height;
+  const H = includeSignature ? ch + 160 : ch;
+  const out = document.createElement('canvas');
+  out.width = cw;
+  out.height = H;
+  const ctx = out.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, H);
+  ctx.drawImage(colorCanvas, 0, 0);
+
+  if (includeSignature) {
+    ctx.fillStyle = '#f8f6f2';
+    ctx.fillRect(0, ch, cw, 160);
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, ch);
+    ctx.lineTo(cw, ch);
+    ctx.stroke();
+    // Scale signature to fit
+    const sigAspect = SIGN_W / SIGN_H;
+    const sigW = cw - 80;
+    const sigH = sigW / sigAspect;
+    ctx.drawImage(signCanvas, 0, 0, SIGN_W, SIGN_H,
+                  40, ch + (160 - sigH) / 2, sigW, sigH);
+  }
+  return out;
+}
 
 // ─── Export functions ───────────────────────────────────────
 function getExportCanvas(colored) {
-  // Re-generate at print quality
-  const src = colored ? colorCanvas : variantCanvases[selectedVariant];
-  const exportCanvas = document.createElement('canvas');
-
   if (colored) {
-    // For colored version, use the canvas as-is (already at good resolution)
+    const exportCanvas = document.createElement('canvas');
     exportCanvas.width = colorCanvas.width;
     exportCanvas.height = colorCanvas.height;
     exportCanvas.getContext('2d').drawImage(colorCanvas, 0, 0);
+    return exportCanvas;
   } else {
-    // For B&W, regenerate at higher res if source is available
-    const hiRes = generateVariant(sourceImage, VARIANT_CONFIG[selectedVariant]);
-    exportCanvas.width = hiRes.width;
-    exportCanvas.height = hiRes.height;
-    exportCanvas.getContext('2d').drawImage(hiRes, 0, 0);
+    return generateVariant(sourceImage, VARIANT_CONFIG[selectedVariant]);
   }
-  return exportCanvas;
 }
 
 function downloadCanvas(canvas, filename) {
@@ -1294,19 +1636,9 @@ function printCanvas(canvas) {
     showToast('Pop-up blocked — please allow pop-ups');
     return;
   }
-  win.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head><title>Color Pages - Print</title>
-    <style>
-      @page { margin: 0.5in; }
-      body { margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-      img { max-width: 100%; max-height: 100vh; }
-    </style>
-    </head>
-    <body><img src="${dataUrl}" onload="window.print(); window.close();" /></body>
-    </html>
-  `);
+  win.document.write(`<!DOCTYPE html><html><head><title>Color Pages - Print</title>
+    <style>@page{margin:0.5in}body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:100vh}</style>
+    </head><body><img src="${dataUrl}" onload="window.print();window.close()"/></body></html>`);
   win.document.close();
 }
 
@@ -1324,7 +1656,6 @@ async function nativeShare(canvas) {
 
 // ─── Action sheet ───────────────────────────────────────────
 function openActionSheet() {
-  // Show/hide native share
   const shareBtn = $('actShareNative');
   const canShare = navigator.share && navigator.canShare;
   shareBtn.classList.toggle('hidden', !canShare);
@@ -1411,16 +1742,14 @@ fileInput.addEventListener('change', () => {
 // Processing back
 $('btnProcessingBack').addEventListener('click', () => showScreen('home'));
 
-// Picker back
+// Picker
 $('btnPickerBack').addEventListener('click', () => showScreen('home'));
 $('btnPickerRestart').addEventListener('click', () => showScreen('home'));
 
-// Variant card clicks
 document.querySelectorAll('.variant-card').forEach(card => {
   card.addEventListener('click', () => selectVariant(card.dataset.variant));
 });
 
-// Confirm variant
 $('btnPickerConfirm').addEventListener('click', () => {
   setupColorCanvas();
   const labels = { simple: 'Simple', bold: 'Bold', easy: 'Extra Easy' };
@@ -1428,19 +1757,44 @@ $('btnPickerConfirm').addEventListener('click', () => {
   showScreen('color');
 });
 
-// Color screen back
+// Color screen
 $('btnColorBack').addEventListener('click', () => showScreen('picker'));
-
-// Undo
 $('btnUndo').addEventListener('click', popUndo);
-
-// Reset
 $('btnReset').addEventListener('click', () => {
   if (baseImageData) {
     pushUndo();
     colorCtx.putImageData(baseImageData, 0, 0);
     showToast('Canvas reset');
   }
+});
+
+// Sign it button → go to sign screen
+$('btnSignIt').addEventListener('click', async () => {
+  initSignCanvas();
+  // Build preview of current colored artwork
+  const previewCanvas = document.createElement('canvas');
+  previewCanvas.width = colorCanvas.width;
+  previewCanvas.height = colorCanvas.height;
+  previewCanvas.getContext('2d').drawImage(colorCanvas, 0, 0);
+  $('signPreview').src = previewCanvas.toDataURL('image/png');
+  showScreen('sign');
+});
+
+// Sign screen
+$('btnSignBack').addEventListener('click', () => showScreen('color'));
+
+$('btnSkipSign').addEventListener('click', () => {
+  // Save without signature
+  const canvas = getExportCanvas(true);
+  downloadCanvas(canvas, 'coloring-page-colored.png');
+  showToast('Saved!');
+});
+
+$('btnSave').addEventListener('click', () => {
+  // Save with signature
+  const canvas = buildComposite(true);
+  downloadCanvas(canvas, 'coloring-page-signed.png');
+  showToast('Saved with your signature!');
 });
 
 // Resize handler
@@ -1450,7 +1804,7 @@ window.addEventListener('resize', () => {
   }
 });
 
-// ─── Keyboard shortcuts (desktop) ───────────────────────────
+// Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (!screens.color.classList.contains('active')) return;
   if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
