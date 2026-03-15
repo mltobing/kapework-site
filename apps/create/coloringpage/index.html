@@ -357,6 +357,7 @@ a { color: inherit; text-decoration: none; }
   background: #fff;
   box-shadow: var(--shadow-lg);
   border-radius: 4px;
+  touch-action: none;
 }
 
 /* ─── Toolbar ────────────────────────────────────────────────── */
@@ -1237,10 +1238,9 @@ function popUndo() {
 // ─── Canvas coordinates ─────────────────────────────────────
 function getCanvasPos(e) {
   const rect = colorCanvas.getBoundingClientRect();
-  const touch = e.touches ? e.touches[0] : e;
   return {
-    x: (touch.clientX - rect.left) / canvasScale,
-    y: (touch.clientY - rect.top) / canvasScale,
+    x: (e.clientX - rect.left) / canvasScale,
+    y: (e.clientY - rect.top) / canvasScale,
   };
 }
 
@@ -1457,14 +1457,11 @@ function onPointerUp() {
   }
 }
 
-colorCanvas.addEventListener('mousedown', onPointerDown);
-colorCanvas.addEventListener('mousemove', onPointerMove);
-colorCanvas.addEventListener('mouseup', onPointerUp);
-colorCanvas.addEventListener('mouseleave', onPointerUp);
-colorCanvas.addEventListener('touchstart', onPointerDown, { passive: false });
-colorCanvas.addEventListener('touchmove', onPointerMove, { passive: false });
-colorCanvas.addEventListener('touchend', onPointerUp);
-colorCanvas.addEventListener('touchcancel', onPointerUp);
+colorCanvas.addEventListener('pointerdown',  onPointerDown, { passive: false });
+colorCanvas.addEventListener('pointermove',  onPointerMove, { passive: false });
+colorCanvas.addEventListener('pointerup',    onPointerUp,   { passive: false });
+colorCanvas.addEventListener('pointerleave', onPointerUp,   { passive: false });
+colorCanvas.addEventListener('pointercancel', onPointerUp,  { passive: false });
 
 // ─── Build palette ──────────────────────────────────────────
 function buildPalette() {
@@ -1534,10 +1531,9 @@ function getSignPoint(e) {
   const rect = signCanvas.getBoundingClientRect();
   const scaleX = SIGN_W / rect.width;
   const scaleY = SIGN_H / rect.height;
-  const src = e.touches ? e.touches[0] : e;
   return {
-    x: (src.clientX - rect.left) * scaleX,
-    y: (src.clientY - rect.top) * scaleY,
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY,
   };
 }
 
@@ -1816,6 +1812,7 @@ document.addEventListener('keydown', e => {
 })();
 </script>
 
-<script src="/shared/subdomain-nav.js"></script>
+<!-- subdomain-nav.js intentionally omitted: this app has its own back nav,
+     and the fixed footer bar would overlap the coloring toolbar -->
 </body>
 </html>
