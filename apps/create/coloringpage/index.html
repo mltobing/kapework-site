@@ -353,11 +353,26 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   touch-action: none;
 }
-.canvas-wrapper canvas {
-  background: #fff;
+.canvas-container {
+  position: relative;
   box-shadow: var(--shadow-lg);
   border-radius: 4px;
+  overflow: hidden;
+}
+.canvas-container canvas {
+  display: block;
   touch-action: none;
+}
+#colorCanvas {
+  background: #fff;
+  cursor: crosshair;
+}
+#templateOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* ─── Toolbar ────────────────────────────────────────────────── */
@@ -788,7 +803,10 @@ a { color: inherit; text-decoration: none; }
   </div>
 
   <div class="canvas-wrapper" id="canvasWrapper">
-    <canvas id="colorCanvas"></canvas>
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="colorCanvas"></canvas>
+      <canvas id="templateOverlay"></canvas>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -915,7 +933,6 @@ let sourceImage = null;
 let variantCanvases = {};
 let selectedVariant = 'simple';
 let colorCanvas, colorCtx;
-let baseImageData = null;     // Clean template for reset
 let undoStack = [];
 const MAX_UNDO = 20;
 let currentTool = 'brush';    // 'brush' | 'airbrush' | 'fill' | 'eraser'
@@ -940,8 +957,11 @@ const toast = $('toast');
 const actionSheet = $('actionSheet');
 const paletteEl = $('palette');
 const canvasWrapper = $('canvasWrapper');
+const canvasContainer = $('canvasContainer');
 colorCanvas = $('colorCanvas');
-colorCtx = colorCanvas.getContext('2d', { willReadFrequently: true });
+colorCtx = colorCanvas.getContext('2d');
+const templateOverlay = $('templateOverlay');
+const templateCtx = templateOverlay.getContext('2d');
 
 // Sign canvas
 const signCanvas = $('signCanvas');
@@ -1203,10 +1223,29 @@ function selectVariant(variant) {
 // ─── Coloring canvas setup ──────────────────────────────────
 function setupColorCanvas() {
   const src = variantCanvases[selectedVariant];
-  colorCanvas.width = src.width;
-  colorCanvas.height = src.height;
-  colorCtx.drawImage(src, 0, 0);
-  baseImageData = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
+  const w = src.width, h = src.height;
+
+  // Drawing canvas: starts white — user colours on this
+  colorCanvas.width = w;
+  colorCanvas.height = h;
+  colorCtx.fillStyle = '#ffffff';
+  colorCtx.fillRect(0, 0, w, h);
+
+  // Template overlay: only black lines, rest transparent
+  templateOverlay.width = w;
+  templateOverlay.height = h;
+  const srcData = src.getContext('2d').getImageData(0, 0, w, h);
+  const overlayData = templateCtx.createImageData(w, h);
+  const sd = srcData.data, od = overlayData.data;
+  for (let i = 0; i < sd.length; i += 4) {
+    if (sd[i] < 60 && sd[i+1] < 60 && sd[i+2] < 60) {
+      // Black line pixel → opaque black on overlay
+      od[i] = 0; od[i+1] = 0; od[i+2] = 0; od[i+3] = 255;
+    }
+    // else: transparent (alpha stays 0)
+  }
+  templateCtx.putImageData(overlayData, 0, 0);
+
   undoStack = [];
   fitCanvas();
 }
@@ -1219,8 +1258,14 @@ function fitCanvas() {
   const availW = wrapRect.width - pad * 2;
   const availH = wrapRect.height - pad * 2;
   canvasScale = Math.min(availW / cw, availH / ch, 1);
-  colorCanvas.style.width = Math.round(cw * canvasScale) + 'px';
-  colorCanvas.style.height = Math.round(ch * canvasScale) + 'px';
+  const displayW = Math.round(cw * canvasScale) + 'px';
+  const displayH = Math.round(ch * canvasScale) + 'px';
+  canvasContainer.style.width = displayW;
+  canvasContainer.style.height = displayH;
+  colorCanvas.style.width = displayW;
+  colorCanvas.style.height = displayH;
+  templateOverlay.style.width = displayW;
+  templateOverlay.style.height = displayH;
 }
 
 // ─── Undo ───────────────────────────────────────────────────
@@ -1249,19 +1294,6 @@ function effectiveRadius() {
   return brushSize / canvasScale;
 }
 
-// ─── Redraw template lines on top ───────────────────────────
-function redrawTemplateLines() {
-  const current = colorCtx.getImageData(0, 0, colorCanvas.width, colorCanvas.height);
-  const base = baseImageData.data;
-  const cur = current.data;
-  for (let i = 0; i < base.length; i += 4) {
-    if (base[i] < 60 && base[i+1] < 60 && base[i+2] < 60) {
-      cur[i] = 0; cur[i+1] = 0; cur[i+2] = 0; cur[i+3] = 255;
-    }
-  }
-  colorCtx.putImageData(current, 0, 0);
-}
-
 // ─── Brush drawing ──────────────────────────────────────────
 function drawBrushDot(x, y) {
   colorCtx.globalCompositeOperation = 'source-over';
@@ -1287,17 +1319,7 @@ function drawBrushLine(x0, y0, x1, y1) {
 function sprayAt(x, y) {
   const r = effectiveRadius() * 1.5;
   const density = Math.max(8, Math.round(r * 1.2));
-  const fc = hexToRgb(currentColor);
-  if (!fc) return;
 
-  const imgData = colorCtx.getImageData(
-    Math.max(0, Math.floor(x - r)),
-    Math.max(0, Math.floor(y - r)),
-    Math.min(colorCanvas.width - Math.floor(x - r), Math.ceil(r * 2)),
-    Math.min(colorCanvas.height - Math.floor(y - r), Math.ceil(r * 2))
-  );
-
-  // Just use dots for simplicity and performance
   colorCtx.fillStyle = currentColor;
   colorCtx.globalAlpha = 0.15;
   for (let i = 0; i < density; i++) {
@@ -1398,7 +1420,7 @@ function onPointerDown(e) {
   if (currentTool === 'fill') {
     pushUndo();
     floodFill(pos.x, pos.y, currentColor);
-    redrawTemplateLines();
+
     isDrawing = false;
     return;
   }
@@ -1409,7 +1431,7 @@ function onPointerDown(e) {
 
   if (currentTool === 'brush') {
     drawBrushDot(pos.x, pos.y);
-    redrawTemplateLines();
+
   } else if (currentTool === 'airbrush') {
     sprayAt(pos.x, pos.y);
     airbrushInterval = setInterval(() => {
@@ -1417,7 +1439,7 @@ function onPointerDown(e) {
     }, 50);
   } else if (currentTool === 'eraser') {
     eraseDot(pos.x, pos.y);
-    redrawTemplateLines();
+
   }
 }
 
@@ -1428,7 +1450,7 @@ function onPointerMove(e) {
 
   if (currentTool === 'brush') {
     drawBrushLine(lastX, lastY, pos.x, pos.y);
-    redrawTemplateLines();
+
   } else if (currentTool === 'airbrush') {
     // Spray along the path
     const dist = Math.sqrt((pos.x - lastX) ** 2 + (pos.y - lastY) ** 2);
@@ -1439,7 +1461,7 @@ function onPointerMove(e) {
     }
   } else if (currentTool === 'eraser') {
     eraseLine(lastX, lastY, pos.x, pos.y);
-    redrawTemplateLines();
+
   }
 
   lastX = pos.x;
@@ -1448,7 +1470,7 @@ function onPointerMove(e) {
 
 function onPointerUp() {
   if (isDrawing && currentTool === 'airbrush') {
-    redrawTemplateLines();
+
   }
   isDrawing = false;
   if (airbrushInterval) {
@@ -1585,6 +1607,7 @@ function buildComposite(includeSignature) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, cw, H);
   ctx.drawImage(colorCanvas, 0, 0);
+  ctx.drawImage(templateOverlay, 0, 0);
 
   if (includeSignature) {
     ctx.fillStyle = '#f8f6f2';
@@ -1607,15 +1630,23 @@ function buildComposite(includeSignature) {
 
 // ─── Export functions ───────────────────────────────────────
 function getExportCanvas(colored) {
+  const w = colorCanvas.width, h = colorCanvas.height;
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = w;
+  exportCanvas.height = h;
+  const ctx = exportCanvas.getContext('2d');
+
   if (colored) {
-    const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = colorCanvas.width;
-    exportCanvas.height = colorCanvas.height;
-    exportCanvas.getContext('2d').drawImage(colorCanvas, 0, 0);
-    return exportCanvas;
+    // Composite: user drawing + template lines on top
+    ctx.drawImage(colorCanvas, 0, 0);
+    ctx.drawImage(templateOverlay, 0, 0);
   } else {
-    return generateVariant(sourceImage, VARIANT_CONFIG[selectedVariant]);
+    // B&W template only
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(templateOverlay, 0, 0);
   }
+  return exportCanvas;
 }
 
 function downloadCanvas(canvas, filename) {
@@ -1757,21 +1788,22 @@ $('btnPickerConfirm').addEventListener('click', () => {
 $('btnColorBack').addEventListener('click', () => showScreen('picker'));
 $('btnUndo').addEventListener('click', popUndo);
 $('btnReset').addEventListener('click', () => {
-  if (baseImageData) {
-    pushUndo();
-    colorCtx.putImageData(baseImageData, 0, 0);
-    showToast('Canvas reset');
-  }
+  pushUndo();
+  colorCtx.fillStyle = '#ffffff';
+  colorCtx.fillRect(0, 0, colorCanvas.width, colorCanvas.height);
+  showToast('Canvas reset');
 });
 
 // Sign it button → go to sign screen
 $('btnSignIt').addEventListener('click', async () => {
   initSignCanvas();
-  // Build preview of current colored artwork
+  // Build preview: composite drawing + template lines
   const previewCanvas = document.createElement('canvas');
   previewCanvas.width = colorCanvas.width;
   previewCanvas.height = colorCanvas.height;
-  previewCanvas.getContext('2d').drawImage(colorCanvas, 0, 0);
+  const pCtx = previewCanvas.getContext('2d');
+  pCtx.drawImage(colorCanvas, 0, 0);
+  pCtx.drawImage(templateOverlay, 0, 0);
   $('signPreview').src = previewCanvas.toDataURL('image/png');
   showScreen('sign');
 });
