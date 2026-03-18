@@ -6,47 +6,39 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0a1628">
   <title>Prim4 · Kapework</title>
-  <meta name="description" content="Guess the 4-digit prime in 6 tries. A daily number puzzle by Kapework.">
+  <meta name="description" content="Guess the 4-digit prime in 6 tries. A daily number puzzle.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
   <style>
 /* ── Reset ───────────────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box; margin: 0; padding: 0;
-  -webkit-tap-highlight-color: transparent;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 /* ── Variables ───────────────────────────────────────────────────────────── */
 :root {
-  --bg:          #0a1628;
-  --surface:     #121e33;
-  --surface2:    #1a2a44;
-  --border:      rgba(232,237,245,0.10);
-  --border-hi:   rgba(232,237,245,0.25);
-  --text:        #e8edf5;
-  --muted:       rgba(232,237,245,0.50);
-  --cyan:        #00e5cc;
-  --cyan-dim:    rgba(0,229,204,0.15);
+  --bg:         #0a1628;
+  --surface:    #121e33;
+  --surface2:   #1a2a44;
+  --border:     rgba(232,237,245,0.10);
+  --border-hi:  rgba(232,237,245,0.25);
+  --text:       #e8edf5;
+  --muted:      rgba(232,237,245,0.50);
+  --cyan:       #00e5cc;
+  --cyan-dim:   rgba(0,229,204,0.15);
+  --gold:       #b59f3b;
 
-  /* Tile colours */
   --tile-filled-bg: rgba(232,237,245,0.08);
   --tile-filled-bd: rgba(232,237,245,0.35);
   --col-correct:    #538d4e;
   --col-present:    #b59f3b;
   --col-absent:     #2d3748;
 
-  /* Dynamic tile size — overridden by JS */
   --tile-size: 56px;
   --tile-gap:  6px;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
-html, body {
-  height: 100%;
-  background: var(--bg);
-  overscroll-behavior: none;
-}
+html, body { height: 100%; background: var(--bg); overscroll-behavior: none; }
 
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -77,460 +69,383 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: 8px 0 9px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
+  gap: 4px;
 }
 
-.header-btn {
-  background: none;
-  border: none;
+.back-btn {
+  background: none; border: none;
   color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 8px;
-  transition: color 0.15s;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  min-width: 72px;
+  font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; padding: 6px 6px 6px 0;
+  border-radius: 8px; transition: color 0.15s;
+  font-family: inherit; white-space: nowrap;
+  flex-shrink: 0;
 }
-.header-btn:hover { color: var(--text); }
-.header-btn:last-child { justify-content: flex-end; }
+.back-btn:hover { color: var(--text); }
 
+.header-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
 .header-title {
   font-family: 'Space Mono', monospace;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: -0.5px;
-  flex: 1;
-  text-align: center;
+}
+.puzzle-num {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.streak-chip {
+  display: flex; align-items: center; gap: 2px;
+  font-size: 0.78rem; font-weight: 700;
+  background: none; border: none; color: var(--text);
+  cursor: pointer; padding: 5px 6px; border-radius: 8px;
+  transition: background 0.15s; white-space: nowrap;
+}
+.streak-chip:hover { background: var(--surface2); }
+.streak-chip .flame { font-size: 0.88rem; }
+
+.icon-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px; border: none;
+  background: none; color: var(--muted);
+  font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  position: relative;
+}
+.icon-btn:hover { color: var(--text); background: var(--surface2); }
+.icon-btn:disabled { opacity: 0.28; cursor: default; }
+.icon-btn:disabled:hover { background: none; color: var(--muted); }
+.icon-btn.hint-active { color: var(--cyan); }
+.icon-btn.hint-used   { color: var(--col-correct); }
+/* small green dot when hint used */
+.icon-btn.hint-used::after {
+  content: '';
+  position: absolute; bottom: 5px; right: 5px;
+  width: 5px; height: 5px;
+  border-radius: 50%; background: var(--col-correct);
+}
+
+/* ── Archive bar ─────────────────────────────────────────────────────────── */
+.archive-bar {
+  flex-shrink: 0;
+  height: 0; overflow: hidden;
+  transition: height 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.archive-bar.visible { height: 30px; }
+.archive-bar-text {
+  font-size: 0.74rem; color: var(--muted);
+}
+.archive-bar-text strong { color: var(--gold); }
+.archive-today-btn {
+  font-size: 0.72rem; font-weight: 700;
+  color: var(--cyan); background: none; border: none;
+  cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  font-family: inherit;
 }
 
 /* ── Subtitle ────────────────────────────────────────────────────────────── */
 .subtitle {
   flex-shrink: 0;
   text-align: center;
-  padding: 8px 4px 4px;
+  padding: 6px 4px 3px;
 }
-.subtitle p {
-  font-size: 0.78rem;
-  color: var(--muted);
-  line-height: 1.5;
-}
+.subtitle p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
 
-/* ── Board wrapper ───────────────────────────────────────────────────────── */
+/* ── Hint bar ────────────────────────────────────────────────────────────── */
+.hint-bar {
+  flex-shrink: 0;
+  height: 28px; /* stable reserved slot */
+  display: flex; align-items: center; justify-content: center;
+}
+.hint-pill {
+  font-size: 0.73rem; font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(0,229,204,0.30);
+  color: var(--cyan);
+  white-space: nowrap;
+  max-width: calc(100% - 20px);
+  overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transition: opacity 0.25s;
+}
+.hint-pill.visible { opacity: 1; }
+
+/* ── Board ───────────────────────────────────────────────────────────────── */
 .board-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding: 4px 0;
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 2px 0;
 }
+.board { display: flex; flex-direction: column; gap: var(--tile-gap); }
+.row   { display: flex; gap: var(--tile-gap); }
 
-/* ── Board grid ──────────────────────────────────────────────────────────── */
-.board {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tile-gap);
-}
-
-.row {
-  display: flex;
-  gap: var(--tile-gap);
-}
-
-/* ── Tile ────────────────────────────────────────────────────────────────── */
+/* ── Tiles ───────────────────────────────────────────────────────────────── */
 .tile {
-  width:  var(--tile-size);
-  height: var(--tile-size);
+  width: var(--tile-size); height: var(--tile-size);
   border: 2px solid rgba(232,237,245,0.12);
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   font-family: 'Space Mono', monospace;
   font-size: calc(var(--tile-size) * 0.46);
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 700; color: var(--text);
   background: transparent;
-  position: relative;
-  overflow: hidden;
 }
-
 .tile.filled {
   background: var(--tile-filled-bg);
   border-color: var(--tile-filled-bd);
   animation: tile-pop 0.09s ease;
 }
-
-/* Revealed states — background set via animation fill or instant class */
 .tile.correct { --reveal-col: var(--col-correct); }
 .tile.present { --reveal-col: var(--col-present); }
 .tile.absent  { --reveal-col: var(--col-absent);  }
-
-.tile.revealed {
-  background: var(--reveal-col);
-  border-color: transparent;
-  color: #fff;
-}
-
-/* Animated flip — only when .flip class present */
-.tile.flip {
-  animation: tile-flip 0.52s ease forwards;
-}
-
-/* Row shake on invalid submit */
-.row.shake {
-  animation: row-shake 0.38s ease;
-}
-
-/* Win bounce */
-.tile.win-bounce {
-  animation: win-bounce 0.5s ease forwards;
-}
+.tile.revealed { background: var(--reveal-col); border-color: transparent; color: #fff; }
+.tile.flip     { animation: tile-flip 0.52s ease forwards; }
+.row.shake     { animation: row-shake 0.38s ease; }
+.tile.win-bounce { animation: win-bounce 0.5s ease forwards; }
 
 /* ── Keyframes ───────────────────────────────────────────────────────────── */
-@keyframes tile-pop {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.10); }
+@keyframes tile-pop   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.10)} }
+@keyframes tile-flip  {
+  0%  { transform:scaleY(1);    background:var(--tile-filled-bg); border-color:var(--tile-filled-bd); color:var(--text); }
+  45% { transform:scaleY(0.02); background:var(--tile-filled-bg); border-color:var(--tile-filled-bd); color:var(--text); }
+  55% { transform:scaleY(0.02); background:var(--reveal-col);     border-color:transparent;            color:#fff; }
+  100%{ transform:scaleY(1);    background:var(--reveal-col);     border-color:transparent;            color:#fff; }
 }
+@keyframes row-shake  { 0%,100%{transform:translateX(0)} 18%{transform:translateX(-6px)} 36%{transform:translateX(6px)} 54%{transform:translateX(-4px)} 72%{transform:translateX(4px)} }
+@keyframes win-bounce { 0%{transform:translateY(0)} 30%{transform:translateY(-12px)} 60%{transform:translateY(-5px)} 80%{transform:translateY(-9px)} 100%{transform:translateY(0)} }
 
-@keyframes tile-flip {
-  0%   { transform: scaleY(1);    background: var(--tile-filled-bg); border-color: var(--tile-filled-bd); color: var(--text); }
-  45%  { transform: scaleY(0.02); background: var(--tile-filled-bg); border-color: var(--tile-filled-bd); color: var(--text); }
-  55%  { transform: scaleY(0.02); background: var(--reveal-col);     border-color: transparent;            color: #fff; }
-  100% { transform: scaleY(1);    background: var(--reveal-col);     border-color: transparent;            color: #fff; }
-}
-
-@keyframes row-shake {
-  0%, 100% { transform: translateX(0); }
-  18%      { transform: translateX(-6px); }
-  36%      { transform: translateX(6px); }
-  54%      { transform: translateX(-4px); }
-  72%      { transform: translateX(4px); }
-}
-
-@keyframes win-bounce {
-  0%   { transform: translateY(0); }
-  30%  { transform: translateY(-12px); }
-  60%  { transform: translateY(-5px); }
-  80%  { transform: translateY(-9px); }
-  100% { transform: translateY(0); }
-}
-
-/* ── Math fun pill ───────────────────────────────────────────────────────── */
+/* ── Math fun ────────────────────────────────────────────────────────────── */
 .mathfun-wrap {
-  flex-shrink: 0;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0; height: 30px;
+  display: flex; align-items: center; justify-content: center;
 }
-
 .mathfun-pill {
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 4px 14px;
-  border-radius: 999px;
-  background: var(--surface2);
-  color: var(--muted);
+  font-size: 0.73rem; font-weight: 700;
+  padding: 4px 14px; border-radius: 999px;
+  background: var(--surface2); color: var(--muted);
   border: 1px solid var(--border);
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.25s;
+  white-space: nowrap; opacity: 0; transition: opacity 0.25s;
+  max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
 }
 .mathfun-pill.visible { opacity: 1; }
-.mathfun-pill.prime {
-  color: var(--cyan);
-  border-color: var(--cyan);
-  background: var(--cyan-dim);
-}
+.mathfun-pill.prime   { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
 
 /* ── Keyboard ────────────────────────────────────────────────────────────── */
 .keyboard {
   flex-shrink: 0;
-  padding: 4px 0 env(safe-area-inset-bottom, 16px);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
+  padding: 4px 0 env(safe-area-inset-bottom, 14px);
+  display: flex; flex-direction: column; gap: 6px;
   width: 100%;
 }
-
-.key-row {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-}
-
+.key-row { display: flex; gap: 6px; justify-content: center; }
 .key {
-  flex: 1;
-  height: 50px;
-  max-width: 60px;
+  flex: 1; height: 50px; max-width: 60px;
   border: 1px solid rgba(232,237,245,0.08);
-  border-radius: 10px;
-  background: #1e2d3f;
+  border-radius: 10px; background: #1e2d3f;
   color: var(--text);
-  font-family: 'Space Mono', monospace;
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-family: 'Space Mono', monospace; font-size: 1.05rem; font-weight: 700;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.08s;
-  -webkit-tap-highlight-color: transparent;
 }
 .key:active { transform: scale(0.91); }
-
-.key.action {
-  flex: 1.6;
-  max-width: none;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.8rem;
-  letter-spacing: 0.3px;
-}
-
-/* Key state colors — green wins over yellow wins over gray */
+.key.action { flex: 1.6; max-width: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; }
 .key.correct { background: var(--col-correct); border-color: var(--col-correct); color: #fff; }
 .key.present { background: var(--col-present); border-color: var(--col-present); color: #fff; }
 .key.absent  { background: #1a2535; border-color: rgba(232,237,245,0.04); color: rgba(232,237,245,0.35); }
 
+/* small-screen compaction */
+@media (max-height: 640px) {
+  .key { height: 44px; }
+  .keyboard { gap: 5px; padding-bottom: env(safe-area-inset-bottom, 8px); }
+  .subtitle { padding: 3px 4px 2px; }
+  .mathfun-wrap, .hint-bar { height: 24px; }
+}
+
 /* ── Toast ───────────────────────────────────────────────────────────────── */
 .toast-zone {
-  position: fixed;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 300;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  position: fixed; top: 62px; left: 50%; transform: translateX(-50%);
+  z-index: 300; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
-
 .toast {
-  background: var(--text);
-  color: var(--bg);
-  font-size: 0.84rem;
-  font-weight: 800;
-  padding: 8px 22px;
-  border-radius: 999px;
-  white-space: nowrap;
+  background: var(--text); color: var(--bg);
+  font-size: 0.84rem; font-weight: 800;
+  padding: 8px 22px; border-radius: 999px; white-space: nowrap;
   animation: toast-in 0.18s ease, toast-out 0.25s ease 1.8s forwards;
 }
+@keyframes toast-in  { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes toast-out { to{opacity:0} }
 
-@keyframes toast-in  { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes toast-out { to   { opacity: 0; } }
-
-/* ── Modal ───────────────────────────────────────────────────────────────── */
+/* ── Overlay / sheet ─────────────────────────────────────────────────────── */
 .overlay {
-  position: fixed;
-  inset: 0;
+  position: fixed; inset: 0;
   background: rgba(10,22,40,0.82);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  z-index: 200;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.2s;
 }
-.overlay.open {
-  opacity: 1;
-  pointer-events: all;
-}
+.overlay.open { opacity: 1; pointer-events: all; }
 
 .sheet {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: 24px 24px 0 0;
-  width: 100%;
-  max-width: 440px;
+  width: 100%; max-width: 440px;
   padding: 18px 24px env(safe-area-inset-bottom, 20px);
-  transform: translateY(16px);
-  transition: transform 0.2s;
+  transform: translateY(16px); transition: transform 0.2s;
+  max-height: 92dvh; overflow-y: auto;
 }
 .overlay.open .sheet { transform: translateY(0); }
 
 .sheet-handle {
-  width: 36px; height: 4px;
-  background: var(--border-hi);
-  border-radius: 2px;
-  margin: 0 auto 18px;
+  width: 36px; height: 4px; background: var(--border-hi);
+  border-radius: 2px; margin: 0 auto 16px;
 }
+.sheet-title { font-size: 1.1rem; font-weight: 800; text-align: center; margin-bottom: 16px; }
 
-.sheet-title {
-  font-size: 1.15rem;
-  font-weight: 800;
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-/* Result sheet */
-.result-verdict {
-  text-align: center;
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--muted);
-}
-
-.result-score {
-  text-align: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 14px;
-}
-
-.result-answer-row {
-  text-align: center;
-  margin-bottom: 14px;
-  display: none;
-}
-.result-answer-row .label {
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.result-answer-row .num {
-  font-family: 'Space Mono', monospace;
-  font-size: 2.2rem;
-  font-weight: 700;
-  color: var(--cyan);
-}
-
-.share-grid {
-  font-size: 1.25rem;
-  text-align: center;
-  line-height: 1.55;
-  letter-spacing: 1px;
-  margin-bottom: 16px;
-}
-
-.stats-row {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-.stat {
-  text-align: center;
-  min-width: 52px;
-}
-.stat-num {
-  font-family: 'Space Mono', monospace;
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-.stat-lbl {
-  font-size: 0.68rem;
-  color: var(--muted);
-  margin-top: 2px;
-  line-height: 1.3;
-}
-
-.countdown {
-  text-align: center;
-  margin-bottom: 16px;
-}
-.countdown .countdown-lbl {
-  font-size: 0.72rem;
-  color: var(--muted);
-  margin-bottom: 3px;
-}
-.countdown .countdown-time {
-  font-family: 'Space Mono', monospace;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.btn-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
+/* ── Result sheet ────────────────────────────────────────────────────────── */
+.result-verdict { text-align: center; font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; color: var(--muted); }
+.result-score   { text-align: center; font-family: 'Space Mono', monospace; font-size: 1.4rem; font-weight: 700; margin-bottom: 12px; }
+.result-answer-row { text-align: center; margin-bottom: 12px; display: none; }
+.result-answer-row .lbl { font-size: 0.72rem; color: var(--muted); margin-bottom: 3px; }
+.result-answer-row .num { font-family: 'Space Mono', monospace; font-size: 2rem; font-weight: 700; color: var(--cyan); }
+.share-grid { font-size: 1.2rem; text-align: center; line-height: 1.55; letter-spacing: 1px; margin-bottom: 14px; }
+.stats-row  { display: flex; justify-content: center; gap: 14px; margin-bottom: 12px; }
+.stat { text-align: center; min-width: 48px; }
+.stat-num { font-family: 'Space Mono', monospace; font-size: 1.35rem; font-weight: 700; }
+.stat-lbl { font-size: 0.66rem; color: var(--muted); margin-top: 2px; }
+.countdown { text-align: center; margin-bottom: 14px; }
+.countdown .cd-lbl  { font-size: 0.7rem; color: var(--muted); margin-bottom: 2px; }
+.countdown .cd-time { font-family: 'Space Mono', monospace; font-size: 1.1rem; font-weight: 700; }
+.btn-row { display: flex; gap: 10px; margin-bottom: 12px; }
 .btn {
-  flex: 1;
-  padding: 13px 10px;
-  border-radius: 12px;
-  border: none;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.08s;
+  flex: 1; padding: 12px 10px; border-radius: 12px; border: none;
+  font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 700;
+  cursor: pointer; transition: opacity 0.15s, transform 0.08s;
 }
 .btn:active { transform: scale(0.97); }
-.btn-primary  { background: var(--cyan); color: var(--bg); }
-.btn-ghost    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-
+.btn-primary { background: var(--cyan); color: var(--bg); }
+.btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .fun-fact {
-  font-size: 0.76rem;
-  color: var(--muted);
-  text-align: center;
-  padding: 10px 12px;
-  background: var(--surface2);
-  border-radius: 10px;
-  line-height: 1.5;
+  font-size: 0.74rem; color: var(--muted); text-align: center;
+  padding: 9px 12px; background: var(--surface2); border-radius: 10px; line-height: 1.5;
+  margin-bottom: 14px;
 }
 
-/* Help sheet */
-.help-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+/* More games */
+.more-games { border-top: 1px solid var(--border); padding-top: 14px; }
+.more-games-lbl { font-size: 0.68rem; font-weight: 700; color: var(--muted); text-align: center; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.more-games-row { display: flex; gap: 8px; justify-content: center; }
+.more-game {
+  flex: 1; max-width: 104px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 6px;
+  text-align: center; cursor: pointer;
+  transition: border-color 0.15s;
+  color: var(--text);
 }
-.help-p {
-  font-size: 0.86rem;
-  color: var(--muted);
-  line-height: 1.6;
+.more-game:hover { border-color: var(--cyan); }
+.mg-icon { display: block; font-size: 1.3rem; margin-bottom: 3px; }
+.mg-name { display: block; font-size: 0.72rem; font-weight: 700; }
+
+/* ── Calendar sheet ──────────────────────────────────────────────────────── */
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
 }
+.cal-nav-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: none; color: var(--muted); font-size: 1rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+.cal-nav-btn:hover { color: var(--text); background: var(--surface2); }
+.cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.cal-nav-btn:disabled:hover { background: none; color: var(--muted); }
+.cal-month-title { font-size: 1rem; font-weight: 800; text-align: center; }
+.cal-streak-row  { font-size: 0.8rem; color: var(--muted); text-align: center; margin-bottom: 14px; }
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px; margin-bottom: 4px;
+}
+.cal-wd { text-align: center; font-size: 0.62rem; font-weight: 700; color: var(--muted); padding: 3px 0; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 16px; }
+.cal-day {
+  aspect-ratio: 1; border-radius: 8px; border: none;
+  background: none; color: var(--text);
+  font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.cal-day.empty { cursor: default; }
+.cal-day.pre-epoch, .cal-day.future { color: rgba(232,237,245,0.2); cursor: default; pointer-events: none; }
+.cal-day:not(.pre-epoch):not(.future):not(.empty):hover { background: var(--surface2); }
+.cal-day.won  { background: rgba(185,159,59,0.32); }
+.cal-day.lost { background: rgba(180,60,60,0.28); color: rgba(232,237,245,0.7); }
+.cal-day.partial { background: var(--surface2); }
+.cal-day.is-today  { box-shadow: inset 0 0 0 2px var(--cyan); }
+.cal-day.is-active { box-shadow: inset 0 0 0 2px rgba(232,237,245,0.5); }
+
+/* ── Stats / help sheet shared ───────────────────────────────────────────── */
+.dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.dist-num { font-family: 'Space Mono', monospace; font-size: 0.8rem; font-weight: 700; width: 14px; text-align: right; flex-shrink: 0; }
+.dist-bar-bg { flex: 1; height: 22px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.dist-bar    { height: 100%; min-width: 24px; background: var(--surface2); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.72rem; font-weight: 700; transition: width 0.4s ease; }
+.dist-bar.filled { background: var(--col-absent); }
+.dist-bar.current { background: var(--col-correct); }
+
+/* Help tiles */
+.help-body { display: flex; flex-direction: column; gap: 13px; }
+.help-p { font-size: 0.84rem; color: var(--muted); line-height: 1.6; }
 .help-p strong { color: var(--text); }
-
-.help-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 4px 0 2px;
-}
-
-.htile {
-  width: 40px; height: 40px;
-  border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Space Mono', monospace;
-  font-size: 1rem; font-weight: 700;
-  color: #fff;
-}
+.help-row { display: flex; gap: 6px; align-items: center; margin: 4px 0 2px; }
+.htile { width: 40px; height: 40px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 1rem; font-weight: 700; color: #fff; }
 .htile.c { background: var(--col-correct); }
 .htile.p { background: var(--col-present); }
 .htile.a { background: var(--col-absent);  }
-.htile.e { background: transparent; border: 2px solid rgba(232,237,245,0.15); color: var(--text); }
+.help-note { font-size: 0.74rem; color: var(--muted); line-height: 1.4; }
 
-.help-note {
-  font-size: 0.76rem;
-  color: var(--muted);
-  line-height: 1.5;
+/* Menu sheet */
+.menu-list { display: flex; flex-direction: column; gap: 8px; }
+.menu-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  cursor: pointer; font-size: 0.9rem; font-weight: 700;
+  transition: border-color 0.15s; color: var(--text); width: 100%;
+  font-family: inherit;
 }
+.menu-item:hover { border-color: var(--cyan); }
+.menu-icon { font-size: 1.1rem; flex-shrink: 0; }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .tile.filled            { animation: none; }
-  .tile.flip              { animation: none; }
-  .row.shake              { animation: none; }
-  .tile.win-bounce        { animation: none; }
-  .toast                  { animation: none; opacity: 1; }
-  .overlay, .sheet        { transition: none; }
-  .mathfun-pill           { transition: none; }
+  .tile.filled, .tile.flip, .row.shake, .tile.win-bounce { animation: none; }
+  .toast { animation: none; opacity: 1; }
+  .overlay, .sheet, .archive-bar, .hint-pill, .mathfun-pill { transition: none; }
 }
   </style>
 </head>
@@ -540,15 +455,37 @@ a { color: inherit; text-decoration: none; }
 
   <!-- Header -->
   <header class="header" role="banner">
-    <a class="header-btn" href="../numbercrunch/" aria-label="Back to Number Crunch">← Numbers</a>
-    <h1 class="header-title">Prim4</h1>
-    <button class="header-btn" id="btn-help" aria-label="How to play">How to play</button>
+    <a class="back-btn" href="https://numbercrunch.kapework.com/" aria-label="Back to Number Crunch">← Numbers</a>
+
+    <div class="header-center">
+      <h1 class="header-title">Prim4</h1>
+      <div class="puzzle-num" id="puzzle-num">#1</div>
+    </div>
+
+    <div class="header-right">
+      <button class="streak-chip" id="btn-streak" aria-label="View stats">
+        <span class="flame">🔥</span><span id="hdr-streak">0</span>
+      </button>
+      <button class="icon-btn" id="btn-hint" disabled aria-label="Hint (available after 2 guesses)">?</button>
+      <button class="icon-btn" id="btn-menu" aria-label="More options">⋯</button>
+    </div>
   </header>
+
+  <!-- Archive bar -->
+  <div class="archive-bar" id="archive-bar" role="status" aria-live="polite">
+    <span class="archive-bar-text">Archive: <strong id="archive-date-text"></strong></span>
+    <button class="archive-today-btn" id="btn-today">← Today</button>
+  </div>
 
   <!-- Subtitle -->
   <div class="subtitle">
     <p>Guess the 4-digit prime in 6 tries.</p>
     <p>Any 4-digit number works — we'll tell you if it's prime.</p>
+  </div>
+
+  <!-- Hint bar -->
+  <div class="hint-bar" aria-live="polite" aria-atomic="true">
+    <div class="hint-pill" id="hint-pill"></div>
   </div>
 
   <!-- Board -->
@@ -593,33 +530,106 @@ a { color: inherit; text-decoration: none; }
   <div class="sheet">
     <div class="sheet-handle"></div>
     <div class="result-verdict" id="result-verdict"></div>
-    <div class="result-score" id="result-score"></div>
-
+    <div class="result-score"   id="result-score"></div>
     <div class="result-answer-row" id="result-answer-row">
-      <div class="label">The answer was</div>
+      <div class="lbl">The answer was</div>
       <div class="num" id="result-answer-num"></div>
     </div>
-
-    <div class="share-grid" id="share-grid" aria-label="Guess results"></div>
-
+    <div class="share-grid" id="share-grid" aria-label="Guess emoji grid"></div>
     <div class="stats-row">
       <div class="stat"><div class="stat-num" id="s-played">0</div><div class="stat-lbl">Played</div></div>
       <div class="stat"><div class="stat-num" id="s-winpct">0%</div><div class="stat-lbl">Win %</div></div>
       <div class="stat"><div class="stat-num" id="s-streak">0</div><div class="stat-lbl">Streak</div></div>
       <div class="stat"><div class="stat-num" id="s-best">0</div><div class="stat-lbl">Best</div></div>
     </div>
-
-    <div class="countdown">
-      <div class="countdown-lbl">Next Prim4 in</div>
-      <div class="countdown-time" id="countdown">--:--:--</div>
+    <div class="countdown" id="result-countdown">
+      <div class="cd-lbl">Next Prim4 in</div>
+      <div class="cd-time" id="countdown-time">--:--:--</div>
     </div>
-
     <div class="btn-row">
-      <button class="btn btn-ghost" id="btn-close-result">Close</button>
+      <button class="btn btn-ghost"   id="btn-close-result">Close</button>
       <button class="btn btn-primary" id="btn-share">Share 🔗</button>
     </div>
-
     <div class="fun-fact" id="fun-fact"></div>
+    <div class="more-games">
+      <div class="more-games-lbl">More games</div>
+      <div class="more-games-row">
+        <a class="more-game" href="https://make24.app" target="_blank" rel="noopener">
+          <span class="mg-icon">✖️</span><span class="mg-name">Make 24</span>
+        </a>
+        <a class="more-game" href="https://make36.kapework.com/">
+          <span class="mg-icon">➗</span><span class="mg-name">Make 36</span>
+        </a>
+        <a class="more-game" href="https://tapsum.kapework.com/">
+          <span class="mg-icon">➕</span><span class="mg-name">TapSum</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar sheet -->
+<div class="overlay" id="overlay-cal" role="dialog" aria-modal="true" aria-label="Puzzle calendar">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" id="cal-prev" aria-label="Previous month">‹</button>
+      <div class="cal-month-title" id="cal-month-title"></div>
+      <button class="cal-nav-btn" id="cal-next" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-streak-row" id="cal-streak-row"></div>
+    <div class="cal-weekdays">
+      <div class="cal-wd">MON</div><div class="cal-wd">TUE</div><div class="cal-wd">WED</div>
+      <div class="cal-wd">THU</div><div class="cal-wd">FRI</div><div class="cal-wd">SAT</div>
+      <div class="cal-wd">SUN</div>
+    </div>
+    <div class="cal-grid" id="cal-grid" role="grid" aria-label="Calendar"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost"   id="btn-cal-share">Share month 📋</button>
+      <button class="btn btn-primary" id="btn-close-cal">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stats sheet -->
+<div class="overlay" id="overlay-stats" role="dialog" aria-modal="true" aria-label="Your stats">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Stats</div>
+    <div class="stats-row" style="margin-bottom:20px">
+      <div class="stat"><div class="stat-num" id="ss-played">0</div><div class="stat-lbl">Played</div></div>
+      <div class="stat"><div class="stat-num" id="ss-winpct">0%</div><div class="stat-lbl">Win %</div></div>
+      <div class="stat"><div class="stat-num" id="ss-streak">0</div><div class="stat-lbl">Streak</div></div>
+      <div class="stat"><div class="stat-num" id="ss-best">0</div><div class="stat-lbl">Best</div></div>
+    </div>
+    <div style="margin-bottom:20px">
+      <div class="dist-row" id="d1"><div class="dist-num">1</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+      <div class="dist-row" id="d2"><div class="dist-num">2</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+      <div class="dist-row" id="d3"><div class="dist-num">3</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+      <div class="dist-row" id="d4"><div class="dist-num">4</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+      <div class="dist-row" id="d5"><div class="dist-num">5</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+      <div class="dist-row" id="d6"><div class="dist-num">6</div><div class="dist-bar-bg"><div class="dist-bar">0</div></div></div>
+    </div>
+    <button class="btn btn-primary" id="btn-close-stats" style="width:100%">Done</button>
+  </div>
+</div>
+
+<!-- Menu sheet -->
+<div class="overlay" id="overlay-menu" role="dialog" aria-modal="true" aria-label="Menu">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="menu-list">
+      <button class="menu-item" id="menu-cal">
+        <span class="menu-icon">📅</span> Calendar
+      </button>
+      <button class="menu-item" id="menu-stats">
+        <span class="menu-icon">📊</span> Stats
+      </button>
+      <button class="menu-item" id="menu-help">
+        <span class="menu-icon">❓</span> How to play
+      </button>
+      <button class="btn btn-ghost" id="btn-close-menu" style="margin-top:4px">Close</button>
+    </div>
   </div>
 </div>
 
@@ -630,42 +640,30 @@ a { color: inherit; text-decoration: none; }
     <div class="sheet-title">How to Play</div>
     <div class="help-body">
       <p class="help-p">Guess the <strong>4-digit prime number</strong> in 6 tries. Your guess can be <strong>any 4-digit number</strong> — it doesn't have to be prime.</p>
-
-      <p class="help-p">After each guess, the tiles reveal how close you are:</p>
-
+      <p class="help-p">After each guess the tiles show how close you are:</p>
       <div>
         <div class="help-row">
-          <div class="htile c">5</div>
-          <div class="htile a">2</div>
-          <div class="htile a">3</div>
-          <div class="htile a">4</div>
+          <div class="htile c">5</div><div class="htile a">2</div>
+          <div class="htile a">3</div><div class="htile a">4</div>
         </div>
         <p class="help-note"><strong style="color:#6aab65">Green</strong> — right digit, right position.</p>
       </div>
-
       <div>
         <div class="help-row">
-          <div class="htile a">1</div>
-          <div class="htile p">9</div>
-          <div class="htile a">3</div>
-          <div class="htile a">7</div>
+          <div class="htile a">1</div><div class="htile p">9</div>
+          <div class="htile a">3</div><div class="htile a">7</div>
         </div>
         <p class="help-note"><strong style="color:#c9b05a">Yellow</strong> — digit is in the answer but in a different spot.</p>
       </div>
-
       <div>
         <div class="help-row">
-          <div class="htile a">6</div>
-          <div class="htile a">8</div>
-          <div class="htile a">0</div>
-          <div class="htile a">2</div>
+          <div class="htile a">6</div><div class="htile a">8</div>
+          <div class="htile a">0</div><div class="htile a">2</div>
         </div>
-        <p class="help-note" style="color:var(--muted)"><strong>Gray</strong> — digit is not in the answer at all.</p>
+        <p class="help-note" style="color:var(--muted)"><strong>Gray</strong> — digit is not in the answer.</p>
       </div>
-
-      <p class="help-p">A <strong>Math fun</strong> note appears after each guess. A new prime puzzle drops every day.</p>
-
-      <button class="btn btn-primary" id="btn-close-help" style="margin-top:4px">Got it</button>
+      <p class="help-p">After 2 guesses a <strong>?</strong> hint button unlocks in the header. One hint per puzzle. A <strong>Math fun</strong> note appears after each guess. A new prime drops every day.</p>
+      <button class="btn btn-primary" id="btn-close-help" style="margin-top:2px">Got it</button>
     </div>
   </div>
 </div>
@@ -673,7 +671,10 @@ a { color: inherit; text-decoration: none; }
 <script>
 'use strict';
 
-/* ── Prime sieve ─────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRIMES — sieve of Eratosthenes, all 4-digit primes (1000–9999)
+   Includes primes with repeated digits. No uniqueness restriction.
+   ═════════════════════════════════════════════════════════════════════════ */
 const _sieve = (() => {
   const s = new Uint8Array(10000).fill(1);
   s[0] = s[1] = 0;
@@ -683,124 +684,166 @@ const _sieve = (() => {
   return s;
 })();
 
-/** All 4-digit primes, in order (1061 total) */
-const PRIMES = [];
+const PRIMES = []; // 1061 primes
 for (let n = 1000; n <= 9999; n++) if (_sieve[n]) PRIMES.push(n);
 
-function isPrime(n) {
-  return Number.isInteger(n) && n >= 1000 && n <= 9999 && _sieve[n] === 1;
+function isPrime(n) { return Number.isInteger(n) && n >= 1000 && n <= 9999 && _sieve[n] === 1; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATE HELPERS
+   ═════════════════════════════════════════════════════════════════════════ */
+const EPOCH_DATESTR = '2026-03-18';
+const EPOCH_MS = new Date('2026-03-18T00:00:00').getTime(); // local midnight epoch
+
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-/* ── Daily answer ────────────────────────────────────────────────────────── */
-/** Returns "YYYY-MM-DD" in the user's local timezone */
-function localDateStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+const TODAY = localDateStr();
 
-const EPOCH_MS = Date.UTC(2026, 2, 18); // 2026-03-18 UTC midnight
-
-function dailyAnswer() {
-  const today = new Date(localDateStr() + 'T00:00:00');
-  const dayIdx = Math.floor((today.getTime() - EPOCH_MS) / 86400000);
-  const idx = ((dayIdx % PRIMES.length) + PRIMES.length) % PRIMES.length;
+function answerForDate(ds) {
+  const ms = new Date(ds + 'T00:00:00').getTime();
+  const idx = (((Math.floor((ms - EPOCH_MS) / 86400000)) % PRIMES.length) + PRIMES.length) % PRIMES.length;
   return PRIMES[idx];
 }
 
-const TODAY   = localDateStr();
-const ANSWER  = dailyAnswer();
-const ANS_STR = String(ANSWER);
-
-/* ── Fun facts ───────────────────────────────────────────────────────────── */
-const FUN_FACTS = [
-  '2 is the only even prime number.',
-  'Any prime greater than 5 ends in 1, 3, 7, or 9.',
-  'If a number\'s digit sum is divisible by 3, it\'s not prime.',
-  'There are exactly 1,061 four-digit prime numbers.',
-  'Twin primes differ by 2 — like 1031 and 1033.',
-  '1 is not prime: primes have exactly two distinct factors.',
-  'Every even number > 2 is the sum of two primes (Goldbach\'s conjecture — unproven!).',
-  'Mersenne primes have the form 2ⁿ − 1.',
-  'The largest known prime has over 41 million digits.',
-  'Primes become rarer as numbers grow — but they never stop.',
-];
-
-/* ── State ───────────────────────────────────────────────────────────────── */
-const STATE_KEY = 'prim4_state_v1';
-const STATS_KEY = 'prim4_stats_v1';
-
-function loadState() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STATE_KEY));
-    if (s && s.date === TODAY) return s;
-  } catch (_) { /* ignore */ }
-  return { date: TODAY, guesses: [], status: 'playing', statsRecorded: false };
+function puzzleNumForDate(ds) {
+  return Math.max(1, Math.floor((new Date(ds + 'T00:00:00').getTime() - EPOCH_MS) / 86400000) + 1);
 }
 
-function saveState(s) {
-  try { localStorage.setItem(STATE_KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
+function prevDayStr(ds) {
+  const d = new Date(ds + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return localDateStr(d);
+}
+
+function friendlyDate(ds) {
+  return new Date(ds + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE MANAGEMENT
+   ═════════════════════════════════════════════════════════════════════════ */
+const STATS_KEY = 'prim4_stats_v2';
+
+function stateKey(ds) { return `prim4_s_${ds}`; }
+
+function loadStateForDate(ds) {
+  try {
+    const s = JSON.parse(localStorage.getItem(stateKey(ds)));
+    if (s && s.date === ds) return s;
+  } catch (_) { /* ignore */ }
+  return { date: ds, guesses: [], status: 'playing', statsRecorded: false, hintUsed: false };
+}
+
+function saveStateForDate(ds, s) {
+  try { localStorage.setItem(stateKey(ds), JSON.stringify(s)); } catch (_) { /* ignore */ }
+}
+
+function getDateStatus(ds) {
+  try {
+    const s = JSON.parse(localStorage.getItem(stateKey(ds)));
+    if (!s || !s.guesses || !s.guesses.length) return 'unplayed';
+    return s.status === 'won' ? 'won' : s.status === 'lost' ? 'lost' : 'partial';
+  } catch (_) { return 'unplayed'; }
 }
 
 function loadStats() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STATS_KEY));
-    if (s) return s;
-  } catch (_) { /* ignore */ }
-  return { played: 0, won: 0, streak: 0, best: 0, dist: [0, 0, 0, 0, 0, 0] };
+  try { return JSON.parse(localStorage.getItem(STATS_KEY)) || blankStats(); }
+  catch (_) { return blankStats(); }
 }
+function blankStats() { return { played: 0, won: 0, streak: 0, best: 0, dist: [0,0,0,0,0,0], lastWonDate: null }; }
+function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (_) { /* ignore */ } }
 
-function saveStats(s) {
-  try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch (_) { /* ignore */ }
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACTIVE PUZZLE STATE (can be today or an archive date)
+   ═════════════════════════════════════════════════════════════════════════ */
+let activeDate   = TODAY;
+let activeAnswer = answerForDate(TODAY); // number
+let activeState  = loadStateForDate(TODAY);
+let isArchive    = false;
 
-/* ── Guess evaluation (Wordle-style duplicate handling) ──────────────────── */
-/**
- * Returns array of 4: 'correct' | 'present' | 'absent'
- * Handles duplicate digits correctly.
- */
+/* ═══════════════════════════════════════════════════════════════════════════
+   GUESS EVALUATION — Wordle-style duplicate handling
+   ═════════════════════════════════════════════════════════════════════════ */
 function evaluate(guess, answer) {
-  const g = [...guess];
-  const a = [...answer];
-  const result = ['absent', 'absent', 'absent', 'absent'];
-  const aRem = [...a];
-  const gRem = [...g];
+  const result = ['absent','absent','absent','absent'];
+  const aRem = [...answer]; // mutable copy
+  const gRem = [...guess];
 
-  // Pass 1: exact matches
+  // Pass 1: exact matches (green)
   for (let i = 0; i < 4; i++) {
-    if (g[i] === a[i]) {
+    if (guess[i] === answer[i]) {
       result[i] = 'correct';
-      aRem[i] = null;
-      gRem[i] = null;
+      aRem[i] = null; gRem[i] = null;
     }
   }
-
-  // Pass 2: present (wrong position)
+  // Pass 2: present in wrong position (yellow)
   for (let i = 0; i < 4; i++) {
     if (gRem[i] === null) continue;
     const j = aRem.indexOf(gRem[i]);
-    if (j !== -1) {
-      result[i] = 'present';
-      aRem[j] = null;
-    }
+    if (j !== -1) { result[i] = 'present'; aRem[j] = null; }
   }
-
   return result;
 }
 
-/* ── Math fun ────────────────────────────────────────────────────────────── */
-function mathFunMsg(guessStr) {
-  const n = parseInt(guessStr, 10);
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATH FUN
+   ═════════════════════════════════════════════════════════════════════════ */
+function mathFunMsg(gs) {
+  const n = parseInt(gs, 10);
   if (isPrime(n)) return { text: `Math fun: Prime ✓ — ${n} is prime!`, prime: true };
-  if (n % 2 === 0) return { text: 'Math fun: Not prime — it\'s even.', prime: false };
-  if (n % 5 === 0) return { text: 'Math fun: Not prime — it ends in 5.', prime: false };
-  const dsum = [...guessStr].reduce((a, d) => a + +d, 0);
-  if (dsum % 3 === 0) return { text: `Math fun: Not prime — digit sum ${dsum} means divisible by 3.`, prime: false };
-  return { text: 'Math fun: Composite — not prime.', prime: false };
+  if (n % 2 === 0)  return { text: "Math fun: Not prime — it's even.", prime: false };
+  if (n % 5 === 0)  return { text: "Math fun: Not prime — ends in 5.", prime: false };
+  const dsum = [...gs].reduce((a, d) => a + +d, 0);
+  if (dsum % 3 === 0) return { text: `Math fun: Not prime — digit sum ${dsum} is divisible by 3.`, prime: false };
+  return { text: 'Math fun: Composite number.', prime: false };
 }
 
-/* ── Key state tracking ──────────────────────────────────────────────────── */
-const KP = { correct: 3, present: 2, absent: 1 }; // priority
-let keyState = {}; // digit → 'correct'|'present'|'absent'
+/* ═══════════════════════════════════════════════════════════════════════════
+   HINTS — smart, rotated by puzzle number
+   Only available after 2 guesses. One per puzzle.
+   ═════════════════════════════════════════════════════════════════════════ */
+function computeHint(answer, puzzleNum) {
+  const digits = [...String(answer)].map(Number);
+  const sum    = digits.reduce((a, b) => a + b, 0);
+  const unique = new Set(digits);
+  const odds   = digits.filter(d => d % 2 !== 0).length;
+
+  const pool = [
+    unique.size < 4 ? 'There is a repeated digit in the answer.'
+                    : 'All four digits are distinct.',
+    `The digit sum is ${sum}.`,
+    odds === 0 ? 'All four digits are even.'
+    : odds === 4 ? 'All four digits are odd.'
+    : `Exactly ${odds} of the four digits ${odds === 1 ? 'is' : 'are'} odd.`,
+    answer < 5000 ? 'The answer is less than 5000.'
+                  : 'The answer is 5000 or greater.',
+  ];
+
+  return '💡 ' + pool[puzzleNum % pool.length];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FUN FACTS
+   ═════════════════════════════════════════════════════════════════════════ */
+const FUN_FACTS = [
+  '2 is the only even prime.',
+  'Any prime greater than 5 ends in 1, 3, 7, or 9.',
+  'If the digit sum is divisible by 3, the number is composite.',
+  'There are exactly 1,061 four-digit prime numbers.',
+  'Twin primes differ by exactly 2 — like 1031 & 1033.',
+  '1 is not prime: a prime has exactly two distinct factors.',
+  'Mersenne primes have the form 2ⁿ − 1.',
+  'Primes become rarer as numbers grow — but they never stop.',
+  'Every even number > 2 is conjectured to be a sum of two primes (Goldbach).',
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEY STATE TRACKING
+   ═════════════════════════════════════════════════════════════════════════ */
+const KP = { correct: 3, present: 2, absent: 1 };
+let keyState = {};
 
 function updateKeys(guess, result) {
   [...guess].forEach((d, i) => {
@@ -809,105 +852,90 @@ function updateKeys(guess, result) {
   });
 }
 
-/* ── DOM references ──────────────────────────────────────────────────────── */
-const boardEl    = document.getElementById('board');
-const mathfunEl  = document.getElementById('mathfun-pill');
-const toastZone  = document.getElementById('toast-zone');
+/* ═══════════════════════════════════════════════════════════════════════════
+   DOM REFS
+   ═════════════════════════════════════════════════════════════════════════ */
+const boardEl      = document.getElementById('board');
+const mathfunEl    = document.getElementById('mathfun-pill');
+const hintPillEl   = document.getElementById('hint-pill');
+const btnHint      = document.getElementById('btn-hint');
+const toastZone    = document.getElementById('toast-zone');
 
-/* ── Tile size (fit board in viewport) ───────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   TILE SIZING — fits board into whatever vertical space remains
+   ═════════════════════════════════════════════════════════════════════════ */
+const noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function fitTiles() {
-  // Reserve: header≈50 + subtitle≈42 + mathfun≈32 + keyboard≈175 + padding≈36 = 335
-  const avail = window.innerHeight - 335;
-  const size  = Math.max(42, Math.min(62, Math.floor((avail - 5 * 6) / 6)));
+  const vh = window.innerHeight;
+  // Reserve: header≈52 + archivebar≈30 + subtitle≈36 + hintbar≈28 + mathfun≈30 +
+  //          keyboard≈168 + padding/gaps≈36 = 380
+  const reserved = vh < 640 ? 340 : 380;
+  const size = Math.max(40, Math.min(62, Math.floor((vh - reserved - 5 * 6) / 6)));
   document.documentElement.style.setProperty('--tile-size', size + 'px');
 }
 window.addEventListener('resize', fitTiles);
 fitTiles();
 
-/* ── Build board DOM ─────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOARD CONSTRUCTION
+   ═════════════════════════════════════════════════════════════════════════ */
 function buildBoard() {
   boardEl.innerHTML = '';
   for (let r = 0; r < 6; r++) {
     const row = document.createElement('div');
-    row.className = 'row';
-    row.id = `row-${r}`;
-    row.setAttribute('role', 'row');
+    row.className = 'row'; row.id = `row-${r}`; row.setAttribute('role', 'row');
     for (let c = 0; c < 4; c++) {
       const tile = document.createElement('div');
-      tile.className = 'tile';
-      tile.id = `tile-${r}-${c}`;
-      tile.setAttribute('role', 'gridcell');
+      tile.className = 'tile'; tile.id = `tile-${r}-${c}`; tile.setAttribute('role', 'gridcell');
       row.appendChild(tile);
     }
     boardEl.appendChild(row);
   }
 }
 
-/* ── Reduced motion helper ───────────────────────────────────────────────── */
-const noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* ── Render helpers ──────────────────────────────────────────────────────── */
-function setTileText(r, c, char) {
-  document.getElementById(`tile-${r}-${c}`).textContent = char;
-}
-
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER HELPERS
+   ═════════════════════════════════════════════════════════════════════════ */
 function renderInput(row, text) {
   for (let c = 0; c < 4; c++) {
     const tile = document.getElementById(`tile-${row}-${c}`);
     const ch = text[c] || '';
     tile.textContent = ch;
-    if (ch && !tile.classList.contains('filled')) {
-      tile.classList.add('filled');
-    } else if (!ch) {
-      tile.classList.remove('filled');
-    }
+    tile.classList.toggle('filled', !!ch);
   }
 }
 
-/**
- * Reveal a row with the flip animation (or instant for no-animation cases).
- * Returns a promise that resolves when the full row animation is done.
- */
 function revealRow(r, guess, result, instant = false) {
   return new Promise(resolve => {
-    const PER_TILE = instant ? 0 : 140; // ms between tile flips
-    const FLIP_DUR = instant ? 0 : 520; // ms for a single flip animation
-
+    const PER = instant ? 0 : 140;
+    const DUR = instant ? 0 : 520;
     for (let c = 0; c < 4; c++) {
       const tile = document.getElementById(`tile-${r}-${c}`);
-      const delay = instant ? 0 : c * PER_TILE;
-
       setTimeout(() => {
         tile.textContent = guess[c];
-        // Set result class before removing 'filled' so --reveal-col is defined
         tile.classList.add(result[c]);
         if (instant || noMotion) {
           tile.classList.remove('filled');
           tile.classList.add('revealed');
         } else {
-          // Kick off flip — animation handles transition from filled bg to reveal color
-          tile.classList.remove('revealed'); // just in case
+          tile.classList.remove('revealed');
           tile.classList.add('flip');
-          // After animation ends, lock in the final state
           tile.addEventListener('animationend', () => {
             tile.classList.remove('flip', 'filled');
             tile.classList.add('revealed');
           }, { once: true });
         }
-
-        if (c === 3) {
-          setTimeout(resolve, instant ? 0 : FLIP_DUR);
-        }
-      }, delay);
+        if (c === 3) setTimeout(resolve, instant ? 0 : DUR);
+      }, c * PER);
     }
   });
 }
 
-function renderPastGuesses(state) {
+function renderPastGuesses(state, ansStr) {
   state.guesses.forEach((guess, r) => {
-    const result = evaluate(guess, ANS_STR);
-    updateKeys(guess, result);
-    revealRow(r, guess, result, true); // instant, no animation
+    const result = evaluate(guess, ansStr);
+    revealRow(r, guess, result, true);
   });
 }
 
@@ -915,38 +943,40 @@ function renderKeyboard() {
   document.querySelectorAll('.key[data-key]').forEach(btn => {
     const k = btn.dataset.key;
     if (k === 'Backspace' || k === 'Enter') return;
-    // Remove old state classes
     btn.classList.remove('correct', 'present', 'absent');
     if (keyState[k]) btn.classList.add(keyState[k]);
   });
 }
 
-function showMathFun(guessStr) {
-  const { text, prime } = mathFunMsg(guessStr);
+function showMathFun(gs) {
+  const { text, prime } = mathFunMsg(gs);
   mathfunEl.textContent = text;
   mathfunEl.classList.toggle('prime', prime);
   mathfunEl.classList.add('visible');
 }
 
-/* ── Toast ───────────────────────────────────────────────────────────────── */
+function clearMathFun() {
+  mathfunEl.classList.remove('visible', 'prime');
+}
+
+/* ── Toast ─────────────────────────────────────────────────────────────── */
 function toast(msg) {
   const el = document.createElement('div');
-  el.className = 'toast';
-  el.textContent = msg;
+  el.className = 'toast'; el.textContent = msg;
   toastZone.appendChild(el);
   setTimeout(() => el.remove(), 2200);
 }
 
-/* ── Row shake ───────────────────────────────────────────────────────────── */
+/* ── Shake ─────────────────────────────────────────────────────────────── */
 function shakeRow(r) {
   const row = document.getElementById(`row-${r}`);
   row.classList.remove('shake');
-  void row.offsetWidth; // force reflow
+  void row.offsetWidth;
   row.classList.add('shake');
   row.addEventListener('animationend', () => row.classList.remove('shake'), { once: true });
 }
 
-/* ── Win bounce ──────────────────────────────────────────────────────────── */
+/* ── Win bounce ────────────────────────────────────────────────────────── */
 function bounceRow(r) {
   return new Promise(resolve => {
     for (let c = 0; c < 4; c++) {
@@ -960,86 +990,165 @@ function bounceRow(r) {
   });
 }
 
-/* ── Stats ───────────────────────────────────────────────────────────────── */
-function recordStats(won, guessCount, state) {
-  if (state.statsRecorded) return;
+/* ═══════════════════════════════════════════════════════════════════════════
+   HINT SYSTEM
+   ═════════════════════════════════════════════════════════════════════════ */
+function updateHintButton() {
+  const guessCount = activeState.guesses.length;
+  const playing    = activeState.status === 'playing';
+  const used       = activeState.hintUsed;
+
+  btnHint.classList.remove('hint-active', 'hint-used');
+
+  if (used) {
+    btnHint.disabled = false;
+    btnHint.classList.add('hint-used');
+    btnHint.setAttribute('aria-label', 'Hint used — tap to see again');
+    showHintPill();
+  } else if (guessCount >= 2 && playing) {
+    btnHint.disabled = false;
+    btnHint.classList.add('hint-active');
+    btnHint.setAttribute('aria-label', 'Get a hint');
+  } else {
+    btnHint.disabled = true;
+    btnHint.setAttribute('aria-label', 'Hint (available after 2 guesses)');
+    hintPillEl.classList.remove('visible');
+  }
+}
+
+function showHintPill() {
+  const hint = computeHint(activeAnswer, puzzleNumForDate(activeDate));
+  hintPillEl.textContent = hint;
+  hintPillEl.classList.add('visible');
+}
+
+btnHint.addEventListener('click', () => {
+  if (activeState.hintUsed) {
+    // Toggle hint visibility
+    hintPillEl.classList.toggle('visible');
+    return;
+  }
+  if (activeState.guesses.length < 2) {
+    toast('Available after 2 guesses');
+    return;
+  }
+  // Use hint for the first time
+  activeState.hintUsed = true;
+  saveStateForDate(activeDate, activeState);
+  updateHintButton();
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEADER UPDATES
+   ═════════════════════════════════════════════════════════════════════════ */
+function updateHeaderStreak() {
+  const st = loadStats();
+  document.getElementById('hdr-streak').textContent = st.streak;
+}
+
+function updatePuzzleNum() {
+  document.getElementById('puzzle-num').textContent = `#${puzzleNumForDate(activeDate)}`;
+}
+
+function updateArchiveBar() {
+  const bar = document.getElementById('archive-bar');
+  if (isArchive) {
+    bar.classList.add('visible');
+    document.getElementById('archive-date-text').textContent = friendlyDate(activeDate);
+  } else {
+    bar.classList.remove('visible');
+  }
+  fitTiles();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATS RECORDING (today's puzzle only, not archive)
+   ═════════════════════════════════════════════════════════════════════════ */
+function recordStats(won, guessCount) {
+  if (activeState.statsRecorded || isArchive) return;
   const st = loadStats();
   st.played++;
   if (won) {
     st.won++;
-    st.streak++;
+    const yesterday = prevDayStr(TODAY);
+    if (st.lastWonDate === yesterday || st.streak === 0) {
+      st.streak++;
+    } else if (st.lastWonDate !== TODAY) {
+      st.streak = 1;
+    }
     st.best = Math.max(st.best, st.streak);
-    if (!st.dist) st.dist = [0, 0, 0, 0, 0, 0];
-    if (guessCount >= 1 && guessCount <= 6) st.dist[guessCount - 1]++;
+    st.lastWonDate = TODAY;
+    st.dist = st.dist || [0,0,0,0,0,0];
+    st.dist[guessCount - 1]++;
   } else {
-    st.streak = 0;
+    if (st.lastWonDate !== TODAY) st.streak = 0;
   }
   saveStats(st);
-  state.statsRecorded = true;
-  saveState(state);
+  activeState.statsRecorded = true;
+  saveStateForDate(activeDate, activeState);
+  updateHeaderStreak();
 }
 
-/* ── Share ───────────────────────────────────────────────────────────────── */
-function buildShareText(state) {
-  const score = state.status === 'won' ? `${state.guesses.length}/6` : 'X/6';
-  const grid  = state.guesses.map(g => {
-    return evaluate(g, ANS_STR)
-      .map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛')
-      .join('');
-  }).join('\n');
-  return `Prim4 ${score}\n${grid}\nhttps://prim4.kapework.com`;
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARE
+   ═════════════════════════════════════════════════════════════════════════ */
+function buildShareText() {
+  const score = activeState.status === 'won' ? `${activeState.guesses.length}/6` : 'X/6';
+  const hint  = activeState.hintUsed ? ' 💡' : '';
+  const pNum  = puzzleNumForDate(activeDate);
+  const extra = isArchive ? ` (${friendlyDate(activeDate)})` : '';
+  const grid  = activeState.guesses.map(g =>
+    evaluate(g, String(activeAnswer)).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
+  ).join('\n');
+  return `Prim4 #${pNum}${extra} ${score}${hint}\n${grid}\nhttps://prim4.kapework.com`;
 }
 
-async function share(state) {
-  const text = buildShareText(state);
+async function shareResult() {
+  const text = buildShareText();
   try {
-    if (navigator.share) {
-      await navigator.share({ text });
-      return;
-    }
-  } catch (_) { /* fall through to clipboard */ }
-
+    if (navigator.share) { await navigator.share({ text }); return; }
+  } catch (_) { /* fall through */ }
   try {
     await navigator.clipboard.writeText(text);
     toast('Copied!');
   } catch (_) {
-    // Legacy fallback
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
-    document.body.appendChild(ta);
-    ta.select();
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); toast('Copied!'); } catch (_2) { toast('Copy failed'); }
     document.body.removeChild(ta);
   }
 }
 
-/* ── Result modal ────────────────────────────────────────────────────────── */
-let countdownInterval = null;
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESULT SHEET
+   ═════════════════════════════════════════════════════════════════════════ */
+let countdownTick = null;
 
-function openResult(state) {
-  const won    = state.status === 'won';
-  const score  = won ? `${state.guesses.length}/6` : 'X/6';
-  const st     = loadStats();
+function openResult() {
+  const won   = activeState.status === 'won';
+  const score = won ? `${activeState.guesses.length}/6` : 'X/6';
+  const st    = loadStats();
 
   document.getElementById('result-verdict').textContent =
-    won ? (state.guesses.length <= 2 ? '🔥 Brilliant!' : state.guesses.length <= 4 ? '✓ Solved!' : '😌 Got there!') : '✗ Better luck tomorrow';
-  document.getElementById('result-score').textContent = `Prim4 — ${score}`;
+    won ? (activeState.guesses.length <= 2 ? '🔥 Brilliant!'
+         : activeState.guesses.length <= 4 ? '✓ Solved!'
+         : '😌 Got there!') : '✗ Better luck tomorrow';
+  document.getElementById('result-score').textContent = `Prim4 #${puzzleNumForDate(activeDate)} — ${score}`;
 
   const ansRow = document.getElementById('result-answer-row');
   if (!won) {
     ansRow.style.display = 'block';
-    document.getElementById('result-answer-num').textContent = ANSWER;
+    document.getElementById('result-answer-num').textContent = activeAnswer;
   } else {
     ansRow.style.display = 'none';
   }
 
-  // Emoji grid
-  document.getElementById('share-grid').textContent = state.guesses.map(g =>
-    evaluate(g, ANS_STR).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
+  document.getElementById('share-grid').textContent = activeState.guesses.map(g =>
+    evaluate(g, String(activeAnswer)).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
   ).join('\n');
 
-  // Stats
+  // Stats (always show today's stats, even if viewing archive)
   document.getElementById('s-played').textContent = st.played;
   document.getElementById('s-winpct').textContent  = st.played ? Math.round(st.won / st.played * 100) + '%' : '0%';
   document.getElementById('s-streak').textContent  = st.streak;
@@ -1047,104 +1156,319 @@ function openResult(state) {
 
   // Fun fact
   document.getElementById('fun-fact').textContent =
-    '💡 ' + FUN_FACTS[Math.floor(Math.random() * FUN_FACTS.length)];
+    '💡 ' + FUN_FACTS[puzzleNumForDate(activeDate) % FUN_FACTS.length];
 
-  // Countdown
-  if (countdownInterval) clearInterval(countdownInterval);
-  function tick() {
-    const now = new Date();
-    const next = new Date(now); next.setDate(next.getDate() + 1); next.setHours(0, 0, 0, 0);
-    const d = next - now;
-    const h = Math.floor(d / 3600000);
-    const m = Math.floor((d % 3600000) / 60000);
-    const s = Math.floor((d % 60000)   / 1000);
-    document.getElementById('countdown').textContent =
-      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  // Countdown (only for today)
+  const cdEl = document.getElementById('result-countdown');
+  if (!isArchive) {
+    cdEl.style.display = 'block';
+    if (countdownTick) clearInterval(countdownTick);
+    function tick() {
+      const now = new Date(), next = new Date(now);
+      next.setDate(next.getDate() + 1); next.setHours(0,0,0,0);
+      const d = next - now;
+      const h = Math.floor(d / 3600000), m = Math.floor((d % 3600000) / 60000), s = Math.floor((d % 60000) / 1000);
+      document.getElementById('countdown-time').textContent =
+        `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    tick(); countdownTick = setInterval(tick, 1000);
+  } else {
+    cdEl.style.display = 'none';
   }
-  tick();
-  countdownInterval = setInterval(tick, 1000);
 
-  document.getElementById('overlay-result').classList.add('open');
+  openOverlay('overlay-result');
 }
 
-/* ── Game logic ──────────────────────────────────────────────────────────── */
-let gameState; // loaded from localStorage
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATS SHEET
+   ═════════════════════════════════════════════════════════════════════════ */
+function openStats() {
+  const st = loadStats();
+  document.getElementById('ss-played').textContent = st.played;
+  document.getElementById('ss-winpct').textContent  = st.played ? Math.round(st.won / st.played * 100) + '%' : '0%';
+  document.getElementById('ss-streak').textContent  = st.streak;
+  document.getElementById('ss-best').textContent    = st.best;
+
+  const dist = st.dist || [0,0,0,0,0,0];
+  const max  = Math.max(1, ...dist);
+  const currentGuess = activeState.status === 'won' ? activeState.guesses.length : -1;
+
+  for (let i = 1; i <= 6; i++) {
+    const row = document.getElementById(`d${i}`);
+    const bar = row.querySelector('.dist-bar');
+    const pct = Math.round((dist[i-1] / max) * 100);
+    bar.style.width = Math.max(8, pct) + '%';
+    bar.textContent = dist[i-1];
+    bar.className = 'dist-bar' + (dist[i-1] > 0 ? ' filled' : '') + (i === currentGuess ? ' current' : '');
+  }
+
+  openOverlay('overlay-stats');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALENDAR
+   ═════════════════════════════════════════════════════════════════════════ */
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+function renderCalendar() {
+  const now = new Date();
+  const isCurMonth = calYear === now.getFullYear() && calMonth === now.getMonth();
+
+  const monthName = new Date(calYear, calMonth, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  document.getElementById('cal-month-title').textContent = monthName;
+
+  const st = loadStats();
+  document.getElementById('cal-streak-row').textContent = `🔥 ${st.streak} day streak`;
+
+  document.getElementById('cal-next').disabled = isCurMonth;
+
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const startOffset = (firstDay + 6) % 7; // Mon=0
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  for (let i = 0; i < startOffset; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-day empty';
+    grid.appendChild(empty);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const btn = document.createElement('button');
+    btn.className = 'cal-day';
+    btn.textContent = day;
+
+    if (ds < EPOCH_DATESTR) {
+      btn.classList.add('pre-epoch');
+    } else if (ds > TODAY) {
+      btn.classList.add('future');
+    } else {
+      const status = getDateStatus(ds);
+      if (status === 'won')   btn.classList.add('won');
+      else if (status === 'lost')  btn.classList.add('lost');
+      else if (status === 'partial') btn.classList.add('partial');
+      if (ds === TODAY)       btn.classList.add('is-today');
+      if (ds === activeDate)  btn.classList.add('is-active');
+      btn.addEventListener('click', () => {
+        closeOverlay('overlay-cal');
+        openDate(ds);
+      });
+    }
+    grid.appendChild(btn);
+  }
+}
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('cal-next').addEventListener('click', () => {
+  const now = new Date();
+  if (calYear === now.getFullYear() && calMonth >= now.getMonth()) return;
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+});
+
+document.getElementById('btn-cal-share').addEventListener('click', async () => {
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const monthName = new Date(calYear, calMonth, 1).toLocaleString(undefined, { month: 'long', year: 'numeric' });
+  let row = '', lines = [`Prim4 — ${monthName}`];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    if (ds < EPOCH_DATESTR || ds > TODAY) row += '⬜';
+    else {
+      const st = getDateStatus(ds);
+      row += st === 'won' ? '🟩' : st === 'lost' ? '🟥' : '⬜';
+    }
+    if (day % 7 === 0) { lines.push(row); row = ''; }
+  }
+  if (row) lines.push(row);
+  const text = lines.join('\n') + '\nhttps://prim4.kapework.com';
+  try {
+    if (navigator.share) { await navigator.share({ text }); return; }
+  } catch (_) { /* fall through */ }
+  try { await navigator.clipboard.writeText(text); toast('Copied!'); }
+  catch (_) { toast('Could not copy'); }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATE SWITCHING (archive navigation)
+   ═════════════════════════════════════════════════════════════════════════ */
+function openDate(ds) {
+  saveStateForDate(activeDate, activeState); // persist current before switching
+
+  activeDate   = ds;
+  activeAnswer = answerForDate(ds);
+  activeState  = loadStateForDate(ds);
+  isArchive    = (ds !== TODAY);
+  input        = '';
+  busy         = false;
+  keyState     = {};
+
+  // Rebuild key state from archive guesses
+  activeState.guesses.forEach(g => {
+    updateKeys(g, evaluate(g, String(activeAnswer)));
+  });
+
+  buildBoard();
+  renderPastGuesses(activeState, String(activeAnswer));
+  renderKeyboard();
+  updatePuzzleNum();
+  updateArchiveBar();
+  updateHintButton();
+
+  // Restore math fun for last guess
+  if (activeState.guesses.length > 0) {
+    showMathFun(activeState.guesses[activeState.guesses.length - 1]);
+  } else {
+    clearMathFun();
+  }
+
+  if (activeState.status !== 'playing') {
+    setTimeout(() => openResult(), 700);
+  }
+}
+
+document.getElementById('btn-today').addEventListener('click', () => {
+  openDate(TODAY);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY HELPERS
+   ═════════════════════════════════════════════════════════════════════════ */
+function openOverlay(id) { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+
+// Backdrop click
+document.querySelectorAll('.overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('open'); });
+});
+
+// Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(ov => ov.classList.remove('open'));
+});
+
+// Result
+document.getElementById('btn-close-result').addEventListener('click', () => closeOverlay('overlay-result'));
+document.getElementById('btn-share').addEventListener('click', shareResult);
+
+// Calendar
+document.getElementById('btn-close-cal').addEventListener('click', () => closeOverlay('overlay-cal'));
+
+// Stats
+document.getElementById('btn-close-stats').addEventListener('click', () => closeOverlay('overlay-stats'));
+document.getElementById('btn-streak').addEventListener('click', () => openStats());
+
+// Menu
+document.getElementById('btn-menu').addEventListener('click', () => openOverlay('overlay-menu'));
+document.getElementById('btn-close-menu').addEventListener('click', () => closeOverlay('overlay-menu'));
+document.getElementById('menu-cal').addEventListener('click', () => {
+  closeOverlay('overlay-menu');
+  calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+  renderCalendar();
+  openOverlay('overlay-cal');
+});
+document.getElementById('menu-stats').addEventListener('click', () => {
+  closeOverlay('overlay-menu');
+  openStats();
+});
+document.getElementById('menu-help').addEventListener('click', () => {
+  closeOverlay('overlay-menu');
+  openOverlay('overlay-help');
+});
+
+// Help
+document.getElementById('btn-close-help').addEventListener('click', () => closeOverlay('overlay-help'));
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GAME FLOW
+   ═════════════════════════════════════════════════════════════════════════ */
 let input = '';
 let busy  = false;
-
 const WIN_WORDS = ['Brilliant!', 'Excellent!', 'Great job!', 'Nice!', 'Close call!', 'Phew!'];
 
 async function submitGuess() {
-  if (busy || gameState.status !== 'playing') return;
+  if (busy || activeState.status !== 'playing') return;
 
-  // Validate
   if (input.length < 4) {
     toast('Enter 4 digits');
-    shakeRow(gameState.guesses.length);
+    shakeRow(activeState.guesses.length);
     return;
   }
+  // Leading-zero guard (belt + suspenders — also blocked at input time)
   if (input[0] === '0') {
     toast('No leading zero');
-    shakeRow(gameState.guesses.length);
+    shakeRow(activeState.guesses.length);
     return;
   }
 
   busy = true;
-  const r      = gameState.guesses.length;
-  const result = evaluate(input, ANS_STR);
+  const r      = activeState.guesses.length;
+  const ansStr = String(activeAnswer);
+  const result = evaluate(input, ansStr);
 
-  // Animate reveal
   await revealRow(r, input, result, false);
 
-  // Update key state & keyboard UI
   updateKeys(input, result);
   renderKeyboard();
-
-  // Math fun
   showMathFun(input);
 
-  // Record guess
-  gameState.guesses.push(input);
+  activeState.guesses.push(input);
   input = '';
+
+  // Update hint button availability now that guess count changed
+  updateHintButton();
 
   const won = result.every(x => x === 'correct');
 
   if (won) {
-    gameState.status = 'won';
-    saveState(gameState);
-    recordStats(true, gameState.guesses.length, gameState);
-
+    activeState.status = 'won';
+    saveStateForDate(activeDate, activeState);
+    recordStats(true, activeState.guesses.length);
     await bounceRow(r);
     toast(WIN_WORDS[Math.min(r, WIN_WORDS.length - 1)]);
-    setTimeout(() => openResult(gameState), 1600);
-  } else if (gameState.guesses.length >= 6) {
-    gameState.status = 'lost';
-    saveState(gameState);
-    recordStats(false, 0, gameState);
-
+    setTimeout(() => openResult(), 1600);
+  } else if (activeState.guesses.length >= 6) {
+    activeState.status = 'lost';
+    saveStateForDate(activeDate, activeState);
+    recordStats(false, 0);
     setTimeout(() => {
-      toast(`The answer was ${ANSWER}`);
-      setTimeout(() => openResult(gameState), 1800);
+      toast(`The answer was ${activeAnswer}`);
+      setTimeout(() => openResult(), 1800);
     }, 200);
   } else {
-    saveState(gameState);
+    saveStateForDate(activeDate, activeState);
   }
 
   busy = false;
 }
 
-/* ── Input handling ──────────────────────────────────────────────────────── */
+/* ─── Input handling ────────────────────────────────────────────────────── */
 function handleKey(key) {
-  if (gameState.status !== 'playing') return;
+  if (activeState.status !== 'playing') return;
+
   if (key >= '0' && key <= '9') {
+    // Block leading zero at input time
+    if (key === '0' && input.length === 0) {
+      toast('No leading zero');
+      shakeRow(activeState.guesses.length);
+      return;
+    }
     if (input.length < 4) {
       input += key;
-      renderInput(gameState.guesses.length, input);
+      renderInput(activeState.guesses.length, input);
     }
   } else if (key === 'Backspace' || key === 'Delete') {
     if (input.length > 0) {
       input = input.slice(0, -1);
-      renderInput(gameState.guesses.length, input);
+      renderInput(activeState.guesses.length, input);
     }
   } else if (key === 'Enter') {
     submitGuess();
@@ -1164,60 +1488,40 @@ document.querySelectorAll('.key[data-key]').forEach(btn => {
   btn.addEventListener('click', () => handleKey(btn.dataset.key));
 });
 
-/* ── Modals ──────────────────────────────────────────────────────────────── */
-document.getElementById('btn-help').addEventListener('click', () => {
-  document.getElementById('overlay-help').classList.add('open');
-});
-document.getElementById('btn-close-help').addEventListener('click', () => {
-  document.getElementById('overlay-help').classList.remove('open');
-});
-document.getElementById('btn-close-result').addEventListener('click', () => {
-  document.getElementById('overlay-result').classList.remove('open');
-});
-document.getElementById('btn-share').addEventListener('click', () => share(gameState));
-
-// Backdrop click to close
-document.querySelectorAll('.overlay').forEach(ov => {
-  ov.addEventListener('click', e => {
-    if (e.target === ov) ov.classList.remove('open');
-  });
-});
-
-// Escape key
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    document.querySelectorAll('.overlay.open').forEach(ov => ov.classList.remove('open'));
-  }
-});
-
-/* ── Init ────────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═════════════════════════════════════════════════════════════════════════ */
 function init() {
   buildBoard();
 
-  gameState = loadState();
-
-  // Rebuild key state and render past guesses
-  gameState.guesses.forEach(g => {
-    const res = evaluate(g, ANS_STR);
-    updateKeys(g, res);
+  // Rebuild key state from today's guesses
+  activeState.guesses.forEach(g => {
+    updateKeys(g, evaluate(g, String(activeAnswer)));
   });
-  renderPastGuesses(gameState);
+
+  renderPastGuesses(activeState, String(activeAnswer));
   renderKeyboard();
+  updatePuzzleNum();
+  updateArchiveBar(); // initialises archive bar as hidden
+  updateHintButton();
+  updateHeaderStreak();
 
   // Restore math fun for last guess
-  if (gameState.guesses.length > 0) {
-    showMathFun(gameState.guesses[gameState.guesses.length - 1]);
+  if (activeState.guesses.length > 0) {
+    showMathFun(activeState.guesses[activeState.guesses.length - 1]);
   }
 
-  // If game is already over, show result after a short delay
-  if (gameState.status !== 'playing') {
-    setTimeout(() => openResult(gameState), 700);
+  // Restore hint pill if previously used
+  if (activeState.hintUsed) showHintPill();
+
+  // If game already over, show result
+  if (activeState.status !== 'playing') {
+    setTimeout(() => openResult(), 700);
   }
 }
 
 init();
 </script>
 
-<script src="/shared/subdomain-nav.js"></script>
 </body>
 </html>
