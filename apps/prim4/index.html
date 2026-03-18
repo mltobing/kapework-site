@@ -535,7 +535,6 @@ a { color: inherit; text-decoration: none; }
       <div class="lbl">The answer was</div>
       <div class="num" id="result-answer-num"></div>
     </div>
-    <div class="share-grid" id="share-grid" aria-label="Guess emoji grid"></div>
     <div class="stats-row">
       <div class="stat"><div class="stat-num" id="s-played">0</div><div class="stat-lbl">Played</div></div>
       <div class="stat"><div class="stat-num" id="s-winpct">0%</div><div class="stat-lbl">Win %</div></div>
@@ -547,23 +546,12 @@ a { color: inherit; text-decoration: none; }
       <div class="cd-time" id="countdown-time">--:--:--</div>
     </div>
     <div class="btn-row">
-      <button class="btn btn-ghost"   id="btn-close-result">Close</button>
-      <button class="btn btn-primary" id="btn-share">Share 🔗</button>
+      <button class="btn btn-primary" id="btn-play-another">▶ Play Another</button>
+      <button class="btn btn-ghost"   id="btn-share">Share 🔗</button>
     </div>
-    <div class="fun-fact" id="fun-fact"></div>
-    <div class="more-games">
-      <div class="more-games-lbl">More games</div>
-      <div class="more-games-row">
-        <a class="more-game" href="https://make24.app" target="_blank" rel="noopener">
-          <span class="mg-icon">✖️</span><span class="mg-name">Make 24</span>
-        </a>
-        <a class="more-game" href="https://make36.kapework.com/">
-          <span class="mg-icon">➗</span><span class="mg-name">Make 36</span>
-        </a>
-        <a class="more-game" href="https://tapsum.kapework.com/">
-          <span class="mg-icon">➕</span><span class="mg-name">TapSum</span>
-        </a>
-      </div>
+    <div class="btn-row" style="margin-top:-2px">
+      <a class="btn btn-ghost" href="https://numbercrunch.kapework.com/">NumberCrunch Menu</a>
+      <button class="btn btn-ghost" id="btn-result-replay" style="display:none">↩ Replay</button>
     </div>
   </div>
 </div>
@@ -719,6 +707,18 @@ function prevDayStr(ds) {
 
 function friendlyDate(ds) {
   return new Date(ds + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function findNextUnplayed() {
+  const d = new Date(TODAY + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  for (let i = 0; i < 366; i++) {
+    const ds = localDateStr(d);
+    if (ds < EPOCH_DATESTR) break;
+    if (getDateStatus(ds) === 'unplayed') return ds;
+    d.setDate(d.getDate() - 1);
+  }
+  return null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -906,10 +906,10 @@ function renderInput(row, text) {
   }
 }
 
-function revealRow(r, guess, result, instant = false) {
+function revealRow(r, guess, result, instant = false, perMs = 140, durMs = 520) {
   return new Promise(resolve => {
-    const PER = instant ? 0 : 140;
-    const DUR = instant ? 0 : 520;
+    const PER = instant ? 0 : perMs;
+    const DUR = instant ? 0 : durMs;
     for (let c = 0; c < 4; c++) {
       const tile = document.getElementById(`tile-${r}-${c}`);
       setTimeout(() => {
@@ -988,6 +988,27 @@ function bounceRow(r) {
     }
     setTimeout(resolve, 4 * 80 + 500);
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REPLAY
+   ═════════════════════════════════════════════════════════════════════════ */
+async function startReplay() {
+  closeOverlay('overlay-result');
+  buildBoard();
+  renderKeyboard();
+  clearMathFun();
+  const ansStr  = String(activeAnswer);
+  const guesses = activeState.guesses;
+  busy = true;
+  for (let r = 0; r < guesses.length; r++) {
+    const result = evaluate(guesses[r], ansStr);
+    await revealRow(r, guesses[r], result, false, 80, 360);
+    if (r < guesses.length - 1) await new Promise(res => setTimeout(res, 180));
+  }
+  busy = false;
+  if (guesses.length > 0) showMathFun(guesses[guesses.length - 1]);
+  setTimeout(() => openResult(), 600);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1144,19 +1165,11 @@ function openResult() {
     ansRow.style.display = 'none';
   }
 
-  document.getElementById('share-grid').textContent = activeState.guesses.map(g =>
-    evaluate(g, String(activeAnswer)).map(r => r === 'correct' ? '🟩' : r === 'present' ? '🟨' : '⬛').join('')
-  ).join('\n');
-
   // Stats (always show today's stats, even if viewing archive)
   document.getElementById('s-played').textContent = st.played;
   document.getElementById('s-winpct').textContent  = st.played ? Math.round(st.won / st.played * 100) + '%' : '0%';
   document.getElementById('s-streak').textContent  = st.streak;
   document.getElementById('s-best').textContent    = st.best;
-
-  // Fun fact
-  document.getElementById('fun-fact').textContent =
-    '💡 ' + FUN_FACTS[puzzleNumForDate(activeDate) % FUN_FACTS.length];
 
   // Countdown (only for today)
   const cdEl = document.getElementById('result-countdown');
@@ -1175,6 +1188,20 @@ function openResult() {
   } else {
     cdEl.style.display = 'none';
   }
+
+  // Play Another button — find most recent unplayed date
+  const nextUnplayed = findNextUnplayed();
+  const btnPA = document.getElementById('btn-play-another');
+  if (nextUnplayed) {
+    btnPA.style.display = '';
+    btnPA.dataset.targetDate = nextUnplayed;
+  } else {
+    btnPA.style.display = 'none';
+  }
+
+  // Replay button — only for archive won games
+  document.getElementById('btn-result-replay').style.display =
+    (isArchive && won) ? '' : 'none';
 
   openOverlay('overlay-result');
 }
@@ -1255,7 +1282,7 @@ function renderCalendar() {
       if (ds === activeDate)  btn.classList.add('is-active');
       btn.addEventListener('click', () => {
         closeOverlay('overlay-cal');
-        openDate(ds);
+        openDate(ds, status === 'won');
       });
     }
     grid.appendChild(btn);
@@ -1300,7 +1327,7 @@ document.getElementById('btn-cal-share').addEventListener('click', async () => {
 /* ═══════════════════════════════════════════════════════════════════════════
    DATE SWITCHING (archive navigation)
    ═════════════════════════════════════════════════════════════════════════ */
-function openDate(ds) {
+function openDate(ds, withReplay = false) {
   saveStateForDate(activeDate, activeState); // persist current before switching
 
   activeDate   = ds;
@@ -1311,27 +1338,30 @@ function openDate(ds) {
   busy         = false;
   keyState     = {};
 
-  // Rebuild key state from archive guesses
+  // Rebuild key state from saved guesses
   activeState.guesses.forEach(g => {
     updateKeys(g, evaluate(g, String(activeAnswer)));
   });
 
   buildBoard();
-  renderPastGuesses(activeState, String(activeAnswer));
   renderKeyboard();
   updatePuzzleNum();
   updateArchiveBar();
   updateHintButton();
 
-  // Restore math fun for last guess
-  if (activeState.guesses.length > 0) {
-    showMathFun(activeState.guesses[activeState.guesses.length - 1]);
-  } else {
+  if (withReplay && activeState.status === 'won' && activeState.guesses.length > 0) {
     clearMathFun();
-  }
-
-  if (activeState.status !== 'playing') {
-    setTimeout(() => openResult(), 700);
+    startReplay();
+  } else {
+    renderPastGuesses(activeState, String(activeAnswer));
+    if (activeState.guesses.length > 0) {
+      showMathFun(activeState.guesses[activeState.guesses.length - 1]);
+    } else {
+      clearMathFun();
+    }
+    if (activeState.status !== 'playing') {
+      setTimeout(() => openResult(), 700);
+    }
   }
 }
 
@@ -1356,8 +1386,12 @@ document.addEventListener('keydown', e => {
 });
 
 // Result
-document.getElementById('btn-close-result').addEventListener('click', () => closeOverlay('overlay-result'));
 document.getElementById('btn-share').addEventListener('click', shareResult);
+document.getElementById('btn-play-another').addEventListener('click', () => {
+  const ds = document.getElementById('btn-play-another').dataset.targetDate;
+  if (ds) { closeOverlay('overlay-result'); openDate(ds); }
+});
+document.getElementById('btn-result-replay').addEventListener('click', () => startReplay());
 
 // Calendar
 document.getElementById('btn-close-cal').addEventListener('click', () => closeOverlay('overlay-cal'));
