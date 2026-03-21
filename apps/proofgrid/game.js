@@ -1,341 +1,254 @@
-/* game.js — Proof Grid: board UI, input, conflict check, win detect */
+/* game.js — Proof Grid v2: board UI, pair clues, no oracle, 2-check limit */
 
 "use strict";
 
 /* ── Symbol encoding ─────────────────────────────────────────
-   Each cell is 0-4:
-     0 = empty
-     1 = hollow circle
-     2 = filled circle
-     3 = hollow square
-     4 = filled square
-
-   Shape:  circle (1,2)  or square (3,4)
-   Fill:   hollow (1,3)  or filled (2,4)
+   0 = empty
+   1 = hollow circle
+   2 = filled circle
+   3 = hollow square
+   4 = filled square
 ──────────────────────────────────────────────────────────── */
 
-const SYM = {
-  EMPTY: 0,
-  HOLLOW_CIRCLE: 1,
-  FILLED_CIRCLE: 2,
-  HOLLOW_SQUARE: 3,
-  FILLED_SQUARE: 4,
-};
-
-const SYM_COUNT = 4; // 1..4
-
-function symShape(v) { return v <= 2 ? "circle" : "square"; }
-function symFill(v)  { return (v === 1 || v === 3) ? "hollow" : "filled"; }
-
-/* SVG markup for each symbol */
-const SYM_SVG = {
-  0: "",
-  1: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
-  2: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="currentColor"/></svg>',
-  3: '<svg viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
-  4: '<svg viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="currentColor"/></svg>',
-};
-
-/* ── Puzzle data ─────────────────────────────────────────── */
-
-// Sample puzzle for initial testing
-// Solution:
-//   row0: 1 3 2 4  (HC HS FC FS)
-//   row1: 4 2 3 1  (FS FC HS HC)
-//   row2: 2 4 1 3  (FC FS HC HS)
-//   row3: 3 1 4 2  (HS HC FS FC)
-
-const SAMPLE_PUZZLE = {
-  solution: [
-    [1, 3, 2, 4],
-    [4, 2, 3, 1],
-    [2, 4, 1, 3],
-    [3, 1, 4, 2],
-  ],
-  // Row shape clues: array of 4; null = no clue, else array of "circle"|"square"
-  rowClues: [
-    ["circle", "square", "circle", "square"],
-    ["square", "circle", "square", "circle"],
-    null,
-    null,
-  ],
-  // Column fill clues: array of 4; null = no clue, else array of "hollow"|"filled"
-  colClues: [
-    null,
-    ["hollow", "filled", "filled", "hollow"],
-    ["filled", "hollow", "hollow", "filled"],
-    null,
-  ],
-  // Prefilled cells: [row, col, value]
-  prefilled: [[2, 0, 2]],
-};
+var SYM_SVG = [
+  "",
+  '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
+  '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="currentColor"/></svg>',
+  '<svg viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>',
+  '<svg viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="currentColor"/></svg>'
+];
 
 /* ── Game state ──────────────────────────────────────────── */
 
-let puzzle = null;    // current puzzle object
-let grid = [];        // 4x4 array of current cell values (0-4)
-let locked = [];      // 4x4 boolean: true if prefilled
-let cellEls = [];     // 4x4 DOM elements
-let won = false;
+var puzzle = null;
+var grid = [];        // 4x4 current values (0-4)
+var locked = [];      // 4x4 boolean
+var cellEls = [];     // 4x4 DOM refs
+var won = false;
+var checksLeft = 2;
 
 /* ── DOM refs ────────────────────────────────────────────── */
-const colCluesEl = document.getElementById("col-clues");
-const gridAreaEl = document.querySelector(".grid-area");
-const statusEl   = document.getElementById("status");
-const checkBtn   = document.getElementById("check-btn");
-const resetBtn   = document.getElementById("reset-btn");
-const helpBtn    = document.getElementById("help-btn");
-const helpModal  = document.getElementById("help-modal");
-const helpClose  = document.getElementById("help-close");
-const subtitleEl = document.getElementById("subtitle");
+var boardEl   = document.getElementById("board");
+var statusEl  = document.getElementById("status");
+var checkBtn  = document.getElementById("check-btn");
+var checkText = document.getElementById("check-text");
+var resetBtn  = document.getElementById("reset-btn");
+var helpBtn   = document.getElementById("help-btn");
+var helpModal = document.getElementById("help-modal");
+var helpClose = document.getElementById("help-close");
+var subtitleEl = document.getElementById("subtitle");
 
 /* ── Help modal ──────────────────────────────────────────── */
-helpBtn.addEventListener("click", () => { helpModal.hidden = false; });
-helpClose.addEventListener("click", () => { helpModal.hidden = true; });
-helpModal.addEventListener("click", (e) => {
+helpBtn.addEventListener("click", function () { helpModal.hidden = false; });
+helpClose.addEventListener("click", function () { helpModal.hidden = true; });
+helpModal.addEventListener("click", function (e) {
   if (e.target === helpModal) helpModal.hidden = true;
 });
 
-/* ── Build board ─────────────────────────────────────────── */
+/* ── Load puzzle ─────────────────────────────────────────── */
 
 function loadPuzzle(p) {
   puzzle = p;
   won = false;
-  grid = Array.from({ length: 4 }, () => Array(4).fill(0));
-  locked = Array.from({ length: 4 }, () => Array(4).fill(false));
-  cellEls = Array.from({ length: 4 }, () => []);
+  checksLeft = 2;
+  grid = [];
+  locked = [];
+  cellEls = [];
+  for (var r = 0; r < 4; r++) {
+    grid.push([0, 0, 0, 0]);
+    locked.push([false, false, false, false]);
+    cellEls.push([null, null, null, null]);
+  }
 
-  // Apply prefilled
-  for (const [r, c, v] of p.prefilled) {
-    grid[r][c] = v;
-    locked[r][c] = true;
+  for (var i = 0; i < p.givens.length; i++) {
+    var g = p.givens[i];
+    grid[g[0]][g[1]] = g[2];
+    locked[g[0]][g[1]] = true;
   }
 
   buildBoard();
+  updateCheckBtn();
   statusEl.textContent = "";
+  statusEl.style.color = "";
+}
+
+/* ── Build board ─────────────────────────────────────────── */
+
+function clueKey(clue) {
+  return clue.orientation + ":" + clue.r + ":" + clue.c;
 }
 
 function buildBoard() {
-  // Clear previous
-  colCluesEl.innerHTML = '<div class="clue-corner"></div>';
-  gridAreaEl.innerHTML = "";
+  boardEl.innerHTML = "";
 
-  // Column clues
-  for (let c = 0; c < 4; c++) {
-    const wrap = document.createElement("div");
-    wrap.className = "col-clue-cell";
-    const clue = puzzle.colClues[c];
-    for (let r = 0; r < 4; r++) {
-      const pip = document.createElement("div");
-      pip.className = "col-clue-pip";
-      if (clue) {
-        pip.classList.add(clue[r]); // "hollow" or "filled"
-      } else {
-        pip.classList.add("none");
-      }
-      wrap.appendChild(pip);
-    }
-    colCluesEl.appendChild(wrap);
+  // Index clues by gap position for fast lookup
+  var clueMap = {};
+  for (var i = 0; i < puzzle.clues.length; i++) {
+    var cl = puzzle.clues[i];
+    clueMap[clueKey(cl)] = cl;
   }
 
-  // Grid rows
-  for (let r = 0; r < 4; r++) {
-    const rowDiv = document.createElement("div");
-    rowDiv.className = "grid-row";
+  // The board is a CSS grid with 7 columns and 7 rows:
+  //   col pattern: cell gap cell gap cell gap cell
+  //   row pattern: cell gap cell gap cell gap cell
+  // Cells at grid positions (1,1) (1,3) (1,5) (1,7) etc.
+  // Horizontal clue gaps at (row, col) where col is even
+  // Vertical clue gaps at (row, col) where row is even
 
-    // Row clue strip
-    const strip = document.createElement("div");
-    strip.className = "row-clue-strip";
-    const rClue = puzzle.rowClues[r];
-    for (let c = 0; c < 4; c++) {
-      const pip = document.createElement("div");
-      pip.className = "row-clue-pip";
-      if (rClue) {
-        pip.classList.add(rClue[c]); // "circle" or "square"
-      } else {
-        pip.classList.add("none");
-      }
-      strip.appendChild(pip);
-    }
-    rowDiv.appendChild(strip);
-
-    // Cells
-    for (let c = 0; c < 4; c++) {
-      const cell = document.createElement("div");
+  for (var r = 0; r < 4; r++) {
+    for (var c = 0; c < 4; c++) {
+      // Cell
+      var cell = document.createElement("div");
       cell.className = "cell";
       if (locked[r][c]) cell.classList.add("prefilled");
-      cell.addEventListener("click", () => onCellTap(r, c));
-      rowDiv.appendChild(cell);
+      cell.style.gridRow = (r * 2 + 1).toString();
+      cell.style.gridColumn = (c * 2 + 1).toString();
+      cell.setAttribute("data-r", r.toString());
+      cell.setAttribute("data-c", c.toString());
+      cell.addEventListener("click", onCellTap);
+      cell.innerHTML = SYM_SVG[grid[r][c]];
+      boardEl.appendChild(cell);
       cellEls[r][c] = cell;
     }
-
-    gridAreaEl.appendChild(rowDiv);
   }
 
-  renderAll();
-}
+  // Horizontal gap clues (between columns)
+  for (var r = 0; r < 4; r++) {
+    for (var c = 0; c < 3; c++) {
+      var key = "h:" + r + ":" + c;
+      var gap = document.createElement("div");
+      gap.className = "gap gap-h";
+      gap.style.gridRow = (r * 2 + 1).toString();
+      gap.style.gridColumn = (c * 2 + 2).toString();
 
-/* ── Render ───────────────────────────────────────────────── */
+      if (clueMap[key]) {
+        var mark = document.createElement("div");
+        mark.className = "clue-mark clue-h";
+        if (clueMap[key].type === "same-shape") {
+          mark.classList.add("clue-outline");
+        } else {
+          mark.classList.add("clue-solid");
+        }
+        gap.appendChild(mark);
+      }
 
-function renderAll() {
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      cellEls[r][c].innerHTML = SYM_SVG[grid[r][c]];
+      boardEl.appendChild(gap);
+    }
+  }
+
+  // Vertical gap clues (between rows)
+  for (var r = 0; r < 3; r++) {
+    for (var c = 0; c < 4; c++) {
+      var key = "v:" + r + ":" + c;
+      var gap = document.createElement("div");
+      gap.className = "gap gap-v";
+      gap.style.gridRow = (r * 2 + 2).toString();
+      gap.style.gridColumn = (c * 2 + 1).toString();
+
+      if (clueMap[key]) {
+        var mark = document.createElement("div");
+        mark.className = "clue-mark clue-v";
+        if (clueMap[key].type === "same-shape") {
+          mark.classList.add("clue-outline");
+        } else {
+          mark.classList.add("clue-solid");
+        }
+        gap.appendChild(mark);
+      }
+
+      boardEl.appendChild(gap);
+    }
+  }
+
+  // Diagonal intersection gaps (purely empty spacers)
+  for (var r = 0; r < 3; r++) {
+    for (var c = 0; c < 3; c++) {
+      var spacer = document.createElement("div");
+      spacer.className = "gap-corner";
+      spacer.style.gridRow = (r * 2 + 2).toString();
+      spacer.style.gridColumn = (c * 2 + 2).toString();
+      boardEl.appendChild(spacer);
     }
   }
 }
 
 /* ── Input ────────────────────────────────────────────────── */
 
-function onCellTap(r, c) {
+function onCellTap(e) {
+  var cell = e.currentTarget;
+  var r = parseInt(cell.getAttribute("data-r"));
+  var c = parseInt(cell.getAttribute("data-c"));
   if (won || locked[r][c]) return;
-  // Cycle: 0 → 1 → 2 → 3 → 4 → 0
+
   grid[r][c] = (grid[r][c] + 1) % 5;
-  cellEls[r][c].innerHTML = SYM_SVG[grid[r][c]];
+  cell.innerHTML = SYM_SVG[grid[r][c]];
   if (navigator.vibrate) navigator.vibrate(6);
-  clearHighlights();
-  checkConflicts();
+
+  // No oracle feedback — just update check button state
+  updateCheckBtn();
 }
 
-/* ── Conflict checking ───────────────────────────────────── */
+/* ── Check system (2 checks, no oracle) ──────────────────── */
 
-function clearHighlights() {
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      cellEls[r][c].classList.remove("conflict", "correct", "win");
-}
-
-function checkConflicts() {
-  let hasConflict = false;
-  const conflicts = Array.from({ length: 4 }, () => Array(4).fill(false));
-
-  // Check rows for duplicate symbols
-  for (let r = 0; r < 4; r++) {
-    const seen = {};
-    for (let c = 0; c < 4; c++) {
-      const v = grid[r][c];
-      if (v === 0) continue;
-      if (seen[v] !== undefined) {
-        conflicts[r][c] = true;
-        conflicts[r][seen[v]] = true;
-        hasConflict = true;
-      } else {
-        seen[v] = c;
-      }
-    }
-  }
-
-  // Check columns for duplicate symbols
-  for (let c = 0; c < 4; c++) {
-    const seen = {};
-    for (let r = 0; r < 4; r++) {
-      const v = grid[r][c];
-      if (v === 0) continue;
-      if (seen[v] !== undefined) {
-        conflicts[r][c] = true;
-        conflicts[seen[v]][c] = true;
-        hasConflict = true;
-      } else {
-        seen[v] = r;
-      }
-    }
-  }
-
-  // Check row shape clues
-  for (let r = 0; r < 4; r++) {
-    const clue = puzzle.rowClues[r];
-    if (!clue) continue;
-    for (let c = 0; c < 4; c++) {
-      const v = grid[r][c];
-      if (v === 0) continue;
-      if (symShape(v) !== clue[c]) {
-        conflicts[r][c] = true;
-        hasConflict = true;
-      }
-    }
-  }
-
-  // Check column fill clues
-  for (let c = 0; c < 4; c++) {
-    const clue = puzzle.colClues[c];
-    if (!clue) continue;
-    for (let r = 0; r < 4; r++) {
-      const v = grid[r][c];
-      if (v === 0) continue;
-      if (symFill(v) !== clue[r]) {
-        conflicts[r][c] = true;
-        hasConflict = true;
-      }
-    }
-  }
-
-  // Apply conflict classes
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      cellEls[r][c].classList.toggle("conflict", conflicts[r][c]);
-
-  return hasConflict;
-}
-
-/* ── Win detection ───────────────────────────────────────── */
-
-function checkWin() {
-  // All cells filled?
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
+function isBoardFull() {
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++)
       if (grid[r][c] === 0) return false;
-
-  // No conflicts?
-  if (checkConflicts()) return false;
-
-  // Matches solution?
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      if (grid[r][c] !== puzzle.solution[r][c]) return false;
-
   return true;
 }
 
+function isBoardCorrect() {
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++)
+      if (grid[r][c] !== puzzle.solution[r][c]) return false;
+  return true;
+}
+
+function updateCheckBtn() {
+  var full = isBoardFull();
+  checkBtn.disabled = !full || checksLeft <= 0 || won;
+  checkText.textContent = "Check (" + checksLeft + ")";
+}
+
 function onCheck() {
-  if (won) return;
+  if (won || checksLeft <= 0 || !isBoardFull()) return;
 
-  // Check if all filled
-  let empty = 0;
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
-      if (grid[r][c] === 0) empty++;
-
-  if (empty > 0) {
-    statusEl.textContent = `${empty} cell${empty > 1 ? "s" : ""} still empty.`;
-    statusEl.style.color = "var(--muted)";
-    return;
-  }
-
-  if (checkWin()) {
+  if (isBoardCorrect()) {
     won = true;
     statusEl.textContent = "Solved!";
     statusEl.style.color = "var(--ok)";
-    clearHighlights();
-    for (let r = 0; r < 4; r++)
-      for (let c = 0; c < 4; c++) {
+    for (var r = 0; r < 4; r++)
+      for (var c = 0; c < 4; c++) {
         cellEls[r][c].classList.add("win");
-        cellEls[r][c].style.animationDelay = `${(r * 4 + c) * 60}ms`;
+        cellEls[r][c].style.animationDelay = (r * 4 + c) * 60 + "ms";
       }
-  } else {
-    statusEl.textContent = "Not quite — check the highlighted cells.";
-    statusEl.style.color = "var(--err)";
-    checkConflicts();
+    updateCheckBtn();
+    return;
   }
+
+  // Wrong answer
+  checksLeft--;
+  if (checksLeft > 0) {
+    statusEl.textContent = checksLeft + " check left.";
+    statusEl.style.color = "var(--err)";
+  } else {
+    statusEl.textContent = "No checks left. Keep trying or reset.";
+    statusEl.style.color = "var(--err)";
+  }
+  updateCheckBtn();
 }
 
 function onReset() {
-  won = false;
-  for (let r = 0; r < 4; r++)
-    for (let c = 0; c < 4; c++)
+  if (won) return;
+  for (var r = 0; r < 4; r++)
+    for (var c = 0; c < 4; c++) {
       if (!locked[r][c]) grid[r][c] = 0;
-  clearHighlights();
-  renderAll();
+      cellEls[r][c].innerHTML = SYM_SVG[grid[r][c]];
+      cellEls[r][c].classList.remove("win");
+    }
   statusEl.textContent = "";
+  statusEl.style.color = "";
+  updateCheckBtn();
 }
 
 /* ── Wire buttons ────────────────────────────────────────── */
@@ -345,16 +258,15 @@ resetBtn.addEventListener("click", onReset);
 /* ── Init ────────────────────────────────────────────────── */
 
 function init() {
-  // Use generated daily puzzle if engine is available, else sample
   if (typeof ProofEngine !== "undefined" && ProofEngine.dailyPuzzle) {
-    const daily = ProofEngine.dailyPuzzle();
+    var daily = ProofEngine.dailyPuzzle();
     if (daily) {
       loadPuzzle(daily);
-      subtitleEl.textContent = "Daily puzzle · " + new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      subtitleEl.textContent = "Daily puzzle \u00b7 " +
+        new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
       return;
     }
   }
-  loadPuzzle(SAMPLE_PUZZLE);
 }
 
 init();
