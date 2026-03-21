@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Longshot - Daily Word Puzzle</title>
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <meta name="description" content="Find the longest word in today's 4×4 letter grid. New puzzle daily!">
 <style>
   :root { --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08);
@@ -47,6 +48,7 @@
   <header>
     <h1>Longshot <span class="muted" id="puzzleNum"></span></h1>
     <span class="pill">Streak <strong id="streak">0</strong></span>
+    <div id="kw-shell-mount"></div>
   </header>
 
   <div class="panel">
@@ -633,5 +635,10 @@
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('longshot');
+  KapeworkShell.init({ appSlug: 'longshot', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
 /* ─── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after {
@@ -644,6 +645,7 @@ button { font: inherit; cursor: pointer; }
     <a class="back-btn" href="../">← Create</a>
     <div class="top-actions">
       <button class="icon-btn" id="btn-open-gallery" aria-label="My gallery" title="My gallery">🖼</button>
+      <div id="kw-shell-mount"></div>
     </div>
   </div>
 
@@ -1507,5 +1509,10 @@ initCanvas();
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
 <script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('colorsign');
+  KapeworkShell.init({ appSlug: 'colorsign', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

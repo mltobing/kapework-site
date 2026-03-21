@@ -1,6 +1,6 @@
 /* shared/kapework-shell.js — Kapework shared ellipsis menu + feedback modal
  *
- * Usage:
+ * Usage A — full shell with ⋮ button:
  *   KapeworkShell.init({
  *     appSlug:  'proofgrid',          // required
  *     mountId:  'kw-shell-mount',     // id of element to inject ⋮ button into
@@ -13,6 +13,10 @@
  *       }
  *     ]
  *   });
+ *
+ * Usage B — feedback modal only (app has its own menu):
+ *   KapeworkShell.init({ appSlug: 'prim4' });
+ *   // Then wire your own button: KapeworkShell.openFeedback()
  *
  * Requires: KapeworkAnalytics must be loaded first (for track()).
  * Requires: /shared/kapework-shell.css loaded in <head>.
@@ -30,6 +34,7 @@
   var _feedbackOpen = false;
   var _menuEl = null;
   var _backdropEl = null;
+  var _moreBtn = null;
   var _feedbackOverlay = null;
   var _feedbackTextarea = null;
   var _feedbackEmail = null;
@@ -56,22 +61,20 @@
 
   // ── Menu open / close ──────────────────────────────────────────────────────
   function openMenu() {
-    if (_menuOpen) return;
+    if (!_menuEl || _menuOpen) return;
     _menuOpen = true;
     _menuEl.classList.add('kw-menu--open');
-    _moreBtn.setAttribute('aria-expanded', 'true');
-
-    // Backdrop captures outside taps
-    _backdropEl.style.display = 'block';
+    if (_moreBtn) _moreBtn.setAttribute('aria-expanded', 'true');
+    if (_backdropEl) _backdropEl.style.display = 'block';
     track('menu_open');
   }
 
   function closeMenu() {
-    if (!_menuOpen) return;
+    if (!_menuEl || !_menuOpen) return;
     _menuOpen = false;
     _menuEl.classList.remove('kw-menu--open');
-    _moreBtn.setAttribute('aria-expanded', 'false');
-    _backdropEl.style.display = 'none';
+    if (_moreBtn) _moreBtn.setAttribute('aria-expanded', 'false');
+    if (_backdropEl) _backdropEl.style.display = 'none';
   }
 
   // ── Feedback modal open / close ────────────────────────────────────────────
@@ -82,6 +85,7 @@
     _feedbackTextarea.value = '';
     _feedbackEmail.value = '';
     _feedbackSendBtn.disabled = false;
+    _feedbackSendBtn.textContent = 'Send';
     setTimeout(function () { _feedbackTextarea.focus(); }, 180);
     track('feedback_open');
   }
@@ -133,10 +137,72 @@
       });
   }
 
-  // ── Build DOM ──────────────────────────────────────────────────────────────
-  var _moreBtn = null;
+  // ── Build feedback modal + toast (always built) ────────────────────────────
+  function buildFeedbackInfra() {
+    // Feedback modal
+    _feedbackOverlay = document.createElement('div');
+    _feedbackOverlay.className = 'kw-modal-overlay';
+    _feedbackOverlay.setAttribute('role', 'dialog');
+    _feedbackOverlay.setAttribute('aria-modal', 'true');
+    _feedbackOverlay.setAttribute('aria-label', 'Send feedback');
 
-  function buildShell(mountEl, menuItems) {
+    var modal = document.createElement('div');
+    modal.className = 'kw-modal';
+
+    var h2 = document.createElement('h2');
+    h2.textContent = 'Send feedback';
+    modal.appendChild(h2);
+
+    _feedbackTextarea = document.createElement('textarea');
+    _feedbackTextarea.className = 'kw-feedback-textarea';
+    _feedbackTextarea.placeholder = "What's confusing? Bugs? Ideas?";
+    _feedbackTextarea.setAttribute('rows', '4');
+    modal.appendChild(_feedbackTextarea);
+
+    _feedbackEmail = document.createElement('input');
+    _feedbackEmail.type = 'email';
+    _feedbackEmail.className = 'kw-feedback-email';
+    _feedbackEmail.placeholder = 'Your email (optional, for a reply)';
+    _feedbackEmail.setAttribute('autocomplete', 'email');
+    _feedbackEmail.setAttribute('autocapitalize', 'off');
+    modal.appendChild(_feedbackEmail);
+
+    _feedbackSendBtn = document.createElement('button');
+    _feedbackSendBtn.className = 'kw-feedback-send';
+    _feedbackSendBtn.textContent = 'Send';
+    _feedbackSendBtn.addEventListener('click', submitFeedback);
+    modal.appendChild(_feedbackSendBtn);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'kw-feedback-close';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', closeFeedback);
+    modal.appendChild(closeBtn);
+
+    _feedbackOverlay.appendChild(modal);
+
+    _feedbackOverlay.addEventListener('click', function (e) {
+      if (e.target === _feedbackOverlay) closeFeedback();
+    });
+
+    document.body.appendChild(_feedbackOverlay);
+
+    // Toast
+    _toastEl = document.createElement('div');
+    _toastEl.className = 'kw-toast';
+    document.body.appendChild(_toastEl);
+
+    // Escape key closes both
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        closeMenu();
+        closeFeedback();
+      }
+    });
+  }
+
+  // ── Build ⋮ button + dropdown (only when mountEl provided) ─────────────────
+  function buildMenuButton(mountEl, menuItems) {
     // Wrapper (keeps ⋮ + dropdown together for positioning)
     var root = document.createElement('div');
     root.className = 'kw-shell-root';
@@ -179,93 +245,35 @@
     root.appendChild(_menuEl);
     mountEl.appendChild(root);
 
-    // ── Backdrop (closes menu on outside tap) ───────────────────────────────
+    // Backdrop (closes menu on outside tap)
     _backdropEl = document.createElement('div');
     _backdropEl.className = 'kw-backdrop';
     _backdropEl.style.display = 'none';
     _backdropEl.addEventListener('click', closeMenu);
     document.body.appendChild(_backdropEl);
 
-    // ── Feedback modal ──────────────────────────────────────────────────────
-    _feedbackOverlay = document.createElement('div');
-    _feedbackOverlay.className = 'kw-modal-overlay';
-    _feedbackOverlay.setAttribute('role', 'dialog');
-    _feedbackOverlay.setAttribute('aria-modal', 'true');
-    _feedbackOverlay.setAttribute('aria-label', 'Send feedback');
-
-    var modal = document.createElement('div');
-    modal.className = 'kw-modal';
-
-    var h2 = document.createElement('h2');
-    h2.textContent = 'Send feedback';
-    modal.appendChild(h2);
-
-    _feedbackTextarea = document.createElement('textarea');
-    _feedbackTextarea.className = 'kw-feedback-textarea';
-    _feedbackTextarea.placeholder = "What's confusing? Bugs? Ideas?";
-    _feedbackTextarea.setAttribute('rows', '4');
-    modal.appendChild(_feedbackTextarea);
-
-    _feedbackEmail = document.createElement('input');
-    _feedbackEmail.type = 'email';
-    _feedbackEmail.className = 'kw-feedback-email';
-    _feedbackEmail.placeholder = 'Your email (optional, for a reply)';
-    _feedbackEmail.setAttribute('autocomplete', 'email');
-    _feedbackEmail.setAttribute('autocapitalize', 'off');
-    modal.appendChild(_feedbackEmail);
-
-    _feedbackSendBtn = document.createElement('button');
-    _feedbackSendBtn.className = 'kw-feedback-send';
-    _feedbackSendBtn.textContent = 'Send';
-    _feedbackSendBtn.addEventListener('click', submitFeedback);
-    modal.appendChild(_feedbackSendBtn);
-
-    var closeBtn = document.createElement('button');
-    closeBtn.className = 'kw-feedback-close';
-    closeBtn.textContent = 'Close';
-    closeBtn.addEventListener('click', closeFeedback);
-    modal.appendChild(closeBtn);
-
-    _feedbackOverlay.appendChild(modal);
-
-    // Close on overlay click (outside the card)
-    _feedbackOverlay.addEventListener('click', function (e) {
-      if (e.target === _feedbackOverlay) closeFeedback();
-    });
-
-    document.body.appendChild(_feedbackOverlay);
-
-    // ── Toast ───────────────────────────────────────────────────────────────
-    _toastEl = document.createElement('div');
-    _toastEl.className = 'kw-toast';
-    document.body.appendChild(_toastEl);
-
-    // ── Wire ⋮ button ────────────────────────────────────────────────────────
+    // Wire ⋮ button
     _moreBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       if (_menuOpen) { closeMenu(); } else { openMenu(); }
-    });
-
-    // Close menu on Escape
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        closeMenu();
-        closeFeedback();
-      }
     });
   }
 
   // ── Public init ────────────────────────────────────────────────────────────
   function init(config) {
     _appSlug = config.appSlug || 'unknown';
-    var mountId = config.mountId || 'kw-shell-mount';
-    var mountEl = document.getElementById(mountId);
-    if (!mountEl) {
-      console.warn('KapeworkShell: mount element #' + mountId + ' not found');
-      return;
+
+    buildFeedbackInfra();
+
+    if (config.mountId) {
+      var mountEl = document.getElementById(config.mountId);
+      if (mountEl) {
+        buildMenuButton(mountEl, config.menuItems || []);
+      } else {
+        console.warn('KapeworkShell: mount element #' + config.mountId + ' not found');
+      }
     }
-    buildShell(mountEl, config.menuItems || []);
   }
 
-  window.KapeworkShell = { init: init };
+  window.KapeworkShell = { init: init, openFeedback: openFeedback };
 }());

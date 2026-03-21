@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
   <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -152,6 +153,10 @@ a.game-card.coming-soon {
 
 <div class="page">
 
+  <div class="top-bar" style="justify-content:flex-end">
+    <div id="kw-shell-mount"></div>
+  </div>
+
   <div class="hub-header">
     <div class="hub-logo">🔢</div>
     <h1 class="hub-title">Number Crunch</h1>
@@ -205,5 +210,10 @@ a.game-card.coming-soon {
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
 <script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('numbercrunch');
+  KapeworkShell.init({ appSlug: 'numbercrunch', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

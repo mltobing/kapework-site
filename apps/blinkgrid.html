@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BlinkGrid — Kapework Vibe Lab</title>
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
 :root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;display:flex;min-height:100svh}
@@ -19,11 +20,20 @@ button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:1
 button.primary{background:var(--accent);color:#fff;border-color:#a06d47}
 .score{font-weight:700}
 a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
+/* Shell overrides — light cream theme */
+.kw-more-btn{color:#4a2f24}
+.kw-more-btn:hover{background:rgba(74,47,36,0.08)}
+.kw-menu{background:#fff;border-color:#e7ded4}
+.kw-menu-item{color:#4a2f24}
+.kw-menu-item:hover,.kw-menu-item:focus{background:#f5f0ea}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>BlinkGrid</h1>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="margin:0">BlinkGrid</h1>
+    <div id="kw-shell-mount"></div>
+  </div>
   <div class="muted">Watch the pattern, then recreate it. Auto-submit on completion.</div>
 
   <div class="panel">
@@ -160,5 +170,10 @@ if(new URLSearchParams(location.search).get('mode')==='daily') start('Daily');
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('blinkgrid');
+  KapeworkShell.init({ appSlug: 'blinkgrid', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

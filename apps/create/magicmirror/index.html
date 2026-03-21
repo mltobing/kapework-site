@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
   <style>
 /* ── Reset & tokens ──────────────────────────────────────── */
 *, *::before, *::after {
@@ -293,6 +294,7 @@ body {
       <button class="icon-btn" id="btn-gallery">🖼 Gallery</button>
       <button class="icon-btn" id="btn-undo">↩ Undo</button>
       <button class="icon-btn" id="btn-clear">✕ Clear</button>
+      <div id="kw-shell-mount"></div>
     </div>
   </div>
 
@@ -721,5 +723,10 @@ fillBg();   // canvas is sized by the ResizeObserver on first observation
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('magicmirror');
+  KapeworkShell.init({ appSlug: 'magicmirror', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>
