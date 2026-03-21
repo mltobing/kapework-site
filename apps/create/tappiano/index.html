@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
   <style>
 /* ── Reset & tokens ─────────────────────────────────────── */
 *, *::before, *::after {
@@ -302,6 +303,7 @@ body {
   <div class="top-bar">
     <a class="back-btn" href="../">← Create</a>
     <button class="tunes-btn" id="btn-my-tunes">My Tunes 🎵</button>
+    <div id="kw-shell-mount"></div>
   </div>
 
   <div class="app-header">
@@ -736,5 +738,10 @@ rebuildPiano();
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('tappiano');
+  KapeworkShell.init({ appSlug: 'tappiano', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

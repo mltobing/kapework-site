@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TapSum</title>
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
   :root {
     --bg:#0b1220; --panel:#121a2c; --ink:#e8eefc; --muted:#93a3c9; --bd:rgba(255,255,255,.08);
@@ -64,6 +65,7 @@
       <span class="pill">Best Chain <strong id="best">0</strong></span>
       <button id="ambience" class="btn" title="Ambient sound (calming pad)">🎧</button>
     </div>
+    <div id="kw-shell-mount"></div>
   </header>
 
   <div class="panel">
@@ -350,5 +352,10 @@
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('tapsum');
+  KapeworkShell.init({ appSlug: 'tapsum', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

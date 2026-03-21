@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CVC Builder+ — Kapework Vibe Lab</title>
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
 :root{
   --bg1:#fff2e5; --bg2:#fffaf4; --ink:#2a1f17; --muted:#705a4a;
@@ -42,11 +43,20 @@ h1{margin:0 0 8px;font-weight:900;letter-spacing:.2px}
 .note{font-size:.95rem;color:#7b6b60}
 small.muted{font-size:.85rem}
 a{color:inherit}
+/* Shell overrides — light warm theme */
+.kw-more-btn{color:#2a1f17}
+.kw-more-btn:hover{background:rgba(42,31,23,0.08)}
+.kw-menu{background:#fff;border-color:#eadfd3}
+.kw-menu-item{color:#2a1f17}
+.kw-menu-item:hover,.kw-menu-item:focus{background:#fff5e8}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🔤 CVC Builder+</h1>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1 style="margin:0">🔤 CVC Builder+</h1>
+    <div id="kw-shell-mount"></div>
+  </div>
   <div class="muted">Build, sound-out, and blend short vowel C‑V‑C words. <b>Daily</b> challenge or <b>Free play</b>.</div>
 
   <div class="panel">
@@ -299,5 +309,10 @@ else { document.getElementById('daily').click(); }
 </script>
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('cvcbuilder');
+  KapeworkShell.init({ appSlug: 'cvcbuilder', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>

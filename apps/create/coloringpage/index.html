@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
 /* ─── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after {
@@ -79,6 +80,13 @@ a { color: inherit; text-decoration: none; }
   font-weight: 800;
   letter-spacing: -0.3px;
 }
+
+/* Shell overrides — light neutral theme */
+.kw-more-btn{color:var(--text2)}
+.kw-more-btn:hover{background:rgba(0,0,0,0.06)}
+.kw-menu{background:var(--surface);border-color:var(--border)}
+.kw-menu-item{color:var(--text)}
+.kw-menu-item:hover,.kw-menu-item:focus{background:var(--surface2)}
 
 /* ─── Screen 1: Home ─────────────────────────────────────────── */
 .home-content {
@@ -706,6 +714,7 @@ a { color: inherit; text-decoration: none; }
 <div id="screenHome" class="screen active">
   <div class="top-bar">
     <a class="back-btn" href="../">← Create</a>
+    <div id="kw-shell-mount" style="margin-left:auto"></div>
   </div>
   <div class="home-content">
     <div class="home-logo">🖼️</div>
@@ -1849,5 +1858,10 @@ document.addEventListener('keydown', e => {
      and the fixed footer bar would overlap the coloring toolbar -->
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('coloringpage');
+  KapeworkShell.init({ appSlug: 'coloringpage', mountId: 'kw-shell-mount' });
+</script>
 </body>
 </html>
