@@ -12,8 +12,6 @@
   <link rel="stylesheet" href="style.css">
   <!-- Kapework shared shell styles -->
   <link rel="stylesheet" href="/shared/kapework-shell.css">
-  <!-- GA_MEASUREMENT_ID — replace with your real ID in Netlify env or below -->
-  <script>window.GA_MEASUREMENT_ID = window.GA_MEASUREMENT_ID || '';</script>
 </head>
 <body>
 
@@ -69,7 +67,8 @@
   </div>
 </div>
 
-<!-- Shared analytics (injects GA, fires app_open) -->
+<!-- Shared config (GA ID baked in at build time) + analytics -->
+<script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
 <!-- Shared shell (⋮ menu + feedback modal) -->
 <script src="/shared/kapework-shell.js"></script>

@@ -1,12 +1,24 @@
 /* shared/analytics.js — Kapework shared analytics client
  *
- * Usage:
- *   Set window.GA_MEASUREMENT_ID before loading this script (optional).
- *   Call KapeworkAnalytics.init('app-slug') once on page load.
- *   Call KapeworkAnalytics.track('event_name', { extra: 'props' }) anywhere.
+ * Requires: /shared/config.js loaded before this script (sets window.KapeworkConfig).
+ *
+ * Basic usage (page_view fires automatically — no JS needed):
+ *   <script src="/shared/config.js"></script>
+ *   <script src="/shared/analytics.js"></script>
+ *
+ * Full usage (also fires app_open + custom events):
+ *   KapeworkAnalytics.init('app-slug');
+ *   KapeworkAnalytics.track('event_name', { extra: 'props' });
  */
 (function () {
   'use strict';
+
+  // ── Read GA measurement ID (build-time config takes precedence) ────────────
+  function getMeasurementId() {
+    var cfg = window.KapeworkConfig;
+    if (cfg && cfg.gaMeasurementId) return cfg.gaMeasurementId;
+    return ''; // no fallback to window.GA_MEASUREMENT_ID — config.js is the source
+  }
 
   // ── device_id (anonymous, persistent across sessions) ──────────────────────
   function getDeviceId() {
@@ -23,7 +35,7 @@
   // ── session_id (per page-load, not persisted) ──────────────────────────────
   var SESSION_ID = 'ses_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
-  // ── GA4 injection (one snippet per page) ───────────────────────────────────
+  // ── GA4 injection (idempotent — safe to call multiple times) ───────────────
   var _gtag = null;
 
   function injectGA(measurementId) {
@@ -40,6 +52,7 @@
     function gtag() { window.dataLayer.push(arguments); }
     window.gtag = gtag;
     gtag('js', new Date());
+    // GA4 fires page_view automatically on this call
     gtag('config', measurementId);
     _gtag = gtag;
   }
@@ -84,17 +97,25 @@
   }
 
   // ── init ───────────────────────────────────────────────────────────────────
+  // Call this for apps that need app_open tracking and custom events.
+  // injectGA is idempotent — calling init() after the auto-init below is safe.
   function init(appSlug) {
     window._kw_app_slug = appSlug;
-    injectGA(window.GA_MEASUREMENT_ID);
+    injectGA(getMeasurementId()); // no-op if already injected at load time
     trackEvent('app_open');
   }
 
+  // ── Auto-init: inject GA as soon as this script loads ─────────────────────
+  // GA4 queues a page_view automatically via gtag('config', id).
+  // This covers every app that loads config.js + analytics.js,
+  // even those that never call KapeworkAnalytics.init().
+  injectGA(getMeasurementId());
+
   // ── Public API ─────────────────────────────────────────────────────────────
   window.KapeworkAnalytics = {
-    init:      init,
-    track:     trackEvent,
+    init:        init,
+    track:       trackEvent,
     getDeviceId: getDeviceId,
-    sessionId: SESSION_ID
+    sessionId:   SESSION_ID
   };
 }());

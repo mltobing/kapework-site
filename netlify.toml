@@ -16,6 +16,13 @@
 # to the SINGLE_FILE map in the edge function.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Build ─────────────────────────────────────────────────────────────────────
+# Generates shared/config.js with GA_MEASUREMENT_ID baked in from the
+# Netlify build environment. The committed shared/config.js is a placeholder
+# (empty ID) that is overwritten at deploy time.
+[build]
+  command = "node scripts/generate-config.js"
+
 # ── Netlify Functions ─────────────────────────────────────────────────────────
 [functions]
   directory = "netlify/functions"
