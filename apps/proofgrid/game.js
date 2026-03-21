@@ -26,20 +26,32 @@ var locked = [];      // 4x4 boolean
 var cellEls = [];     // 4x4 DOM refs
 var won = false;
 var checksLeft = 2;
+var firstInteraction = false;
+
+/* ── Analytics helper ────────────────────────────────────── */
+
+function track(eventName, props) {
+  if (window.KapeworkAnalytics) {
+    window.KapeworkAnalytics.track(eventName, props);
+  }
+}
 
 /* ── DOM refs ────────────────────────────────────────────── */
-var boardEl   = document.getElementById("board");
-var statusEl  = document.getElementById("status");
-var checkBtn  = document.getElementById("check-btn");
-var checkText = document.getElementById("check-text");
-var resetBtn  = document.getElementById("reset-btn");
-var helpBtn   = document.getElementById("help-btn");
-var helpModal = document.getElementById("help-modal");
-var helpClose = document.getElementById("help-close");
+var boardEl    = document.getElementById("board");
+var statusEl   = document.getElementById("status");
+var checkBtn   = document.getElementById("check-btn");
+var checkText  = document.getElementById("check-text");
+var resetBtn   = document.getElementById("reset-btn");
+var helpModal  = document.getElementById("help-modal");
+var helpClose  = document.getElementById("help-close");
 var subtitleEl = document.getElementById("subtitle");
 
-/* ── Help modal ──────────────────────────────────────────── */
-helpBtn.addEventListener("click", function () { helpModal.hidden = false; });
+/* ── Help modal — exposed for the shell's "How to play" item ─ */
+
+window.openHelpModal = function () {
+  helpModal.hidden = false;
+};
+
 helpClose.addEventListener("click", function () { helpModal.hidden = true; });
 helpModal.addEventListener("click", function (e) {
   if (e.target === helpModal) helpModal.hidden = true;
@@ -51,6 +63,7 @@ function loadPuzzle(p) {
   puzzle = p;
   won = false;
   checksLeft = 2;
+  firstInteraction = false;
   grid = [];
   locked = [];
   cellEls = [];
@@ -70,6 +83,8 @@ function loadPuzzle(p) {
   updateCheckBtn();
   statusEl.textContent = "";
   statusEl.style.color = "";
+
+  track('game_start');
 }
 
 /* ── Build board ─────────────────────────────────────────── */
@@ -180,6 +195,11 @@ function onCellTap(e) {
   var c = parseInt(cell.getAttribute("data-c"));
   if (won || locked[r][c]) return;
 
+  if (!firstInteraction) {
+    firstInteraction = true;
+    track('first_interaction');
+  }
+
   grid[r][c] = (grid[r][c] + 1) % 5;
   cell.innerHTML = SYM_SVG[grid[r][c]];
   if (navigator.vibrate) navigator.vibrate(6);
@@ -213,6 +233,8 @@ function updateCheckBtn() {
 function onCheck() {
   if (won || checksLeft <= 0 || !isBoardFull()) return;
 
+  track('check_used', { checks_remaining: checksLeft - 1 });
+
   if (isBoardCorrect()) {
     won = true;
     statusEl.textContent = "Solved!";
@@ -223,6 +245,7 @@ function onCheck() {
         cellEls[r][c].style.animationDelay = (r * 4 + c) * 60 + "ms";
       }
     updateCheckBtn();
+    track('solve_success');
     return;
   }
 
@@ -249,6 +272,7 @@ function onReset() {
   statusEl.textContent = "";
   statusEl.style.color = "";
   updateCheckBtn();
+  track('reset_used');
 }
 
 /* ── Wire buttons ────────────────────────────────────────── */

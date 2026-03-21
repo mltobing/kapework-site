@@ -16,6 +16,10 @@
 # to the SINGLE_FILE map in the edge function.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Netlify Functions ─────────────────────────────────────────────────────────
+[functions]
+  directory = "netlify/functions"
+
 # ── Edge function: subdomain router ──────────────────────────────────────────
 # Catches every request so the router can inspect the hostname.
 [[edge_functions]]

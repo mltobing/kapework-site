@@ -1,0 +1,9 @@
+{
+  "name": "kapework-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kapework — Netlify Functions dependencies",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  }
+}

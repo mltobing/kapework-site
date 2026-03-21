@@ -10,6 +10,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- Kapework shared shell styles -->
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <!-- GA_MEASUREMENT_ID — replace with your real ID in Netlify env or below -->
+  <script>window.GA_MEASUREMENT_ID = window.GA_MEASUREMENT_ID || '';</script>
 </head>
 <body>
 
@@ -17,8 +21,9 @@
 
   <!-- Top bar -->
   <div class="top-bar">
-    <a class="back-btn" href="https://braingym.kapework.com/">← Brain Gym</a>
-    <button id="help-btn" class="icon-btn" aria-label="How to play">?</button>
+    <a class="back-btn" href="https://braingym.kapework.com/">&#8592; Brain Gym</a>
+    <!-- Shell mounts the ⋮ button here -->
+    <div id="kw-shell-mount"></div>
   </div>
 
   <!-- Header -->
@@ -46,7 +51,7 @@
 <div id="help-modal" class="modal-overlay" hidden>
   <div class="modal">
     <h2>How to Play</h2>
-    <p>Fill the 4×4 grid so every <strong>row</strong> and <strong>column</strong> contains each symbol exactly once. Tap a cell to cycle through symbols.</p>
+    <p>Fill the 4&#xD7;4 grid so every <strong>row</strong> and <strong>column</strong> contains each symbol exactly once. Tap a cell to cycle through symbols.</p>
     <div class="symbol-legend">
       <div class="legend-item"><svg class="sym" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/></svg> Hollow Circle</div>
       <div class="legend-item"><svg class="sym" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="currentColor"/></svg> Filled Circle</div>
@@ -64,7 +69,34 @@
   </div>
 </div>
 
+<!-- Shared analytics (injects GA, fires app_open) -->
+<script src="/shared/analytics.js"></script>
+<!-- Shared shell (⋮ menu + feedback modal) -->
+<script src="/shared/kapework-shell.js"></script>
+
 <script src="engine.js"></script>
 <script src="game.js"></script>
+
+<script>
+  // Init analytics
+  KapeworkAnalytics.init('proofgrid');
+
+  // Init shell — "How to play" routes to the existing help modal
+  KapeworkShell.init({
+    appSlug: 'proofgrid',
+    mountId: 'kw-shell-mount',
+    menuItems: [
+      {
+        id: 'how-to-play',
+        icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        label: 'How to play',
+        onClick: function () {
+          window.openHelpModal && window.openHelpModal();
+          KapeworkAnalytics.track('how_to_open');
+        }
+      }
+    ]
+  });
+</script>
 </body>
 </html>
