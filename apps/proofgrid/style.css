@@ -13,10 +13,9 @@
   --err:       #f87171;
   --ok:        #4ade80;
 
-  --cell-size: min(72px, (100vw - 80px) / 5);
-  --clue-size: calc(var(--cell-size) * 0.55);
-  --gap:       4px;
-  --radius:    12px;
+  --cell:      min(64px, (100vw - 96px) / 4);
+  --gap:       16px;
+  --radius:    10px;
 }
 
 html, body {
@@ -91,89 +90,18 @@ a { color: inherit; text-decoration: none; }
 .title  { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px; }
 .subtitle { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
 
-/* ─── Board ──────────────────────────────────────────────── */
-.board-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
+/* ─── Board (CSS Grid) ───────────────────────────────────── */
+.board {
+  display: grid;
+  /* 4 cells + 3 gaps */
+  grid-template-columns: var(--cell) var(--gap) var(--cell) var(--gap) var(--cell) var(--gap) var(--cell);
+  grid-template-rows:    var(--cell) var(--gap) var(--cell) var(--gap) var(--cell) var(--gap) var(--cell);
 }
 
-/* Column clues row (top) */
-.col-clues {
-  display: flex;
-  gap: var(--gap);
-  margin-bottom: var(--gap);
-  padding-left: calc(var(--clue-size) + var(--gap));
-}
-
-.clue-corner {
-  width: 0; height: 0;
-  /* placeholder to align with row clue column */
-}
-
-.col-clue-cell {
-  width: var(--cell-size);
-  height: var(--clue-size);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-}
-
-.col-clue-pip {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-}
-.col-clue-pip.hollow {
-  border: 1.5px solid var(--cyan);
-  background: transparent;
-}
-.col-clue-pip.filled {
-  background: var(--cyan);
-}
-.col-clue-pip.none { visibility: hidden; }
-
-/* Grid rows */
-.grid-area {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-}
-
-.grid-row {
-  display: flex;
-  gap: var(--gap);
-  align-items: center;
-}
-
-/* Row clue strip (left) */
-.row-clue-strip {
-  width: var(--clue-size);
-  height: var(--cell-size);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.row-clue-pip {
-  width: 8px; height: 8px;
-}
-.row-clue-pip.circle { border-radius: 50%; }
-.row-clue-pip.square { border-radius: 2px; }
-.row-clue-pip.circle, .row-clue-pip.square {
-  border: 1.5px solid var(--cyan);
-  background: transparent;
-}
-.row-clue-pip.none { visibility: hidden; }
-
-/* Grid cells */
+/* ─── Cells ──────────────────────────────────────────────── */
 .cell {
-  width: var(--cell-size);
-  height: var(--cell-size);
+  width: var(--cell);
+  height: var(--cell);
   background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
@@ -182,7 +110,6 @@ a { color: inherit; text-decoration: none; }
   place-items: center;
   transition: border-color 0.15s, background 0.15s;
   touch-action: manipulation;
-  position: relative;
 }
 .cell:hover { border-color: rgba(232,237,245,0.2); }
 .cell:active { background: var(--surface2); }
@@ -193,24 +120,50 @@ a { color: inherit; text-decoration: none; }
   opacity: 0.85;
 }
 
-.cell.conflict {
-  border-color: var(--err);
-  box-shadow: 0 0 8px rgba(248,113,113,0.3);
-}
-
-.cell.correct {
-  border-color: var(--ok);
-}
-
-/* Symbol SVGs inside cells */
 .cell svg {
   width: 55%;
   height: 55%;
   color: var(--text);
 }
+.cell.prefilled svg { color: var(--muted); }
 
-.cell.prefilled svg {
-  color: var(--muted);
+/* ─── Gaps (clue containers) ─────────────────────────────── */
+.gap {
+  display: grid;
+  place-items: center;
+}
+
+.gap-corner {
+  /* empty intersection spacer — truly invisible */
+}
+
+/* ─── Bridge-capsule clue marks ──────────────────────────── */
+.clue-mark {
+  border-radius: 999px;
+}
+
+/* Horizontal capsule: wide, short */
+.clue-h {
+  width: 40%;
+  height: 5px;
+}
+
+/* Vertical capsule: tall, narrow */
+.clue-v {
+  width: 5px;
+  height: 40%;
+}
+
+/* same-shape = outlined capsule */
+.clue-outline {
+  background: transparent;
+  border: 1.75px solid var(--cyan);
+}
+
+/* same-fill = solid capsule */
+.clue-solid {
+  background: var(--cyan);
+  border: none;
 }
 
 /* ─── Actions ────────────────────────────────────────────── */
@@ -244,10 +197,15 @@ a { color: inherit; text-decoration: none; }
   background: var(--cyan-dim);
   color: var(--cyan);
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition: background 0.15s, transform 0.1s, opacity 0.15s;
 }
 .btn:hover { background: rgba(0,229,204,0.25); }
 .btn:active { transform: scale(0.97); }
+.btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
 
 .btn-muted {
   border-color: var(--border);
@@ -282,49 +240,73 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 24px;
-  max-width: 400px;
+  max-width: 380px;
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .modal h2 {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 800;
   margin-bottom: 12px;
 }
 
-.modal h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-top: 16px;
-  margin-bottom: 6px;
+.modal p {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 8px;
 }
 
-.modal p {
-  font-size: 0.85rem;
-  color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 8px;
+.modal strong { color: var(--text); }
+
+.clue-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.clue-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.clue-sample {
+  width: 28px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.clue-sample.outline {
+  border: 1.75px solid var(--cyan);
+  background: transparent;
+}
+.clue-sample.solid {
+  background: var(--cyan);
 }
 
 .symbol-legend {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 12px 0;
+  gap: 6px;
+  margin: 10px 0;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
+  gap: 6px;
+  font-size: 0.78rem;
   color: var(--text);
 }
 
 .legend-item .sym {
-  width: 28px; height: 28px;
+  width: 22px; height: 22px;
   color: var(--cyan);
   flex-shrink: 0;
 }
