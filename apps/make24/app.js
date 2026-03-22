@@ -17,9 +17,9 @@ const APP_CONFIG = {
     shareLabel: 'make24.app'
 };
 
-// Supabase config
-const SUPABASE_URL = 'https://fimsbfcvavpehryvvcho.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ';
+// Supabase config — values injected at build time via shared/config.js
+const SUPABASE_URL = (window.KapeworkConfig || {}).supabaseUrl     || '';
+const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
 
 // Supabase client (auth-aware)
 const { createClient } = supabase;
