@@ -1,184 +1,951 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BlinkGrid 4×4 — Kapework Vibe Lab</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BlinkGrid — Kapework</title>
 <link rel="stylesheet" href="/shared/kapework-shell.css">
 <style>
-/* --- Screen fit: paste near the top of <style> --- */
-html,body{
-  height:100svh;            /* iOS-safe full height */
-  margin:0;
-  overflow:hidden;          /* prevent accidental scroll */
-  background:#f8f7f4;       /* neutral background */
-  color:#2b221b;
-  font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #fdf6ed;
+  --ink:    #4a2f24;
+  --muted:  #7a5e4b;
+  --card:   #fff;
+  --accent: #b67b50;
+  --line:   #e7ded4;
+  --flash:  #f59c42;
+  --hit:    #4ea8de;
 }
-.wrap{
-  height:100%;
-  display:grid;             /* center content */
-  place-items:center;
-  padding:8px;
+
+html, body {
+  height: 100svh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.4 system-ui, -apple-system, sans-serif;
 }
-  :root{--bg:#fdf6ed;--ink:#4a2f24;--card:#fff;--accent:#b67b50;--line:#e7ded4}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif;display:flex;min-height:100svh}
-.wrap{max-width:520px;margin:auto;padding:20px}
-h1{margin:0 0 8px;font-weight:800}
-.muted{color:#7a5e4b}
-.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
-.cell{aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#fff;touch-action:manipulation}
-.cell.show{background:#ffe7cc;border-color:#f0caa0}
-.cell.selected{background:#cfe8ff;border-color:#9dc7f5}
-.row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
-button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 14px;font-weight:600}
-button.primary{background:var(--accent);color:#fff;border-color:#a06d47}
-.score{font-weight:700}
-a{color:inherit;text-decoration:none;border-bottom:1px dashed #c0a893}
-/* Shell overrides — light cream theme */
-.kw-more-btn{color:#4a2f24}
-.kw-more-btn:hover{background:rgba(74,47,36,0.08)}
-.kw-menu{background:#fff;border-color:#e7ded4}
-.kw-menu-item{color:#4a2f24}
-.kw-menu-item:hover,.kw-menu-item:focus{background:#f5f0ea}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* ── Top bar ─────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 4px;
+  flex-shrink: 0;
+}
+.back-link {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 0;
+  flex: 1;
+}
+.back-link:hover { color: var(--ink); }
+.app-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  flex: 1;
+  text-align: center;
+}
+#kw-shell-mount {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+/* ── Tagline ─────────────────────────────────────────── */
+.tagline {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 0 0 8px;
+  flex-shrink: 0;
+}
+
+/* ── Round header ────────────────────────────────────── */
+.round-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px 2px;
+  flex-shrink: 0;
+  min-height: 30px;
+}
+.round-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+.seq-counter {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ── Status ──────────────────────────────────────────── */
+.status {
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+.status.bold   { font-weight: 700; color: var(--ink); }
+.status.success { color: #3a9a6e; font-weight: 700; }
+.status.fail    { color: #c94040; font-weight: 700; }
+
+/* ── Grid ────────────────────────────────────────────── */
+.grid-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+}
+.cell {
+  aspect-ratio: 1;
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.07s, border-color 0.07s, transform 0.07s, box-shadow 0.07s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  outline: none;
+}
+.cell:active { transform: scale(0.93); }
+.cell.flash {
+  background: var(--flash);
+  border-color: #d4822a;
+  transform: scale(1.05);
+  box-shadow: 0 2px 12px rgba(181,100,30,0.3);
+}
+.cell.tapped {
+  background: #d6ecff;
+  border-color: #9dc7f5;
+}
+.cell.tapped-correct {
+  background: #baedc4;
+  border-color: #5cb85c;
+}
+.cell.tapped-wrong {
+  background: #ffd0d0;
+  border-color: #e05c5c;
+  animation: shake 0.3s ease;
+}
+.cell:disabled { cursor: default; }
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-5px); }
+  75%      { transform: translateX(5px); }
+}
+
+/* ── Sequence dots ───────────────────────────────────── */
+.seq-dots {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  padding: 6px 0 10px;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+.seq-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.25s;
+}
+.seq-dot.done    { background: var(--accent); }
+.seq-dot.current { background: var(--ink); }
+
+/* ── Mode screen ─────────────────────────────────────── */
+.mode-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 20px;
+  flex-shrink: 0;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 15px 32px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 100%;
+  max-width: 280px;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary:active { transform: scale(0.96); opacity: 0.85; }
+.btn-secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 11px 32px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 100%;
+  max-width: 280px;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-secondary:active { transform: scale(0.96); }
+
+/* ── Round transition banner ─────────────────────────── */
+.transition-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--ink);
+  color: #fdf6ed;
+  text-align: center;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 700;
+  z-index: 200;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+  safe-area-inset-top: env(safe-area-inset-top);
+}
+.transition-banner.show { transform: translateY(0); }
+.transition-countdown {
+  font-size: 24px;
+  display: block;
+  margin-top: 2px;
+  opacity: 0.6;
+  font-weight: 800;
+}
+
+/* ── Result screen ───────────────────────────────────── */
+.result-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 16px 0 20px;
+  flex-shrink: 0;
+  flex: 1;
+  justify-content: center;
+}
+.result-screen.show { display: flex; }
+.result-emoji    { font-size: 52px; line-height: 1; }
+.result-headline { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.result-sub      { font-size: 16px; color: var(--muted); margin-top: -6px; }
+.result-detail {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 20px;
+  width: 100%;
+  max-width: 280px;
+}
+.result-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.result-stat:last-child { border-bottom: none; }
+.result-stat strong { font-weight: 700; }
+.result-stat.dim { color: var(--muted); font-size: 12px; }
+.share-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 100%;
+  max-width: 280px;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.share-btn:active { transform: scale(0.96); opacity: 0.85; }
+.ghost-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 32px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  width: 100%;
+  max-width: 280px;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ghost-btn:active { transform: scale(0.96); }
+
+/* ── Shell overrides — light cream ───────────────────── */
+.kw-more-btn { color: var(--ink); }
+.kw-more-btn:hover { background: rgba(74,47,36,0.08); }
+.kw-menu { background: #fff; border-color: var(--line); }
+.kw-menu-item { color: var(--ink); }
+.kw-menu-item:hover, .kw-menu-item:focus { background: #f5f0ea; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <h1 style="margin:0">BlinkGrid 4×4</h1>
-    <div id="kw-shell-mount"></div>
-  </div>
-  <div class="muted">Advanced grid. Auto-submit on completion.</div>
 
-  <div class="panel">
-    <div id="msg" class="muted">Choose a mode to start.</div>
-    <div class="row">
-      <button id="daily" class="primary">Daily</button>
-      <button id="endless">Endless</button>
-      <div class="score">Round <span id="round">0</span><span id="of">/5</span> · ✓ <span id="hits">0</span></div>
-    </div>
-
-    <div id="grid" class="grid" aria-label="4 by 4 memory grid"></div>
-
-    <div class="row">
-      <button id="reset">Reset selection</button>
-      <a href="/apps/">← Vibe Lab</a>
-    </div>
-  </div>
+<!-- Round transition banner (slides from top) -->
+<div class="transition-banner" id="transition-banner" aria-live="polite">
+  <span id="transition-msg"></span>
+  <span class="transition-countdown" id="transition-count"></span>
 </div>
 
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <a href="/apps/" class="back-link">← Brain Gym</a>
+    <span class="app-title">BlinkGrid</span>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- Tagline (hidden during active game) -->
+  <div class="tagline" id="tagline">Watch the pattern. Tap it back.</div>
+
+  <!-- Round header (shown during game) -->
+  <div class="round-header" id="round-header" style="display:none">
+    <span class="round-label" id="round-label">Round 1</span>
+    <span class="seq-counter" id="seq-counter">0 / 13</span>
+  </div>
+
+  <!-- Status message -->
+  <div class="status" id="status"></div>
+
+  <!-- Grid -->
+  <div class="grid-wrap">
+    <div class="grid" id="grid" aria-label="4 by 4 memory grid" role="group"></div>
+  </div>
+
+  <!-- Sequence progress dots -->
+  <div class="seq-dots" id="seq-dots"></div>
+
+  <!-- Start screen -->
+  <div class="mode-screen" id="mode-screen">
+    <button class="btn-primary" id="btn-daily">Play Today's Game</button>
+    <button class="btn-secondary" id="btn-endless">Endless mode</button>
+  </div>
+
+  <!-- Result screen -->
+  <div class="result-screen" id="result-screen">
+    <div class="result-emoji"    id="result-emoji"></div>
+    <div class="result-headline" id="result-headline"></div>
+    <div class="result-sub"      id="result-sub"></div>
+    <div class="result-detail"   id="result-detail"></div>
+    <button class="share-btn"  id="btn-share">Share result</button>
+    <button class="ghost-btn"  id="btn-after">Play Endless instead</button>
+  </div>
+
+</div><!-- .app -->
+
 <script>
-// helpers
-function lcg(seed){let s=seed>>>0; return ()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
-function dailySeed(){return Number(new Date().toISOString().slice(0,10).replace(/-/g,''));}
-const ROUNDS_DAILY=5, CELLS=16;
+// ═══════════════════════════════════════════════════════
+// Game structure
+// ═══════════════════════════════════════════════════════
+const CELLS = 16;
+const ROUNDS = [
+  { seqs: 2, len: 3 },  // Round 1 — 2 sequences of 3
+  { seqs: 2, len: 4 },  // Round 2 — 2 sequences of 4
+  { seqs: 2, len: 5 },  // Round 3 — 2 sequences of 5
+  { seqs: 2, len: 6 },  // Round 4 — 2 sequences of 6
+  { seqs: 2, len: 7 },  // Round 5 — 2 sequences of 7
+  { seqs: 3, len: 8 },  // Round 6 — 3 sequences of 8 (Final)
+];
+const TOTAL_SEQS = ROUNDS.reduce((s, r) => s + r.seqs, 0); // 13
 
-// refs & state
-const gridEl=document.getElementById('grid'), msgEl=document.getElementById('msg');
-const roundEl=document.getElementById('round'), ofEl=document.getElementById('of'), hitsEl=document.getElementById('hits');
-const resetB=document.getElementById('reset');
+// Puzzle epoch: day #1 = 2025-01-01
+const EPOCH_MS = Date.UTC(2025, 0, 1);
 
-let rng=Math.random, mode=null, round=0, hits=0, endless=false;
-let patternMask=0, selectMask=0, neededBits=0, busy=false;
-
-// build grid
-const cells=[];
-for(let i=0;i<CELLS;i++){
-  const d=document.createElement('button');
-  d.className='cell'; d.setAttribute('aria-label','cell '+(i+1));
-  d.addEventListener('click',()=>onTap(i));
-  gridEl.appendChild(d); cells.push(d);
+function daysSinceEpoch() {
+  const now = new Date();
+  const utcToday = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor((utcToday - EPOCH_MS) / 86400000) + 1;
 }
-function bitCount(m){let c=0; while(m){m&=m-1; c++;} return c;}
 
-function onTap(i){
-  if(busy) return;
-  const bit=(1<<i);
-  if(selectMask & bit){ selectMask &= ~bit; cells[i].classList.remove('selected'); }
-  else { selectMask |= bit; cells[i].classList.add('selected'); if(navigator.vibrate) navigator.vibrate(8); }
+function todayKey() {
+  const d = new Date();
+  return '' + d.getFullYear()
+    + String(d.getMonth() + 1).padStart(2, '0')
+    + String(d.getDate()).padStart(2, '0');
+}
 
-  const cnt=bitCount(selectMask);
-  if(cnt===neededBits){
-    busy=true;
-    setTimeout(()=>{
-      if(selectMask===patternMask){
-        hits++; hitsEl.textContent=hits;
-        msgEl.textContent='Nice! Next round…';
-        nextRound();
-      }else{
-        if(navigator.vibrate) navigator.vibrate([40,40,40]);
-        msgEl.textContent='Wrong pattern — game over.';
-        endGame();
+// Flash timing: slightly faster in later rounds
+function flashTiming(roundIdx) {
+  return {
+    onMs:  Math.max(260, 380 - roundIdx * 18),
+    offMs: Math.max(70,  110 - roundIdx * 8),
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+// Seeded RNG — Mulberry32
+// ═══════════════════════════════════════════════════════
+function mulberry32(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s += 0x6D2B79F5;
+    let x = s;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dailySeed() {
+  const d = new Date();
+  return Number(
+    '' + d.getFullYear()
+    + String(d.getMonth() + 1).padStart(2, '0')
+    + String(d.getDate()).padStart(2, '0')
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// Generate full run — all rounds × sequences
+// ═══════════════════════════════════════════════════════
+function generateRun(rng) {
+  return ROUNDS.map(({ seqs, len }) => {
+    const roundSeqs = [];
+    for (let s = 0; s < seqs; s++) {
+      const seq = [];
+      const used = new Set();
+      while (seq.length < len) {
+        const c = Math.floor(rng() * CELLS);
+        if (!used.has(c)) { used.add(c); seq.push(c); }
       }
-      busy=false;
-    },80);
-  } else if(cnt>neededBits){
-    if(navigator.vibrate) navigator.vibrate([30,30]);
-    msgEl.textContent='Too many tiles — game over.';
-    endGame();
-  }
-}
-
-function makePattern(bits){
-  let m=0, tries=0;
-  while(bits>0 && tries<128){
-    const i=Math.floor(rng()*CELLS);
-    if(!(m&(1<<i))){ m|=(1<<i); bits--; }
-    tries++;
-  }
-  return m;
-}
-async function showPattern(mask, ms){
-  busy=true;
-  cells.forEach((c,i)=> c.classList.toggle('show', !!(mask&(1<<i))));
-  await new Promise(r=>setTimeout(r, ms));
-  cells.forEach(c=> c.classList.remove('show'));
-  busy=false;
-}
-function clearSelection(){ selectMask=0; cells.forEach(c=>c.classList.remove('selected')); }
-resetB.onclick=()=>{ if(!busy) clearSelection(); };
-
-function nextRound(){
-  round++; roundEl.textContent=round; clearSelection();
-
-  if(!endless && round>ROUNDS_DAILY){ endGame(); return; }
-
-  msgEl.textContent=`Memorize the pattern… (${mode} mode)`;
-  neededBits = Math.min(3 + Math.floor(round*0.8), 10); // start 3; ramp to ~10
-  const showMs = Math.max(500, 1100 - round*80);
-  patternMask = makePattern(neededBits);
-  showPattern(patternMask, showMs).then(()=>{
-    msgEl.textContent=`Select ${neededBits} tile${neededBits>1?'s':''}.`;
+      roundSeqs.push(seq);
+    }
+    return roundSeqs;
   });
 }
 
-function endGame(){
-  const key='blinkgrid4_best_'+mode;
-  const best=Math.max(Number(localStorage.getItem(key)||0), hits);
-  localStorage.setItem(key, best);
-  msgEl.innerHTML=`Done! Correct rounds: <b>${hits}</b>${endless?'':'/5'}. Best (${mode}): <b>${best}</b>.`;
+// ═══════════════════════════════════════════════════════
+// DOM refs
+// ═══════════════════════════════════════════════════════
+const gridEl         = document.getElementById('grid');
+const statusEl       = document.getElementById('status');
+const roundHeaderEl  = document.getElementById('round-header');
+const roundLabelEl   = document.getElementById('round-label');
+const seqCounterEl   = document.getElementById('seq-counter');
+const seqDotsEl      = document.getElementById('seq-dots');
+const modeScreenEl   = document.getElementById('mode-screen');
+const resultScreenEl = document.getElementById('result-screen');
+const taglineEl      = document.getElementById('tagline');
+const bannerEl       = document.getElementById('transition-banner');
+const bannerMsgEl    = document.getElementById('transition-msg');
+const bannerCountEl  = document.getElementById('transition-count');
+
+// ═══════════════════════════════════════════════════════
+// Build 4×4 grid
+// ═══════════════════════════════════════════════════════
+const cellEls = [];
+for (let i = 0; i < CELLS; i++) {
+  const btn = document.createElement('button');
+  btn.className = 'cell';
+  btn.setAttribute('aria-label', 'cell ' + (i + 1));
+  btn.addEventListener('click', () => onTap(i));
+  gridEl.appendChild(btn);
+  cellEls.push(btn);
 }
 
-function start(m){
-  mode=m; endless=(m==='Endless');
-  rng=(m==='Daily')?lcg(dailySeed()):Math.random;
-  round=0; hits=0; hitsEl.textContent=hits; roundEl.textContent=0;
-  ofEl.textContent=endless?'':'/'+ROUNDS_DAILY;
-  nextRound();
-  history.replaceState(null,'', location.pathname + (m==='Daily'?'?mode=daily':'?mode=endless'));
+function setCellsDisabled(disabled) {
+  cellEls.forEach(c => { c.disabled = disabled; });
 }
-document.getElementById('daily').onclick  = ()=>start('Daily');
-document.getElementById('endless').onclick= ()=>start('Endless');
+function clearCellClasses() {
+  cellEls.forEach(c => c.classList.remove('flash', 'tapped', 'tapped-correct', 'tapped-wrong'));
+}
 
-if(new URLSearchParams(location.search).get('mode')==='daily') start('Daily');
+// ═══════════════════════════════════════════════════════
+// Game state
+// ═══════════════════════════════════════════════════════
+let gameRun     = null;
+let roundIdx    = 0;
+let seqIdx      = 0;
+let playerInput = [];
+let seqsCleared = 0;
+let phase       = 'idle'; // 'idle'|'showing'|'input'|'done'
+let isDaily     = false;
+let firstTap    = true;
+
+// ═══════════════════════════════════════════════════════
+// Flash sequence (sequential, one cell at a time)
+// ═══════════════════════════════════════════════════════
+async function flashSequence(seq) {
+  setCellsDisabled(true);
+  clearCellClasses();
+  const { onMs, offMs } = flashTiming(roundIdx);
+  for (let i = 0; i < seq.length; i++) {
+    cellEls[seq[i]].classList.add('flash');
+    await wait(onMs);
+    cellEls[seq[i]].classList.remove('flash');
+    if (i < seq.length - 1) await wait(offMs);
+  }
+  await wait(90);
+}
+
+// ═══════════════════════════════════════════════════════
+// Tap handler (sequential — order matters)
+// ═══════════════════════════════════════════════════════
+function onTap(i) {
+  if (phase !== 'input') return;
+
+  if (firstTap) {
+    firstTap = false;
+    track('first_interaction', { round: roundIdx + 1 });
+  }
+
+  const seq      = gameRun[roundIdx][seqIdx];
+  const expected = seq[playerInput.length];
+
+  if (i !== expected) {
+    // Wrong tap — game over
+    phase = 'done';
+    cellEls[i].classList.add('tapped-wrong');
+    if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
+    setCellsDisabled(true);
+    track('run_fail', { round: roundIdx + 1, seqsCleared });
+    setStatus('Wrong tap.', 'fail');
+    setTimeout(() => showResult(false), 700);
+    return;
+  }
+
+  playerInput.push(i);
+  cellEls[i].classList.add('tapped');
+  if (navigator.vibrate) navigator.vibrate(6);
+
+  if (playerInput.length === seq.length) {
+    // Sequence complete
+    phase = 'done';
+    seqsCleared++;
+    track('sequence_clear', { round: roundIdx + 1, seqsCleared, len: seq.length });
+    // green success confirmation
+    seq.forEach(c => {
+      cellEls[c].classList.remove('tapped');
+      cellEls[c].classList.add('tapped-correct');
+    });
+    setTimeout(() => advanceAfterSequence(), 650);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// Advance after a successful sequence
+// ═══════════════════════════════════════════════════════
+async function advanceAfterSequence() {
+  clearCellClasses();
+  updateProgress();
+
+  const nextSeqIdx = seqIdx + 1;
+
+  if (nextSeqIdx < ROUNDS[roundIdx].seqs) {
+    // Another sequence in the same round
+    seqIdx = nextSeqIdx;
+    updateSeqDots();
+    await wait(550);
+    await startSequence();
+  } else {
+    // Round complete
+    track('round_clear', { round: roundIdx + 1 });
+    const nextRoundIdx = roundIdx + 1;
+
+    if (nextRoundIdx >= ROUNDS.length) {
+      // All done — perfect run
+      track('run_complete', { seqsCleared, perfect: true });
+      showResult(true);
+      return;
+    }
+
+    roundIdx = nextRoundIdx;
+    seqIdx   = 0;
+    updateProgress();
+    updateSeqDots();
+
+    const nextLen = ROUNDS[roundIdx].len;
+    const isFinal = (roundIdx === ROUNDS.length - 1);
+    const label   = isFinal
+      ? `Final round — ${nextLen} flashes`
+      : `Round ${roundIdx + 1} — ${nextLen} flashes`;
+
+    await showRoundTransition(label);
+    await startSequence();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// Start a single sequence
+// ═══════════════════════════════════════════════════════
+async function startSequence() {
+  playerInput = [];
+  phase = 'showing';
+  updateSeqDots();
+  const seq    = gameRun[roundIdx][seqIdx];
+  const seqNum = seqsCleared + 1;
+  setStatus(`Sequence ${seqNum} of ${TOTAL_SEQS}…`, '');
+  await wait(380);
+  track('sequence_start', { round: roundIdx + 1, seqNum, len: seq.length });
+  await flashSequence(seq);
+  setStatus('Tap it back.', 'bold');
+  setCellsDisabled(false);
+  phase = 'input';
+}
+
+// ═══════════════════════════════════════════════════════
+// Round transition banner (slides from top with countdown)
+// ═══════════════════════════════════════════════════════
+function showRoundTransition(label) {
+  return new Promise(resolve => {
+    bannerMsgEl.textContent  = label;
+    bannerCountEl.textContent = '';
+    bannerEl.classList.add('show');
+
+    let count = 2;
+    bannerCountEl.textContent = count;
+
+    const tick = setInterval(() => {
+      count--;
+      if (count > 0) {
+        bannerCountEl.textContent = count;
+      } else {
+        clearInterval(tick);
+        bannerEl.classList.remove('show');
+        setTimeout(resolve, 340);
+      }
+    }, 1000);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// Start game
+// ═══════════════════════════════════════════════════════
+function startDaily() {
+  isDaily = true;
+  gameRun = generateRun(mulberry32(dailySeed()));
+  beginRun();
+  history.replaceState(null, '', location.pathname + '?mode=daily');
+  track('game_start', { mode: 'daily', puzzle: daysSinceEpoch() });
+}
+
+function startEndless() {
+  isDaily = false;
+  gameRun = generateRun(mulberry32(Math.random() * 0xffffffff >>> 0));
+  beginRun();
+  history.replaceState(null, '', location.pathname + '?mode=endless');
+  track('game_start', { mode: 'endless' });
+}
+
+function beginRun() {
+  roundIdx    = 0;
+  seqIdx      = 0;
+  seqsCleared = 0;
+  playerInput = [];
+  firstTap    = true;
+  phase       = 'idle';
+
+  modeScreenEl.style.display    = 'none';
+  resultScreenEl.classList.remove('show');
+  roundHeaderEl.style.display   = 'flex';
+  taglineEl.style.display       = 'none';
+  seqDotsEl.innerHTML           = '';
+
+  updateProgress();
+  updateSeqDots();
+  startSequence();
+}
+
+// ═══════════════════════════════════════════════════════
+// Result screen
+// ═══════════════════════════════════════════════════════
+function showResult(success) {
+  phase = 'done';
+  setCellsDisabled(true);
+  clearCellClasses();
+
+  const roundReached = roundIdx + 1;
+  const isPerfect    = success; // can only win by finishing all 13
+
+  let emoji, headline, sub;
+  if (isPerfect) {
+    emoji    = '🌟';
+    headline = 'Perfect!';
+    sub      = '13/13 sequences';
+  } else {
+    emoji    = '💥';
+    headline = 'Round ' + roundReached;
+    sub      = seqsCleared + ' / ' + TOTAL_SEQS + ' sequences';
+  }
+
+  document.getElementById('result-emoji').textContent    = emoji;
+  document.getElementById('result-headline').textContent = headline;
+  document.getElementById('result-sub').textContent      = sub;
+
+  if (isDaily) {
+    saveDailyResult(success, roundReached, seqsCleared);
+    const streak = loadStreak();
+    document.getElementById('result-detail').innerHTML =
+      statRow('Puzzle', '#' + daysSinceEpoch()) +
+      statRow('Sequences', seqsCleared + ' / ' + TOTAL_SEQS) +
+      statRow('Round reached', roundReached + ' / ' + ROUNDS.length) +
+      (streak.streak > 0 ? statRow('Streak', streak.streak + (streak.streak === 1 ? ' day' : ' days')) : '') +
+      (streak.bestStreak > 1 ? statRow('Best streak', streak.bestStreak) : '');
+    document.getElementById('btn-share').style.display = '';
+  } else {
+    document.getElementById('result-detail').innerHTML =
+      statRow('Sequences', seqsCleared + ' / ' + TOTAL_SEQS) +
+      statRow('Round reached', roundReached + ' / ' + ROUNDS.length);
+    document.getElementById('btn-share').style.display = 'none';
+  }
+
+  resultScreenEl.classList.add('show');
+  roundHeaderEl.style.display = 'none';
+  seqDotsEl.innerHTML = '';
+  setStatus('', '');
+}
+
+function statRow(label, val) {
+  return '<div class="result-stat"><span>' + label + '</span><strong>' + val + '</strong></div>';
+}
+
+// ═══════════════════════════════════════════════════════
+// Share
+// ═══════════════════════════════════════════════════════
+function buildShareText() {
+  const num       = daysSinceEpoch();
+  const isPerfect = seqsCleared === TOTAL_SEQS;
+  // Build a compact emoji grid: one row per round, squares per sequence
+  const rows = ROUNDS.map(({ seqs }, ri) => {
+    let cleared = 0;
+    if (ri < roundIdx) cleared = seqs;
+    else if (ri === roundIdx) cleared = seqIdx + (seqsCleared >= TOTAL_SEQS ? 1 : 0);
+    return Array(seqs).fill(null).map((_, si) => si < cleared ? '🟧' : '⬜').join('');
+  });
+
+  if (isPerfect) {
+    return 'BlinkGrid #' + num + '\nPerfect ✨\n13/13\n' + rows.join('\n');
+  } else {
+    return 'BlinkGrid #' + num + '\nRound ' + (roundIdx + 1) + '\n'
+      + seqsCleared + '/' + TOTAL_SEQS + '\n' + rows.join('\n');
+  }
+}
+
+document.getElementById('btn-share').addEventListener('click', () => {
+  const text = buildShareText();
+  track('share_click', { seqsCleared });
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('btn-share');
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Share result'; }, 2000);
+    }).catch(() => {});
+  }
+});
+
+document.getElementById('btn-after').addEventListener('click', () => {
+  resultScreenEl.classList.remove('show');
+  roundHeaderEl.style.display = 'none';
+  modeScreenEl.style.display  = 'flex';
+  taglineEl.style.display     = '';
+  clearCellClasses();
+  setStatus('', '');
+  seqDotsEl.innerHTML = '';
+});
+
+// ═══════════════════════════════════════════════════════
+// Daily persistence
+// ═══════════════════════════════════════════════════════
+function storageKey()  { return 'blinkgrid_daily_' + todayKey(); }
+function streakStoreKey() { return 'blinkgrid_streak'; }
+
+function loadStreak() {
+  try {
+    const raw = localStorage.getItem(streakStoreKey());
+    return raw ? JSON.parse(raw) : { streak: 0, bestStreak: 0, lastDay: null };
+  } catch (_) {
+    return { streak: 0, bestStreak: 0, lastDay: null };
+  }
+}
+
+function saveDailyResult(success, roundReached, cleared) {
+  const today = todayKey();
+  const streakData = loadStreak();
+  let { streak, bestStreak, lastDay } = streakData;
+
+  const yesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return '' + d.getFullYear()
+      + String(d.getMonth() + 1).padStart(2, '0')
+      + String(d.getDate()).padStart(2, '0');
+  })();
+
+  if (success) {
+    if (lastDay === yesterday) streak++;
+    else if (lastDay === today) { /* already counted */ }
+    else streak = 1;
+    bestStreak = Math.max(bestStreak, streak);
+    lastDay = today;
+  } else {
+    if (lastDay !== today) { streak = 0; lastDay = today; }
+  }
+
+  localStorage.setItem(streakStoreKey(), JSON.stringify({ streak, bestStreak, lastDay }));
+  localStorage.setItem(storageKey(), JSON.stringify({
+    puzzleNum: daysSinceEpoch(),
+    success,
+    roundReached,
+    seqsCleared: cleared,
+    streak,
+    bestStreak,
+    perfectSolve: success,
+    ts: Date.now(),
+  }));
+}
+
+function loadDailyState() {
+  try {
+    const raw = localStorage.getItem(storageKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function showSavedResult(saved) {
+  isDaily     = true;
+  roundIdx    = saved.roundReached - 1;
+  seqsCleared = saved.seqsCleared;
+
+  modeScreenEl.style.display    = 'none';
+  taglineEl.style.display       = 'none';
+  roundHeaderEl.style.display   = 'none';
+
+  const isPerfect = saved.perfectSolve;
+  document.getElementById('result-emoji').textContent    = isPerfect ? '🌟' : (saved.success ? '✅' : '💥');
+  document.getElementById('result-headline').textContent = isPerfect ? 'Perfect!' : 'Round ' + saved.roundReached;
+  document.getElementById('result-sub').textContent      = isPerfect
+    ? '13/13 sequences'
+    : saved.seqsCleared + ' / ' + TOTAL_SEQS + ' sequences';
+
+  document.getElementById('result-detail').innerHTML =
+    statRow('Puzzle', '#' + saved.puzzleNum) +
+    statRow('Sequences', saved.seqsCleared + ' / ' + TOTAL_SEQS) +
+    statRow('Round reached', saved.roundReached + ' / ' + ROUNDS.length) +
+    (saved.streak > 0 ? statRow('Streak', saved.streak + (saved.streak === 1 ? ' day' : ' days')) : '') +
+    (saved.bestStreak > 1 ? statRow('Best streak', saved.bestStreak) : '') +
+    '<div class="result-stat dim"><span>Come back tomorrow for a new puzzle</span><strong></strong></div>';
+
+  document.getElementById('btn-share').style.display = '';
+  document.getElementById('btn-after').textContent   = 'Play Endless instead';
+  resultScreenEl.classList.add('show');
+}
+
+// ═══════════════════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════════════════
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className   = 'status' + (cls ? ' ' + cls : '');
+}
+
+function updateProgress() {
+  const isFinal = (roundIdx === ROUNDS.length - 1);
+  roundLabelEl.textContent = isFinal ? 'Final Round' : 'Round ' + (roundIdx + 1);
+  seqCounterEl.textContent = seqsCleared + ' / ' + TOTAL_SEQS;
+}
+
+function updateSeqDots() {
+  seqDotsEl.innerHTML = '';
+  const { seqs } = ROUNDS[roundIdx];
+  for (let i = 0; i < seqs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'seq-dot';
+    if (i < seqIdx) dot.classList.add('done');
+    else if (i === seqIdx) dot.classList.add('current');
+    seqDotsEl.appendChild(dot);
+  }
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ═══════════════════════════════════════════════════════
+// Analytics
+// ═══════════════════════════════════════════════════════
+function track(name, props) {
+  if (typeof KapeworkAnalytics !== 'undefined') KapeworkAnalytics.track(name, props);
+}
+
+// ═══════════════════════════════════════════════════════
+// Button wiring
+// ═══════════════════════════════════════════════════════
+document.getElementById('btn-daily').addEventListener('click', () => {
+  const saved = loadDailyState();
+  if (saved) { showSavedResult(saved); return; }
+  startDaily();
+});
+
+document.getElementById('btn-endless').addEventListener('click', startEndless);
+
+// ═══════════════════════════════════════════════════════
+// Auto-start from URL param
+// ═══════════════════════════════════════════════════════
+const urlMode = new URLSearchParams(location.search).get('mode');
+if (urlMode === 'daily') {
+  const saved = loadDailyState();
+  if (saved) { showSavedResult(saved); }
+  else { startDaily(); }
+} else if (urlMode === 'endless') {
+  startEndless();
+}
 </script>
+
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>
 <script src="/shared/kapework-shell.js"></script>
 <script>
-  KapeworkAnalytics.init('blinkgrid4');
-  KapeworkShell.init({ appSlug: 'blinkgrid4', mountId: 'kw-shell-mount' });
+  KapeworkAnalytics.init('blinkgrid');
+  KapeworkShell.init({ appSlug: 'blinkgrid', mountId: 'kw-shell-mount' });
 </script>
 </body>
 </html>
