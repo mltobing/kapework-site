@@ -17,14 +17,16 @@ var MIN_WORD_LENGTH = 5;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var _board   = null;   // board object from board-bank
+var _lexicon = null;   // Set of common words (loaded at runtime)
 var _path    = [];     // array of tile indices forming current selection
 var _shots   = [];     // array of valid submitted words (max 3)
 var _done    = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-function init(board, savedState) {
-  _board = board;
-  _path  = [];
+function init(board, savedState, lexiconSet) {
+  _board   = board;
+  _lexicon = lexiconSet || null;
+  _path    = [];
 
   if (savedState && savedState.shots) {
     _shots = savedState.shots.slice(0, MAX_SHOTS);
@@ -87,6 +89,14 @@ function getPath() {
 
 // ── Submission ────────────────────────────────────────────────────────────────
 // Returns { valid: bool, reason: string, word: string }
+//
+// Validation order:
+//   1. Too short (< 5 letters)
+//   2. Already submitted this run
+//   3. Not in the common-word lexicon
+//
+// Path validity is already enforced by tile selection — if the word was built
+// by tapping tiles in the grid, every step was adjacency-checked in real time.
 function submitWord() {
   var word = getCurrentWord();
 
@@ -95,23 +105,15 @@ function submitWord() {
   }
 
   if (_shots.indexOf(word) !== -1) {
-    return { valid: false, reason: 'Already submitted', word: word };
+    return { valid: false, reason: 'Already submitted this run', word: word };
   }
 
-  var allowed = _board.allowed;
-  var found = allowed.indexOf(word) !== -1;
-  if (!found) {
-    // Binary search (allowed is sorted)
-    var lo = 0, hi = allowed.length - 1;
-    while (lo <= hi) {
-      var mid = (lo + hi) >> 1;
-      if (allowed[mid] === word) { found = true; break; }
-      if (allowed[mid] < word) lo = mid + 1; else hi = mid - 1;
-    }
-  }
-
-  if (!found) {
-    return { valid: false, reason: 'Not a valid word for this board', word: word };
+  // Lexicon check — validate against the common-word list loaded at runtime.
+  // This is the trust-first approach: any word the player can trace + is
+  // in the common English lexicon is accepted.
+  var inLexicon = _lexicon ? _lexicon.has(word) : false;
+  if (!inLexicon) {
+    return { valid: false, reason: 'Not in our word list', word: word };
   }
 
   // Valid word — consume a shot
