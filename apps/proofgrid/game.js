@@ -218,10 +218,8 @@ function isBoardFull() {
 }
 
 function isBoardCorrect() {
-  for (var r = 0; r < 4; r++)
-    for (var c = 0; c < 4; c++)
-      if (grid[r][c] !== puzzle.solution[r][c]) return false;
-  return true;
+  // Rule-based validation: accept any board satisfying all constraints
+  return ProofEngine.validateBoard(grid, puzzle.clues, puzzle.givens);
 }
 
 function updateCheckBtn() {
