@@ -12,6 +12,7 @@ var BB = window.LongshotBoardBank;
 var ST = window.LongshotStorage;
 var SH = window.LongshotShare;
 var HP = window.LongshotHelp;
+var LX = window.LongshotLexicon;
 
 var _dateKey = '';
 var _board   = null;
@@ -125,9 +126,15 @@ function onShare() {
 async function boot() {
   _dateKey = ST.todayKey();
 
-  // Load board
+  // Load board and lexicon in parallel
+  var _lexicon;
   try {
-    _board = await BB.loadBoard(_dateKey);
+    var results = await Promise.all([
+      BB.loadBoard(_dateKey),
+      LX.loadLexicon(),
+    ]);
+    _board   = results[0];
+    _lexicon = results[1];
   } catch (e) {
     document.getElementById('ls-loading').textContent = 'Failed to load today\'s board.';
     console.error('Board load failed:', e);
@@ -140,7 +147,7 @@ async function boot() {
   // Restore or init game state
   var saved = ST.loadDailyState(_dateKey);
   if (saved && saved.boardId !== _board.id) saved = null; // board changed — reset
-  G.init(_board, saved);
+  G.init(_board, saved, _lexicon);
 
   // Init UI (sets DOM refs + event listeners) before any render calls
   UI.init({
