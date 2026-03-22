@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0d1117">
   <title>Rainbow Rules · Kapework</title>
-  <meta name="description" content="Guess the hidden 5-color code. A daily Mastermind-style puzzle with a twist.">
+  <meta name="description" content="Guess the hidden 4-color code. A daily Mastermind-style logic puzzle with a twist.">
 
   <!-- Shared shell styles -->
   <link rel="stylesheet" href="/shared/kapework-shell.css">
@@ -38,6 +38,12 @@
     <div class="rr-rule-badge">Today&#39;s Rule</div>
     <div id="rr-rule-label" class="rr-rule-label">&mdash;</div>
     <div id="rr-rule-desc"  class="rr-rule-desc">&mdash;</div>
+  </div>
+
+  <!-- Feedback legend -->
+  <div class="rr-legend" aria-label="Feedback legend">
+    <span><span class="rr-legend-exact">&#x25CE;</span> right spot</span>
+    <span><span class="rr-legend-miss">&#x2194;</span> right color, wrong spot</span>
   </div>
 
   <!-- Guess board (6 rows built by ui.js) -->

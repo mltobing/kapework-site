@@ -3,11 +3,11 @@
  *
  * Daily puzzle:
  *   - Deterministic from the local date (same puzzle for all players on the same day)
- *   - Seeded PRNG → picks one rule from the rule set → generates a valid 5-color code
+ *   - Seeded PRNG → picks one rule from the rule set → generates a valid 4-color code
  *   - Puzzle epoch: 2026-03-22 = puzzle #1
  *
  * Game state:
- *   - 6 max guesses, 5 slots each
+ *   - 6 max guesses, 4 slots each
  *   - Tracks completed guesses (with exact/misplaced feedback) and the current active row
  *   - Medals: Gold ≤ 4 guesses, Silver = 5, Bronze = 6, Fail = not solved
  */
@@ -20,7 +20,7 @@ window.RRGame = (function () {
   var EVAL        = window.RREvaluator;
 
   var MAX_GUESSES = 6;
-  var CODE_LENGTH = 5;
+  var CODE_LENGTH = 4;
 
   // ── Daily puzzle ───────────────────────────────────────────────────────────
 
@@ -97,7 +97,7 @@ window.RRGame = (function () {
   function submitGuess() {
     if (_done) return { ok: false, reason: 'Game is already over.' };
     if (_currentRow.length < CODE_LENGTH) {
-      return { ok: false, reason: 'Fill all 5 slots first.' };
+      return { ok: false, reason: 'Fill all 4 slots first.' };
     }
 
     var colors = _currentRow.slice();

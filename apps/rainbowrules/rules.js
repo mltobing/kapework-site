@@ -11,8 +11,8 @@
  * Quality constraint: generated codes must have ≥ 3 distinct colors.
  *
  * Rules (v1):
- *   all_different    — all 5 slots show different colors
- *   one_repeat       — exactly one color appears twice; rest are unique
+ *   all_different    — all 4 slots show different colors
+ *   one_repeat       — exactly one color appears twice; the other two slots are unique
  *   no_adjacent      — no two neighboring slots share a color
  *   first_last_match — the first and last slot match
  */
@@ -93,43 +93,43 @@ window.RRRules = (function () {
   // ── Generators ────────────────────────────────────────────────────────────
 
   function generateAllDifferent(rand) {
-    // Pick any 5 of 6 colors in random order
-    return shuffle(COLOR_IDS, rand).slice(0, 5);
+    // Pick any 4 of 6 colors in random order
+    return shuffle(COLOR_IDS, rand).slice(0, 4);
   }
 
   function generateOneRepeat(rand) {
-    // Choose 4 distinct colors, duplicate one, shuffle
-    var pool     = shuffle(COLOR_IDS, rand).slice(0, 4);
-    var repeated = pool[randInt(rand, 4)];
+    // Choose 3 distinct colors, duplicate one, shuffle → 4-slot code
+    var pool     = shuffle(COLOR_IDS, rand).slice(0, 3);
+    var repeated = pool[randInt(rand, 3)];
     var code     = pool.concat([repeated]);
     return shuffle(code, rand);
   }
 
   function generateNoAdjacent(rand) {
-    // Rejection sampling — succeeds quickly for 6 colors over 5 slots
+    // Rejection sampling — succeeds quickly for 6 colors over 4 slots
     for (var attempt = 0; attempt < 300; attempt++) {
       var code = [];
-      for (var i = 0; i < 5; i++) {
+      for (var i = 0; i < 4; i++) {
         code.push(COLOR_IDS[randInt(rand, COLOR_IDS.length)]);
       }
       if (validateNoAdjacent(code) && isQuality(code)) return code;
     }
     // Deterministic fallback (always valid)
-    return ['R', 'O', 'R', 'G', 'B'];
+    return ['R', 'O', 'R', 'G'];
   }
 
   function generateFirstLastMatch(rand) {
-    // Anchor = first & last color; fill middle 3 slots freely
+    // Anchor = first & last color; fill middle 2 slots freely
     for (var attempt = 0; attempt < 300; attempt++) {
       var anchor = COLOR_IDS[randInt(rand, COLOR_IDS.length)];
       var mid    = [];
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 2; i++) {
         mid.push(COLOR_IDS[randInt(rand, COLOR_IDS.length)]);
       }
       var code = [anchor].concat(mid).concat([anchor]);
       if (isQuality(code)) return code;
     }
-    return ['R', 'O', 'G', 'B', 'R'];
+    return ['R', 'O', 'G', 'R'];
   }
 
   // ── Rule set ──────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ window.RRRules = (function () {
     {
       id:          'one_repeat',
       label:       'Exactly one repeat',
-      description: 'One color appears exactly twice. All other slots are unique.',
+      description: 'One color appears exactly twice. The other two slots are unique colors.',
       validate:    validateOneRepeat,
       generate:    generateOneRepeat,
     },
