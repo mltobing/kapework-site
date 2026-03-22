@@ -61,9 +61,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
-  // --- Supabase project (reuse yours) ---
-  const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
+  // Supabase config read lazily from shared/config.js (loaded after this script)
   const SLUG = "rainbowrules";
   let sb = null;
 
@@ -338,7 +336,7 @@
   }
   async function upsertBest(val){
     try{
-      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      if (!sb) sb = window.supabase.createClient((window.KapeworkConfig||{}).supabaseUrl||'', (window.KapeworkConfig||{}).supabaseAnonKey||'');
       await sb.from("scores").upsert(
         { slug: SLUG, device_id: deviceId, best_streak: val },
         { onConflict: "slug,device_id" }
@@ -348,7 +346,7 @@
   }
   async function refreshGlobal(){
     try{
-      if (!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      if (!sb) sb = window.supabase.createClient((window.KapeworkConfig||{}).supabaseUrl||'', (window.KapeworkConfig||{}).supabaseAnonKey||'');
       const { data } = await sb.from("global_best_scores").select().eq("slug", SLUG).maybeSingle();
       globalEl.textContent = data?.global_best ?? 0;
     }catch(e){}
