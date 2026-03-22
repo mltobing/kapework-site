@@ -29,7 +29,7 @@ import type { Context } from "https://edge.netlify.com";
 // Maps slug → root-relative path to the HTML file.
 // Every other slug defaults to folder-app convention: /apps/<slug>/...
 const SINGLE_FILE: Record<string, string> = {
-  blinkgrid:    "/apps/blinkgrid.html",
+  blinkgrid:    "/apps/blinkgrid.html",   // redirect → blinkgrid4
   blinkgrid4:   "/apps/blinkgrid4.html",
   cvcbuilder:   "/apps/cvcbuilder.html",
   longshot:     "/apps/longshot.html",
