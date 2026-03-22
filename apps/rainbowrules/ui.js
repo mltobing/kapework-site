@@ -21,7 +21,7 @@ window.RRUI = (function () {
   var P = window.RRPalette;
 
   var MAX_GUESSES = 6;
-  var CODE_LENGTH = 5;
+  var CODE_LENGTH = 4;
 
   // DOM refs (set in init)
   var _board     = null;
@@ -90,8 +90,8 @@ window.RRUI = (function () {
       var fbEl = document.createElement('div');
       fbEl.className = 'rr-feedback';
       fbEl.innerHTML =
-        '<span class="rr-fb-exact" aria-label="exact">\u2014</span>' +
-        '<span class="rr-fb-miss"  aria-label="misplaced">\u2014</span>';
+        '<span class="rr-fb-exact" aria-label="exact">\u25CE</span>' +
+        '<span class="rr-fb-miss"  aria-label="misplaced">\u2194</span>';
 
       row.appendChild(slotsEl);
       row.appendChild(fbEl);
@@ -151,29 +151,32 @@ window.RRUI = (function () {
       if (r < guesses.length) {
         // ── Completed guess ──────────────────────────────────────────────────
         row.classList.remove('rr-row--active');
+        row.classList.add('rr-row--done');
         var g = guesses[r];
         slots.forEach(function (slot, s) { _fillSlot(slot, g.colors[s]); });
-        exact.textContent = g.exact + '\u2713';       // ✓
-        miss.textContent  = g.misplaced + '\u2195';   // ↕
-        exact.setAttribute('title', g.exact + ' exact');
-        miss.setAttribute('title',  g.misplaced + ' misplaced');
+        exact.textContent = '\u25CE\u2009' + g.exact;      // ◎ N
+        miss.textContent  = '\u2194\u2009' + g.misplaced;  // ↔ N
+        exact.setAttribute('title', g.exact + ' right spot');
+        miss.setAttribute('title',  g.misplaced + ' right color, wrong spot');
 
       } else if (r === guesses.length && !done) {
         // ── Active row ───────────────────────────────────────────────────────
         row.classList.add('rr-row--active');
+        row.classList.remove('rr-row--done');
         slots.forEach(function (slot, s) {
           if (s < currentRow.length) _fillSlot(slot, currentRow[s]);
           else _clearSlot(slot);
         });
-        exact.textContent = '\u2014';
-        miss.textContent  = '\u2014';
+        exact.textContent = '\u25CE';
+        miss.textContent  = '\u2194';
 
       } else {
         // ── Future / empty row ───────────────────────────────────────────────
         row.classList.remove('rr-row--active');
+        row.classList.remove('rr-row--done');
         slots.forEach(_clearSlot);
-        exact.textContent = '\u2014';
-        miss.textContent  = '\u2014';
+        exact.textContent = '\u25CE';
+        miss.textContent  = '\u2194';
       }
     });
 

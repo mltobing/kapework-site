@@ -130,6 +130,20 @@ html, body {
   margin-top: 2px;
 }
 
+/* ── Feedback legend ────────────────────────────────────────────────────────── */
+.rr-legend {
+  width: 100%;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  font-size: 11px;
+  color: var(--rr-muted);
+  margin-bottom: 8px;
+}
+
+.rr-legend-exact { color: var(--rr-exact); font-weight: 700; }
+.rr-legend-miss  { color: var(--rr-miss);  font-weight: 700; }
+
 /* ── Guess board ────────────────────────────────────────────────────────────── */
 .rr-board {
   width: 100%;
@@ -186,22 +200,32 @@ html, body {
 .rr-feedback {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1px;
-  width: 38px;
+  gap: 3px;
+  width: 46px;
   flex-shrink: 0;
+  background: var(--rr-surface2);
+  border: 1px solid var(--rr-border);
+  border-radius: var(--rr-r-sm);
+  padding: 5px 7px;
 }
 
 .rr-fb-exact,
 .rr-fb-miss {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1;
+  letter-spacing: .01em;
 }
 
-.rr-fb-exact { color: var(--rr-exact); }
-.rr-fb-miss  { color: var(--rr-miss);  }
+/* Muted (no result yet) — symbol only */
+.rr-fb-exact { color: var(--rr-muted); }
+.rr-fb-miss  { color: var(--rr-muted); }
+
+/* When a row has been submitted, the row gets rr-row--done which lights up counters */
+.rr-row--done .rr-fb-exact { color: var(--rr-exact); }
+.rr-row--done .rr-fb-miss  { color: var(--rr-miss);  }
 
 /* ── Controls area ──────────────────────────────────────────────────────────── */
 .rr-controls {

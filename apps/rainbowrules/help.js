@@ -1,7 +1,7 @@
 /**
  * help.js — Rainbow Rules compact help modal
  *
- * Explains: 5-color code, exact vs misplaced, the Rule Card mechanic.
+ * Explains: 4-color code, exact vs misplaced, the Rule Card mechanic.
  * No long tutorial — just what's needed to start playing.
  */
 
@@ -25,16 +25,16 @@ window.RRHelp = (function () {
         '<button class="rr-modal-close" aria-label="Close help">&times;</button>',
         '<h2 class="rr-modal-title">How to Play</h2>',
         '<div class="rr-modal-body">',
-          '<p>Guess the hidden <strong>5-color code</strong> in 6 tries.</p>',
+          '<p>Guess the hidden <strong>4-color code</strong> in 6 tries.</p>',
           '<p>Tap colors to fill the active row, then hit <strong>Submit</strong>.</p>',
           '<div class="rr-help-rows">',
             '<div class="rr-help-row">',
-              '<span class="rr-help-badge rr-help-exact">2 exact</span>',
-              '<span>Right color, right slot.</span>',
+              '<span class="rr-help-badge rr-help-exact">&#x25CE; right spot</span>',
+              '<span>Right color, right position.</span>',
             '</div>',
             '<div class="rr-help-row">',
-              '<span class="rr-help-badge rr-help-miss">1 misplaced</span>',
-              '<span>Right color, wrong slot.</span>',
+              '<span class="rr-help-badge rr-help-miss">&#x2194; wrong spot</span>',
+              '<span>Right color, wrong position.</span>',
             '</div>',
           '</div>',
           '<p>Each day a <strong>Rule Card</strong> tells you a constraint the hidden code obeys. Your guesses don\u2019t need to follow the rule \u2014 use it as a clue!</p>',
