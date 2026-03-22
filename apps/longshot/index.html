@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#080f1e">
+  <title>Longshot · Kapework</title>
+  <meta name="description" content="Three shots. Find the longest word. Daily 4×4 word puzzle.">
+
+  <!-- Shared shell styles -->
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <!-- Game styles -->
+  <link rel="stylesheet" href="/apps/longshot/styles.css">
+</head>
+<body>
+
+<div class="ls-page">
+
+  <!-- Top bar -->
+  <div class="ls-top-bar">
+    <a class="ls-back-link" href="https://braingym.kapework.com/">← Brain Gym</a>
+    <!-- Kapework ⋮ menu mounts here -->
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- Loading state -->
+  <div id="ls-loading" class="ls-loading">Loading today's board…</div>
+
+  <!-- App (hidden until board loads) -->
+  <div id="ls-app" hidden>
+
+    <!-- Header -->
+    <div class="ls-header">
+      <h1 class="ls-title">Longshot</h1>
+      <p class="ls-subtitle">Three shots. Find the longest word.</p>
+      <div class="ls-puzzle-row">
+        <span id="ls-puzzle-num" class="ls-muted">#–</span>
+        <span class="ls-streak-badge">🔥 <strong id="ls-streak">0</strong></span>
+      </div>
+    </div>
+
+    <!-- Board panel -->
+    <div class="ls-board-wrap">
+
+      <!-- 4×4 letter grid -->
+      <div id="ls-board" class="ls-board" role="group" aria-label="Letter grid"></div>
+
+      <!-- Current word being traced -->
+      <div class="ls-word-row">
+        <div id="ls-word" class="ls-word ls-word--empty" aria-live="polite" aria-label="Current word"></div>
+        <button id="ls-clear" class="ls-clear-btn" aria-label="Clear selection">Clear</button>
+      </div>
+
+      <!-- Submit -->
+      <div class="ls-submit-row">
+        <button id="ls-submit" class="ls-btn ls-btn--primary" disabled>Submit word</button>
+      </div>
+
+      <!-- Shot slots -->
+      <div class="ls-shots-section">
+        <div class="ls-shots-label">Shots</div>
+        <div id="ls-shots" class="ls-shots" aria-label="Shot results"></div>
+      </div>
+
+      <!-- Medal -->
+      <div class="ls-medal-section" style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+        <div class="ls-hint">5+ common words only · 8-way adjacency</div>
+        <div id="ls-medal" class="ls-medal ls-medal--none"></div>
+      </div>
+
+    </div><!-- /.ls-board-wrap -->
+
+  </div><!-- /#ls-app -->
+
+</div><!-- /.ls-page -->
+
+<!-- Results overlay (built and shown by ui.js) -->
+<div id="ls-result" class="ls-result-overlay" hidden></div>
+
+<!-- Toast -->
+<div id="ls-toast" class="ls-toast" aria-live="polite"></div>
+
+<!-- Shared config (GA ID injected at build time) + analytics -->
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<!-- Shared shell (⋮ menu + feedback modal) -->
+<script src="/shared/kapework-shell.js"></script>
+
+<!-- Longshot modules -->
+<script src="/apps/longshot/storage.js"></script>
+<script src="/apps/longshot/board-bank.js"></script>
+<script src="/apps/longshot/game.js"></script>
+<script src="/apps/longshot/share.js"></script>
+<script src="/apps/longshot/help.js"></script>
+<script src="/apps/longshot/ui.js"></script>
+<script src="/apps/longshot/main.js"></script>
+
+</body>
+</html>

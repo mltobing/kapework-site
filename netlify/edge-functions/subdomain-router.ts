@@ -32,7 +32,7 @@ const SINGLE_FILE: Record<string, string> = {
   blinkgrid:    "/apps/blinkgrid.html",   // redirect → blinkgrid4
   blinkgrid4:   "/apps/blinkgrid4.html",
   cvcbuilder:   "/apps/cvcbuilder.html",
-  longshot:     "/apps/longshot.html",
+  // longshot: now a folder app at /apps/longshot/ — no entry needed here
   rainbowrules: "/apps/rainbowrules.html",
   tapsum:       "/apps/tapsum.html",
   tiltrix:      "/apps/tiltrix.html",
