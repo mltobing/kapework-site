@@ -1,0 +1,22 @@
+[
+  {
+    "id": "all_different",
+    "label": "All different",
+    "description": "Every slot in the hidden code shows a different color."
+  },
+  {
+    "id": "one_repeat",
+    "label": "Exactly one repeat",
+    "description": "One color appears exactly twice. All other slots are unique."
+  },
+  {
+    "id": "no_adjacent",
+    "label": "No adjacent match",
+    "description": "No two neighboring slots share the same color."
+  },
+  {
+    "id": "first_last_match",
+    "label": "First and last match",
+    "description": "The first and last slots show the same color."
+  }
+]

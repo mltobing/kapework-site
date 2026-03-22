@@ -33,7 +33,7 @@ const SINGLE_FILE: Record<string, string> = {
   blinkgrid4:   "/apps/blinkgrid4.html",
   cvcbuilder:   "/apps/cvcbuilder.html",
   // longshot: now a folder app at /apps/longshot/ — no entry needed here
-  rainbowrules: "/apps/rainbowrules.html",
+  // rainbowrules: now a folder app at /apps/rainbowrules/ — no entry needed here
   tapsum:       "/apps/tapsum.html",
   tiltrix:      "/apps/tiltrix.html",
   tiltgarden:   "/apps/tiltgarden.html",

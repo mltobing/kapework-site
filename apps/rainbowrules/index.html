@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0d1117">
+  <title>Rainbow Rules · Kapework</title>
+  <meta name="description" content="Guess the hidden 5-color code. A daily Mastermind-style puzzle with a twist.">
+
+  <!-- Shared shell styles -->
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <!-- Game styles -->
+  <link rel="stylesheet" href="/apps/rainbowrules/styles.css">
+</head>
+<body>
+
+<div class="rr-page">
+
+  <!-- Top bar: back link + ⋮ menu mount -->
+  <div class="rr-top-bar">
+    <a class="rr-back-link" href="https://kapework.com/">&#8592; Kapework</a>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="rr-header">
+    <h1 class="rr-title">Rainbow Rules</h1>
+    <p class="rr-subtitle">Guess the hidden color code</p>
+    <div class="rr-meta">
+      <span id="rr-puzzle-num" class="rr-muted">#&ndash;</span>
+      <span class="rr-streak">&#x1F525; <strong id="rr-streak-val">0</strong></span>
+    </div>
+  </header>
+
+  <!-- Rule card -->
+  <div id="rr-rule-card" class="rr-rule-card" aria-label="Today's rule">
+    <div class="rr-rule-badge">Today&#39;s Rule</div>
+    <div id="rr-rule-label" class="rr-rule-label">&mdash;</div>
+    <div id="rr-rule-desc"  class="rr-rule-desc">&mdash;</div>
+  </div>
+
+  <!-- Guess board (6 rows built by ui.js) -->
+  <div id="rr-board" class="rr-board" role="group" aria-label="Guess board"></div>
+
+  <!-- Controls: color tray + delete/submit -->
+  <div class="rr-controls">
+    <div id="rr-tray" class="rr-tray" role="group" aria-label="Color palette"></div>
+    <div class="rr-action-row">
+      <button id="rr-delete" class="rr-btn rr-btn--secondary" disabled>Delete</button>
+      <button id="rr-submit" class="rr-btn rr-btn--primary"   disabled>Submit</button>
+    </div>
+  </div>
+
+</div><!-- /.rr-page -->
+
+<!-- Result bottom sheet (populated by ui.js) -->
+<div id="rr-result" class="rr-result-overlay" aria-live="polite"></div>
+
+<!-- Toast -->
+<div id="rr-toast" class="rr-toast" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ── Shared infrastructure ──────────────────────────────────────────────── -->
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+
+<!-- ── Rainbow Rules modules (load order matters) ─────────────────────────── -->
+<script src="/apps/rainbowrules/palette.js"></script>
+<script src="/apps/rainbowrules/evaluator.js"></script>
+<script src="/apps/rainbowrules/rules.js"></script>
+<script src="/apps/rainbowrules/storage.js"></script>
+<script src="/apps/rainbowrules/game.js"></script>
+<script src="/apps/rainbowrules/share.js"></script>
+<script src="/apps/rainbowrules/help.js"></script>
+<script src="/apps/rainbowrules/ui.js"></script>
+<script src="/apps/rainbowrules/main.js"></script>
+
+</body>
+</html>
