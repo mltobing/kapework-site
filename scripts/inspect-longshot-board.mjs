@@ -29,7 +29,7 @@ import { dirname, join } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT  = join(__dirname, '..');
 const BANK_FILE  = join(REPO_ROOT, 'apps/longshot/data/board-bank.json');
-const WORDS_FILE = join(REPO_ROOT, 'apps/longshot/data/common-words.txt');
+const WORDS_FILE = join(REPO_ROOT, 'apps/longshot/data/longshot-common-words.txt');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
