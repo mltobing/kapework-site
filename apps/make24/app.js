@@ -12,18 +12,56 @@ document.body.addEventListener('touchmove', function(e) {
 // ============================================================
 // CONFIG
 // ============================================================
+// OBSERVABILITY
+// ============================================================
+/**
+ * Consistent error logging.  All caught exceptions should go through here
+ * so there is a single, grep-able call site.  Extend this function to ship
+ * errors to a remote service (e.g. a Supabase table or Sentry) when needed.
+ *
+ * @param {string} context  Short description of where the error occurred.
+ * @param {unknown} err     The caught error or value.
+ */
+function logError(context, err) {
+    console.error('[make24] ' + context + ':', err);
+}
+
+// ============================================================
 const APP_CONFIG = {
     publicUrl: 'https://make24.app/',
     shareLabel: 'make24.app'
 };
 
-// Supabase config — values injected at build time via shared/config.js
-const SUPABASE_URL = (window.KapeworkConfig || {}).supabaseUrl     || '';
-const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
+// Supabase — client and credentials owned by supabase-service.js (loaded first).
+// Keep local aliases so the raw REST fetch calls below don't need to change.
+// In Node.js test environments make24Db is not defined; fall back to empty strings.
+const SUPABASE_URL = (typeof make24Db !== 'undefined') ? make24Db.url : '';
+const SUPABASE_KEY = (typeof make24Db !== 'undefined') ? make24Db.key : '';
 
-// Supabase client (auth-aware)
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+async function trackEvent(eventType, puzzleNum = null, isSpeakeasy = false, metadata = {}) {
+  const deviceId = getDeviceId();
+  if (!deviceId) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/game_events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        device_id: deviceId,
+        event_type: eventType,
+        puzzle_num: puzzleNum,
+        is_speakeasy: isSpeakeasy,
+        metadata: metadata
+      })
+    });
+  } catch (e) {
+    // silent fail — never break the game
+  }
+}
 
 // ============================================================
 // NAMED CONSTANTS (replaces magic numbers)
@@ -50,6 +88,11 @@ const SOLUTION_THRESHOLD_EASY = 20;
 const SOLUTION_THRESHOLD_MEDIUM = 6;
 const TARGET_NUMBER = 24;
 const FLOAT_EPSILON = 0.0001;
+const ENABLE_COMPARISON_LINE = true;
+const MIN_COMPARISON_SAMPLE  = 10;
+// Device-ID localStorage key, scoped to hostname so that different sites
+// (e.g. make24.app vs kapework.com) on a shared origin never collide.
+const DEVICE_ID_KEY = 'make24_device_id_' + window.location.hostname;
 
 // ============================================================
 // GAME STATE
@@ -68,6 +111,8 @@ let currentPuzzle = {
     date: null,
     isArchive: false
 };
+// Expose so speakeasy.js can read the active puzzle (daily or archive)
+window.currentPuzzle = currentPuzzle;
 
 let playState = {
     cards: [],
@@ -287,6 +332,12 @@ function useHint() {
         document.getElementById('hintDisplay').classList.add('visible');
         document.getElementById('hintBtn').classList.remove('visible');
         clearHintTimer();
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'hint_used', {
+                puzzle_num: currentPuzzle.puzzleNum,
+                is_speakeasy: currentPuzzle.isSpeakeasy === true
+            });
+        }
     }
 }
 
@@ -306,7 +357,159 @@ function showSyncError(message) {
 // ============================================================
 const NUDGE_DISMISSED_KEY = 'make24_sync_nudge_dismissed';
 const STREAK_NUDGE_MILESTONES = [3, 7, 14];
+const LAST_USER_ID_KEY = 'make24_last_user_id';
 let pendingOtpEmail = null;
+
+function setBackupStatus(message, type = '') {
+    const status = document.getElementById('backupStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.className = `sync-status${type ? ` ${type}` : ''}`;
+}
+
+function collectMake24LocalStorageDump() {
+    const dump = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (key === STORAGE_KEY || key.startsWith('make24')) {
+            dump[key] = localStorage.getItem(key);
+        }
+    }
+    return dump;
+}
+
+function hasReplayData(entry) {
+    if (!entry) return false;
+    return (Array.isArray(entry.solutionSteps) && entry.solutionSteps.length > 0)
+        || (Array.isArray(entry.replaySequence) && entry.replaySequence.length > 0);
+}
+
+function chooseRicherHistoryEntry(currentEntry, importedEntry) {
+    if (!currentEntry) return importedEntry;
+    if (!importedEntry) return currentEntry;
+
+    const currentReplay = hasReplayData(currentEntry);
+    const importedReplay = hasReplayData(importedEntry);
+    if (currentReplay !== importedReplay) {
+        return importedReplay ? importedEntry : currentEntry;
+    }
+
+    const currentCompleted = !!currentEntry.completed;
+    const importedCompleted = !!importedEntry.completed;
+    if (currentCompleted && importedCompleted) {
+        const currentMoves = Number(currentEntry.moves ?? Infinity);
+        const importedMoves = Number(importedEntry.moves ?? Infinity);
+        if (Number.isFinite(importedMoves) && importedMoves < currentMoves) return importedEntry;
+        if (Number.isFinite(currentMoves) && currentMoves < importedMoves) return currentEntry;
+
+        const currentTime = Number(currentEntry.solveTime ?? Infinity);
+        const importedTime = Number(importedEntry.solveTime ?? Infinity);
+        if (Number.isFinite(importedTime) && importedTime < currentTime) return importedEntry;
+        if (Number.isFinite(currentTime) && currentTime < importedTime) return currentEntry;
+    }
+
+    return currentEntry;
+}
+
+function mergeStoredGameState(currentState, importedState) {
+    const safeCurrent = currentState && typeof currentState === 'object' ? currentState : {};
+    const safeImported = importedState && typeof importedState === 'object' ? importedState : {};
+
+    const merged = { ...safeCurrent, ...safeImported };
+    const currentHistory = safeCurrent.history && typeof safeCurrent.history === 'object' ? safeCurrent.history : {};
+    const importedHistory = safeImported.history && typeof safeImported.history === 'object' ? safeImported.history : {};
+    const mergedHistory = { ...currentHistory };
+    const puzzleNums = new Set([...Object.keys(currentHistory), ...Object.keys(importedHistory)]);
+
+    for (const puzzleNum of puzzleNums) {
+        const currentEntry = currentHistory[puzzleNum];
+        const importedEntry = importedHistory[puzzleNum];
+
+        if (currentEntry?.completed && importedEntry?.completed) {
+            const richer = chooseRicherHistoryEntry(currentEntry, importedEntry);
+            mergedHistory[puzzleNum] = { ...richer, completed: true };
+        } else if (currentEntry?.completed || importedEntry?.completed) {
+            mergedHistory[puzzleNum] = {
+                ...(currentEntry?.completed ? currentEntry : importedEntry),
+                completed: true
+            };
+        } else if (currentEntry || importedEntry) {
+            mergedHistory[puzzleNum] = chooseRicherHistoryEntry(currentEntry, importedEntry);
+        }
+    }
+
+    merged.history = mergedHistory;
+    merged.streak = Math.max(Number(safeCurrent.streak || 0), Number(safeImported.streak || 0));
+    merged.freezes = Math.max(Number(safeCurrent.freezes || 0), Number(safeImported.freezes || 0));
+    merged.lastPlayedDate = Math.max(
+        Number(safeCurrent.lastPlayedDate || 0),
+        Number(safeImported.lastPlayedDate || 0)
+    ) || null;
+    return merged;
+}
+
+function exportProgressToFile() {
+    try {
+        const payload = {
+            version: 1,
+            app: 'make24',
+            exportedAt: new Date().toISOString(),
+            localStorage: collectMake24LocalStorageDump()
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `make24-progress-${stamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        setBackupStatus('Progress exported.', 'success');
+    } catch (e) {
+        console.error('Export failed:', e);
+        setBackupStatus('Export failed.', 'error');
+    }
+}
+
+async function importProgressFromFile(file) {
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const isValid = parsed
+            && parsed.version === 1
+            && parsed.app === 'make24'
+            && parsed.localStorage
+            && typeof parsed.localStorage === 'object';
+        if (!isValid) {
+            setBackupStatus('Invalid backup file.', 'error');
+            return;
+        }
+
+        const ok = confirm('This will merge/overwrite local progress with imported data. Continue?');
+        if (!ok) return;
+
+        const currentStored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const importedStored = JSON.parse(parsed.localStorage[STORAGE_KEY] || '{}');
+        const merged = mergeStoredGameState(currentStored, importedStored);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+
+        for (const [key, value] of Object.entries(parsed.localStorage)) {
+            if (key === STORAGE_KEY) continue;
+            if (key.startsWith('make24')) {
+                localStorage.setItem(key, value);
+            }
+        }
+
+        setBackupStatus('Import complete. Reloading...', 'success');
+        setTimeout(() => window.location.reload(), 250);
+    } catch (e) {
+        console.error('Import failed:', e);
+        setBackupStatus('Import failed. Check JSON file.', 'error');
+    }
+}
 
 async function updateSyncUI() {
     const syncSection = document.getElementById('syncSection');
@@ -316,7 +519,7 @@ async function updateSyncUI() {
     const syncStatus = document.getElementById('syncStatus');
     if (!syncSection) return;
 
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await make24Db.getSession();
     const email = session?.user?.email;
 
     if (email) {
@@ -346,13 +549,7 @@ async function signInWithGoogle() {
     status.textContent = 'Opening Google sign-in...';
     status.className = 'sync-status';
 
-    const { error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-            redirectTo: window.location.href,
-            queryParams: { prompt: 'select_account' }
-        }
-    });
+    const { error } = await make24Db.signInWithGoogle(window.location.href);
 
     if (error) {
         status.textContent = error.message;
@@ -379,12 +576,7 @@ async function sendOtpCode() {
     status.textContent = '';
     status.className = 'sync-status';
 
-    const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: {
-            shouldCreateUser: true
-        }
-    });
+    const { error } = await make24Db.sendOtp(email);
 
     if (error) {
         status.textContent = error.message;
@@ -431,11 +623,7 @@ async function verifyOtpCode() {
     verifyBtn.disabled = true;
     verifyBtn.textContent = '...';
 
-    const { error } = await sb.auth.verifyOtp({
-        email: pendingOtpEmail,
-        token: code,
-        type: 'email'
-    });
+    const { error } = await make24Db.verifyOtp(pendingOtpEmail, code, 'email');
 
     verifyBtn.disabled = false;
     verifyBtn.textContent = 'Verify';
@@ -449,6 +637,7 @@ async function verifyOtpCode() {
         // Drive the full sync explicitly — don't rely solely on onAuthStateChange
         await updateSyncUI();
         await ensureCanonicalDeviceId();
+        await backfillLocalHistoryToSupabase();
         await syncFromSupabase();
         await syncHistoryFromSupabase();
         updateStreak();
@@ -464,36 +653,58 @@ async function verifyOtpCode() {
 async function promptSignOut() {
     const ok = confirm('Sign out? (Your local history stays on this device.)');
     if (!ok) return;
-    console.log('[SYNC DEBUG] promptSignOut: user confirmed, calling sb.auth.signOut()');
+    console.log('[SYNC DEBUG] promptSignOut: user confirmed, starting sign-out flow');
+
+    // Step 1: Best-effort global sign-out (invalidates token server-side)
     try {
-        const { error } = await sb.auth.signOut();
-        console.log('[SYNC DEBUG] signOut returned — error:', JSON.stringify(error));
+        const { error } = await make24Db.signOut();
         if (error) {
-            console.error('[SYNC DEBUG] signOut returned error, trying local scope:', JSON.stringify(error));
-            // If global sign-out fails (e.g. network/token issue), force local sign-out
-            const { error: localErr } = await sb.auth.signOut({ scope: 'local' });
-            if (localErr) {
-                console.error('[SYNC DEBUG] local signOut also failed:', JSON.stringify(localErr));
-                alert('Sign-out failed: ' + error.message);
-            }
+            console.warn('[SYNC DEBUG] global signOut returned error:', JSON.stringify(error));
+        } else {
+            console.log('[SYNC DEBUG] global signOut succeeded');
+            await updateSyncUI();
+            return;
         }
     } catch (e) {
-        console.error('[SYNC DEBUG] signOut threw exception:', e);
-        // Force local sign-out even if global threw
+        console.error('[SYNC DEBUG] global signOut threw:', e);
+    }
+
+    // Step 2: Always force local sign-out (clears local session regardless of global result)
+    let localCleared = false;
+    try {
+        const { error } = await make24Db.signOut({ scope: 'local' });
+        if (error) {
+            console.warn('[SYNC DEBUG] local signOut returned error:', JSON.stringify(error));
+        } else {
+            console.log('[SYNC DEBUG] local signOut succeeded');
+            localCleared = true;
+        }
+    } catch (e) {
+        console.error('[SYNC DEBUG] local signOut threw:', e);
+    }
+
+    // Step 3: Nuclear fallback — directly remove the auth token from localStorage.
+    // This handles the case where the Supabase JS client cannot clear its internal
+    // session state (e.g. expired refresh token causing _useSession to bail early).
+    if (!localCleared) {
         try {
-            await sb.auth.signOut({ scope: 'local' });
-            console.log('[SYNC DEBUG] local signOut succeeded after exception');
-        } catch (e2) {
-            console.error('[SYNC DEBUG] local signOut also threw:', e2);
-            alert('Sign-out failed: ' + (e.message || e));
+            const projectRef = SUPABASE_URL.match(/\/\/([^.]+)\./)?.[1];
+            if (projectRef) {
+                localStorage.removeItem(`sb-${projectRef}-auth-token`);
+                localStorage.removeItem(`sb-${projectRef}-auth-code-verifier`);
+                console.log('[SYNC DEBUG] manually removed auth tokens from localStorage');
+            }
+        } catch (e) {
+            console.error('[SYNC DEBUG] manual localStorage clear threw:', e);
         }
     }
+
     await updateSyncUI();
 }
 
 // Nudge: gentle toast at streak milestones
 async function maybeShowSyncNudge() {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await make24Db.getSession();
     if (session) return;
 
     const dismissed = localStorage.getItem(NUDGE_DISMISSED_KEY);
@@ -507,13 +718,14 @@ async function maybeShowSyncNudge() {
     localStorage.setItem(shownKey, '1');
 
     const nudge = document.getElementById('syncNudge');
+    if (!nudge) return; // auth UI removed from DOM
     setTimeout(() => nudge.classList.add('visible'), NUDGE_SHOW_DELAY_MS);
     setTimeout(() => nudge.classList.remove('visible'), NUDGE_HIDE_DELAY_MS);
 }
 
 function dismissSyncNudge() {
     const nudge = document.getElementById('syncNudge');
-    nudge.classList.remove('visible');
+    nudge?.classList.remove('visible');
     localStorage.setItem(NUDGE_DISMISSED_KEY, 'forever');
 }
 
@@ -524,7 +736,7 @@ function nudgeOpenSignIn() {
 }
 
 async function getAuthHeaders() {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await make24Db.getSession();
     const token = session?.access_token || SUPABASE_KEY;
     return {
         'Content-Type': 'application/json',
@@ -533,8 +745,28 @@ async function getAuthHeaders() {
     };
 }
 
+// Normalize the UUID returned by get_or_create_player — PostgREST can return
+// a bare string, an array, or an object depending on the function's RETURNS clause.
+function extractUuidFromRpcResult(payload) {
+    if (!payload) return null;
+    if (typeof payload === 'string') return payload;
+    if (Array.isArray(payload)) {
+        if (payload.length === 0) return null;
+        const first = payload[0];
+        if (typeof first === 'string') return first;
+        if (first && typeof first === 'object') {
+            return first.id || first.player_id || first.out_player_id || Object.values(first)[0];
+        }
+        return null;
+    }
+    if (typeof payload === 'object') {
+        return payload.id || payload.player_id || payload.out_player_id || Object.values(payload)[0];
+    }
+    return null;
+}
+
 async function ensureCanonicalDeviceId() {
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await make24Db.getSession();
     if (!session) {
         console.log('[SYNC DEBUG] ensureCanonicalDeviceId: no session, skipping');
         return;
@@ -542,7 +774,7 @@ async function ensureCanonicalDeviceId() {
     const localId = getDeviceId();
     console.log('[SYNC DEBUG] ensureCanonicalDeviceId CALLING get_or_set_device_id with localId:', localId, 'auth user:', session.user.id);
     try {
-        const { data, error } = await sb.rpc('get_or_set_device_id', { p_device_id: localId });
+        const { data, error } = await make24Db.rpc('get_or_set_device_id', { p_device_id: localId });
         console.log('[SYNC DEBUG] get_or_set_device_id RETURNED — data:', JSON.stringify(data), 'error:', JSON.stringify(error));
         if (error) {
             console.error('[SYNC DEBUG] get_or_set_device_id FAILED:', JSON.stringify(error));
@@ -561,7 +793,7 @@ async function ensureCanonicalDeviceId() {
                     if (rows && rows.length > 0 && rows[0].device_id) {
                         const canonicalId = rows[0].device_id;
                         if (canonicalId !== localId) {
-                            localStorage.setItem('make24_device_id', canonicalId);
+                            localStorage.setItem(DEVICE_ID_KEY, canonicalId);
                             gameState.deviceId = canonicalId;
                             saveState();
                             console.log('[SYNC DEBUG] Adopted canonical device ID from user_devices:', canonicalId, '(was:', localId, ')');
@@ -580,7 +812,7 @@ async function ensureCanonicalDeviceId() {
         console.log('[SYNC DEBUG] canonicalId:', canonicalId, 'localId:', localId, 'match:', canonicalId === localId);
         if (canonicalId && canonicalId !== localId) {
             // Server returned a different canonical ID — adopt it
-            localStorage.setItem('make24_device_id', canonicalId);
+            localStorage.setItem(DEVICE_ID_KEY, canonicalId);
             gameState.deviceId = canonicalId;
             saveState();
             console.log('[SYNC DEBUG] Adopted canonical device ID:', canonicalId, '(was:', localId, ')');
@@ -613,65 +845,48 @@ async function registerDeviceFallback(userId, deviceId) {
     }
 }
 
-function extractUuidFromRpcResult(payload) {
-    if (!payload) return null;
-    if (typeof payload === 'string') return payload;
-
-    if (Array.isArray(payload)) {
-        if (payload.length === 0) return null;
-        const first = payload[0];
-        if (typeof first === 'string') return first;
-        if (first && typeof first === 'object') {
-            return first.id || first.player_id || first.out_player_id || Object.values(first)[0];
-        }
-        return null;
-    }
-
-    if (typeof payload === 'object') {
-        return payload.id || payload.player_id || payload.out_player_id || Object.values(payload)[0];
-    }
-
-    return null;
-}
-
 async function syncFromSupabase() {
     try {
         const headers = await getAuthHeaders();
-        const { data: { session } } = await sb.auth.getSession();
+        const { data: { session } } = await make24Db.getSession();
         console.log('[SYNC DEBUG] syncFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
+
+        // Only sync with the server when the user is signed in.
+        // Guest users rely on local state only; making unauthenticated RPC calls
+        // against the server produces noisy errors and can fail due to RLS policies.
         if (!session?.user?.id) {
             console.log('[SYNC DEBUG] syncFromSupabase: not signed in; skipping server streak sync.');
             return;
         }
 
-        // When logged in, try to find the player by auth user_id first.
+        // When logged in, try to find the player by auth_id first.
         // This ensures a second device sees the same player row (and streak)
         // even if ensureCanonicalDeviceId failed to register it.
         let player = null;
         if (session?.user?.id) {
-            const userUrl = `${SUPABASE_URL}/rest/v1/players?user_id=eq.${session.user.id}&select=id,current_streak,streak,freezes,device_id&limit=1`;
-            console.log('[SYNC DEBUG] syncFromSupabase: querying players by user_id:', session.user.id);
+            const userUrl = `${SUPABASE_URL}/rest/v1/players?auth_id=eq.${session.user.id}&select=id,current_streak,streak,freezes,device_id&limit=1`;
+            console.log('[SYNC DEBUG] syncFromSupabase: querying players by auth_id:', session.user.id);
             const userRes = await fetch(userUrl, { headers });
             if (userRes.ok) {
                 const rows = await userRes.json();
-                console.log('[SYNC DEBUG] syncFromSupabase: user_id query returned', rows.length, 'rows:', JSON.stringify(rows));
+                console.log('[SYNC DEBUG] syncFromSupabase: auth_id query returned', rows.length, 'rows:', JSON.stringify(rows));
                 if (rows && rows.length > 0) {
                     player = rows[0];
                     // Adopt the canonical device_id from the existing player row
                     // so that future syncs and trackPlay calls use the right ID
                     if (player.device_id && player.device_id !== gameState.deviceId) {
                         console.log('[SYNC DEBUG] syncFromSupabase: adopting canonical device_id from player row:', player.device_id, '(was:', gameState.deviceId, ')');
-                        localStorage.setItem('make24_device_id', player.device_id);
+                        localStorage.setItem(DEVICE_ID_KEY, player.device_id);
                         gameState.deviceId = player.device_id;
                         saveState();
                     }
                 }
             } else {
-                console.log('[SYNC DEBUG] syncFromSupabase: user_id query failed:', userRes.status);
+                console.log('[SYNC DEBUG] syncFromSupabase: auth_id query failed:', userRes.status);
             }
         }
 
-        // Fallback: look up by device_id (anonymous play, or user_id lookup failed)
+        // Fallback: look up by device_id (signed-in user whose auth_id lookup failed)
         if (!player) {
             console.log('[SYNC DEBUG] syncFromSupabase: FALLBACK — querying get_or_create_player with device_id:', gameState.deviceId);
             const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_or_create_player`, {
@@ -692,7 +907,6 @@ async function syncFromSupabase() {
                 showSyncError('Could not sync streak — bad player id');
                 return;
             }
-
             const playerRes = await fetch(
                 `${SUPABASE_URL}/rest/v1/players?id=eq.${encodeURIComponent(playerId)}&select=id,current_streak,streak,freezes,device_id&limit=1`,
                 { headers }
@@ -703,14 +917,10 @@ async function syncFromSupabase() {
                 showSyncError(`Could not sync streak — server error (${playerRes.status})`);
                 return;
             }
-            const players = await playerRes.json();
-            player = players?.[0] || null;
-            if (!player) {
-                console.error('[SYNC DEBUG] no player row found for fallback player id:', playerId);
-                showSyncError('Could not sync streak — bad player id');
-                return;
-            }
-            console.log('[SYNC DEBUG] syncFromSupabase: fallback player:', JSON.stringify(player));
+            const playerRows = await playerRes.json();
+            player = playerRows && playerRows.length > 0 ? playerRows[0] : null;
+            console.log('[SYNC DEBUG] syncFromSupabase: fallback playerId:', playerId, 'player:', JSON.stringify(player));
+            if (!player) return;
         }
 
         const serverStreak = Number(player?.current_streak ?? player?.streak ?? 0);
@@ -725,32 +935,34 @@ async function syncFromSupabase() {
         updateStreakDisplay();
     } catch (e) {
         showSyncError('Could not reach server to sync streak.');
-        console.log('syncFromSupabase skipped:', e?.message || e);
+        logError('syncFromSupabase', e);
     }
 }
 
 async function syncHistoryFromSupabase() {
     try {
         const headers = await getAuthHeaders();
-        const { data: { session } } = await sb.auth.getSession();
+        const { data: { session } } = await make24Db.getSession();
         console.log('[SYNC DEBUG] syncHistoryFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
+
+        // Only sync with the server when the user is signed in.
         if (!session?.user?.id) {
             console.log('[SYNC DEBUG] syncHistoryFromSupabase: not signed in; skipping server history sync.');
             return;
         }
 
-        // Step 1: Get player_id — prefer user_id lookup when logged in,
-        // fall back to device_id for anonymous play
+        // Step 1: Get player_id — prefer auth_id lookup when logged in,
+        // fall back to device_id if auth_id lookup fails
         let playerId = null;
         if (session?.user?.id) {
-            const userUrl = `${SUPABASE_URL}/rest/v1/players?user_id=eq.${session.user.id}&select=id&limit=1`;
+            const userUrl = `${SUPABASE_URL}/rest/v1/players?auth_id=eq.${session.user.id}&select=id&limit=1`;
             const userRes = await fetch(userUrl, { headers });
             if (userRes.ok) {
                 const rows = await userRes.json();
-                console.log('[SYNC DEBUG] syncHistoryFromSupabase: user_id query returned', rows.length, 'rows');
+                console.log('[SYNC DEBUG] syncHistoryFromSupabase: auth_id query returned', rows.length, 'rows');
                 if (rows && rows.length > 0) playerId = rows[0].id;
             } else {
-                console.log('[SYNC DEBUG] syncHistoryFromSupabase: user_id query failed:', userRes.status);
+                console.log('[SYNC DEBUG] syncHistoryFromSupabase: auth_id query failed:', userRes.status);
             }
         }
         if (!playerId) {
@@ -808,7 +1020,79 @@ async function syncHistoryFromSupabase() {
         console.log(`[SYNC DEBUG] syncHistoryFromSupabase: server returned ${totalRows} solved puzzles, merged ${merged} new entries`);
     } catch (e) {
         showSyncError('Could not reach server to sync history.');
-        console.log('syncHistoryFromSupabase skipped:', e?.message || e);
+        logError('syncHistoryFromSupabase', e);
+    }
+}
+
+function buildBackfillRowsFromLocalHistory() {
+    const rows = [];
+    for (const [numStr, entry] of Object.entries(gameState.history || {})) {
+        const puzzleNum = Number(numStr);
+        if (!Number.isFinite(puzzleNum) || puzzleNum <= 0) continue;
+        if (!entry?.completed || entry.solvedOnTime === false) continue;
+
+        const moves = Number(entry.moves || 0);
+        const undos = Number(entry.undos || 0);
+        const solveTime = Number(entry.solveTime || 0);
+        const isPerfect = moves === PERFECT_MOVES && undos === 0 && !entry.hinted;
+        const isFast = isPerfect && solveTime > 0 && solveTime <= FAST_SOLVE_THRESHOLD_S;
+
+        rows.push({
+            puzzle_num: puzzleNum,
+            moves,
+            solve_time_seconds: solveTime,
+            operators: Array.isArray(entry.operators) ? entry.operators : [],
+            undos,
+            is_perfect: isPerfect,
+            is_fast: isFast
+        });
+    }
+    rows.sort((a, b) => a.puzzle_num - b.puzzle_num);
+    return rows;
+}
+
+async function backfillLocalHistoryToSupabase() {
+    const status = document.getElementById('syncStatus');
+    try {
+        const { data: { session } } = await make24Db.getSession();
+        if (!session?.user?.id) return;
+
+        const lastUserId = localStorage.getItem(LAST_USER_ID_KEY);
+        if (lastUserId && lastUserId !== session.user.id) {
+            const ok = confirm("You are signed in as a different account. Merge this device's local progress into this account?");
+            if (!ok) return;
+        }
+        localStorage.setItem(LAST_USER_ID_KEY, session.user.id);
+
+        const rows = buildBackfillRowsFromLocalHistory();
+        if (rows.length === 0) return;
+
+        if (status) {
+            status.textContent = 'Uploading history...';
+            status.className = 'sync-status';
+        }
+
+        const chunkSize = 200;
+        for (let i = 0; i < rows.length; i += chunkSize) {
+            const chunk = rows.slice(i, i + chunkSize);
+            const { error } = await make24Db.rpc('backfill_daily_results', {
+                p_device_id: gameState.deviceId,
+                p_rows: chunk
+            });
+            if (error) {
+                showSyncError('History upload failed');
+                console.error('backfillLocalHistoryToSupabase failed:', error);
+                return;
+            }
+        }
+
+        if (status) {
+            status.textContent = 'History synced.';
+            status.className = 'sync-status success';
+        }
+    } catch (e) {
+        showSyncError('History upload failed');
+        console.error('backfillLocalHistoryToSupabase exception:', e);
     }
 }
 
@@ -857,13 +1141,14 @@ function reconcileStreakFromHistory() {
 // ============================================================
 let bootComplete = false;
 
-sb.auth.onAuthStateChange(async (_event, session) => {
+make24Db.onAuthStateChange(async (_event, session) => {
     // During boot, boot() handles the full sync itself.
     // Only act on auth changes that happen AFTER boot (e.g. sign-in, sign-out).
     if (!bootComplete) return;
     await updateSyncUI();
     if (session) {
         await ensureCanonicalDeviceId();
+        await backfillLocalHistoryToSupabase();
         await syncFromSupabase();
         await syncHistoryFromSupabase();
         updateStreak();
@@ -1015,21 +1300,25 @@ function shareHistoryGrid() {
 // ============================================================
 // CHALLENGE A FRIEND
 // ============================================================
-function shareChallenge() {
-    const puzzleNum = currentPuzzle.puzzleNum;
-    const history = gameState.history[puzzleNum];
-    const moves = history?.moves || playState.moves;
-    const isPerfect = history?.completed && history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
+// Returns the nearest puzzle before fromPuzzleNum that the user hasn't solved yet,
+// or null if every earlier puzzle has been solved.
+function getNearestEarlierUnsolvedPuzzle(fromPuzzleNum) {
+    for (let num = fromPuzzleNum - 1; num >= 1; num--) {
+        if (!gameState.history[num]?.completed) return num;
+    }
+    return null;
+}
 
-    let text = `\u2694\uFE0F Can you beat my Make 24?\n`;
-    text += formatPuzzleDateLong(puzzleNum);
-    if (isPerfect) text += ` \u2014 I got \u2B50 Perfect`;
-    else text += ` \u2014 I solved it in ${moves} moves`;
-    text += `\n\n${APP_CONFIG.publicUrl}`;
-
-    if (navigator.share) {
-        navigator.share({ text }).catch(() => copyToClipboard(text));
-    } else { copyToClipboard(text); }
+function playAnother() {
+    trackEvent('archive_opened', currentPuzzle.puzzleNum, currentPuzzle.isSpeakeasy === true);
+    const next = getNearestEarlierUnsolvedPuzzle(currentPuzzle.puzzleNum);
+    hideVictoryCard();
+    if (next !== null) {
+        initPuzzle(next, next !== getTodayPuzzleNumber());
+    } else {
+        // All earlier puzzles solved — fall back to the history picker
+        showArchive();
+    }
 }
 
 // ============================================================
@@ -1098,10 +1387,18 @@ function generatePuzzle(puzzleNum) {
 }
 
 function getDeviceId() {
-    let id = localStorage.getItem('make24_device_id');
+    let id = localStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
-        id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-        localStorage.setItem('make24_device_id', id);
+        // Migrate from the old unscoped key if present on this origin
+        const legacyId = localStorage.getItem('make24_device_id');
+        if (legacyId) {
+            id = legacyId;
+            localStorage.setItem(DEVICE_ID_KEY, id);
+            localStorage.removeItem('make24_device_id');
+        } else {
+            id = 'dev_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+            localStorage.setItem(DEVICE_ID_KEY, id);
+        }
     }
     return id;
 }
@@ -1176,6 +1473,17 @@ function clearWinState() {
 }
 
 function initPuzzle(puzzleNum, isArchive = false) {
+    if (playState.moves > 0 && !playState.completed) {
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'puzzle_abandoned', {
+                puzzle_num: currentPuzzle.puzzleNum,
+                is_archive: currentPuzzle.isArchive === true,
+                is_speakeasy: currentPuzzle.isSpeakeasy === true,
+                moves_attempted: playState.moves
+            });
+        }
+    }
+
     hideVictoryCard();
     hideOperators();
     clearHintTimer();
@@ -1184,6 +1492,7 @@ function initPuzzle(puzzleNum, isArchive = false) {
     currentPuzzle.puzzleNum = puzzleNum;
     currentPuzzle.numbers = generatePuzzle(puzzleNum);
     currentPuzzle.isArchive = isArchive;
+    currentPuzzle.isSpeakeasy = false;
     currentPuzzle.date = getDateFromPuzzleNumber(puzzleNum);
 
     const history = gameState.history[puzzleNum];
@@ -1201,18 +1510,12 @@ function initPuzzle(puzzleNum, isArchive = false) {
         updateUI();
         showCleanWinState();
 
-        const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
-        const isFast = isPerfect && history.solveTime && history.solveTime <= FAST_SOLVE_THRESHOLD_S;
-
-        let badge = 'Solved';
-        let badgeClass = '';
-        if (isFast) { badge = 'Perfect + Fast'; badgeClass = 'perfect'; }
-        else if (isPerfect) { badge = 'Perfect'; badgeClass = 'perfect'; }
+        const title = getSolveTitle({ hinted: !!history.hinted, moves: history.moves, undos: history.undos || 0, solveTime: history.solveTime });
 
         setTimeout(() => {
             showVictoryCard({
-                badge,
-                badgeClass,
+                badge: title.badge,
+                badgeClass: title.badgeClass,
                 date: formatPuzzleDateLong(puzzleNum),
                 time: formatTimeHuman(history.solveTime),
                 moves: String(history.moves),
@@ -1245,18 +1548,12 @@ function initPuzzle(puzzleNum, isArchive = false) {
     if (alreadySolved && !isArchive) {
         showCleanWinState();
 
-        const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
-        const isFast = isPerfect && history.solveTime && history.solveTime <= FAST_SOLVE_THRESHOLD_S;
-
-        let badge2 = 'Solved';
-        let badgeClass2 = '';
-        if (isFast) { badge2 = 'Perfect + Fast'; badgeClass2 = 'perfect'; }
-        else if (isPerfect) { badge2 = 'Perfect'; badgeClass2 = 'perfect'; }
+        const title2 = getSolveTitle({ hinted: !!history.hinted, moves: history.moves, undos: history.undos || 0, solveTime: history.solveTime });
 
         setTimeout(() => {
             showVictoryCard({
-                badge: badge2,
-                badgeClass: badgeClass2,
+                badge: title2.badge,
+                badgeClass: title2.badgeClass,
                 date: formatPuzzleDateLong(puzzleNum),
                 time: formatTimeHuman(history.solveTime),
                 moves: String(history.moves),
@@ -1270,6 +1567,21 @@ function initPuzzle(puzzleNum, isArchive = false) {
     }
 }
 
+/**
+ * Determine the solve title and CSS class for the victory badge.
+ * @param {{ hinted: boolean, moves: number, undos: number, solveTime: number }} opts
+ * @returns {{ badge: string, badgeClass: string }}
+ */
+function getSolveTitle({ hinted, moves, undos, solveTime }) {
+    if (hinted) return { badge: 'Solved with hint', badgeClass: 'hinted' };
+    const isPerfect = moves === PERFECT_MOVES && (undos || 0) === 0;
+    if (isPerfect && solveTime != null && solveTime <= FAST_SOLVE_THRESHOLD_S) {
+        return { badge: 'Perfect', badgeClass: 'perfect' };
+    }
+    if (isPerfect) return { badge: 'Clean', badgeClass: 'clean' };
+    return { badge: 'Solved', badgeClass: '' };
+}
+
 function showVictoryCard(opts) {
     const { badge, badgeClass, date, time, moves, streak, percentileText } = opts;
     document.getElementById('victoryBadge').textContent = badge;
@@ -1281,6 +1593,9 @@ function showVictoryCard(opts) {
     const pEl = document.getElementById('victoryPercentile');
     pEl.textContent = percentileText || '';
     pEl.className = 'victory-percentile';
+    // Footer only shown for today's puzzle, not archive replays
+    const footerEl = document.getElementById('victoryFooter');
+    if (footerEl) footerEl.style.display = currentPuzzle.isArchive ? 'none' : '';
     document.getElementById('victoryBackdrop').classList.add('show');
 }
 
@@ -1339,7 +1654,10 @@ function renderCards() {
                 if (playState.selected[0] === cardIndex) card.classList.add('first');
                 else card.classList.add('second');
             }
-            card.addEventListener('click', () => selectCard(cardIndex));
+            card.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                selectCard(cardIndex);
+            });
             slot.appendChild(card);
         }
     });
@@ -1599,6 +1917,8 @@ async function handleWin() {
     if (!currentPuzzle.isArchive) {
         incrementStreak();
         syncStreakToSupabase();
+    } else {
+        trackArchivePlay(true);
     }
 
     saveState();
@@ -1608,16 +1928,12 @@ async function handleWin() {
     // Clean win: fade cards, show big 24
     showCleanWinState();
 
-    let badge = 'Solved';
-    let badgeClass = '';
-    if (isFast) { badge = 'Perfect + Fast'; badgeClass = 'perfect'; }
-    else if (isPerfect) { badge = 'Perfect'; badgeClass = 'perfect'; }
-    if (playState.hinted) { badge += ' (with hint)'; }
+    const solveTitle = getSolveTitle({ hinted: playState.hinted, moves: playState.moves, undos: playState.undoCount, solveTime });
 
     setTimeout(() => {
         showVictoryCard({
-            badge,
-            badgeClass,
+            badge: solveTitle.badge,
+            badgeClass: solveTitle.badgeClass,
             date: formatPuzzleDateLong(currentPuzzle.puzzleNum),
             time: formatTimeHuman(solveTime),
             moves: String(playState.moves),
@@ -1629,6 +1945,23 @@ async function handleWin() {
 
     const percentileData = await trackPlay(true);
     displayPercentile(percentileData);
+
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'puzzle_solved', {
+            puzzle_num: currentPuzzle.puzzleNum,
+            is_perfect: isPerfect,
+            is_archive: currentPuzzle.isArchive === true,
+            is_speakeasy: currentPuzzle.isSpeakeasy === true,
+            moves: playState.moves,
+            solve_time: solveTime
+        });
+    }
+
+    trackEvent('post_solve_shown', currentPuzzle.puzzleNum, currentPuzzle.isSpeakeasy === true, {
+        moves: playState.moves,
+        solve_time: solveTime,
+        is_perfect: isPerfect
+    });
 
     // Gentle nudge at streak milestones (if not signed in)
     maybeShowSyncNudge();
@@ -1696,29 +2029,53 @@ function showConfetti() {
 }
 
 // Share result
-function generateShareText() {
+function buildDailyShareText() {
     const history = gameState.history[currentPuzzle.puzzleNum];
     const isPerfect = history?.completed && history.moves === PERFECT_MOVES && (history.undos || 0) === 0 && !history.hinted;
     const isFast = isPerfect && history?.solveTime && history.solveTime <= FAST_SOLVE_THRESHOLD_S;
-    const operators = history?.operators || playState.operatorHistory;
+    const moves = history?.moves ?? playState.moves;
+    const solveTime = history?.solveTime ?? (playState.startTime && playState.endTime
+        ? Math.round((playState.endTime - playState.startTime) / 1000) : null);
 
-    const opSymbols = { '+': '\u2795', '-': '\u2796', '*': '\u2716\uFE0F', '/': '\u2797' };
-    const opLine = operators.map(op => opSymbols[op]).join(' ');
+    let text = `\uD83E\uDDE0 Make24 \u2014 ${formatPuzzleDateLong(currentPuzzle.puzzleNum)}\n`;
+    text += '\n';
 
-    let text = `24 \u2014 ${formatPuzzleDateLong(currentPuzzle.puzzleNum)}\n`;
-    text += `${opLine}\n`;
-    if (isFast) text += `\u26A1 Perfect + Fast!\n`;
-    else if (isPerfect) text += `\u2B50 Perfect!\n`;
-    text += `\uD83D\uDD25 ${gameState.streak}\n`;
-    text += `${APP_CONFIG.publicUrl}`;
+    if (isPerfect && isFast) text += `\u2B50 Perfect solve (${moves} moves)\n`;
+    else if (isPerfect)     text += `\u2B50 Clean solve (${moves} moves)\n`;
+    else                    text += `\u2705 Solved in ${moves} moves\n`;
+
+    if (solveTime) text += `\u23F1 ${solveTime}s\n`;
+    if (gameState.streak > 0) text += `\uD83D\uDD25 ${gameState.streak} day streak\n`;
+
+    if (ENABLE_COMPARISON_LINE && lastPercentileData) {
+        const p = lastPercentileData.percentile, t = lastPercentileData.total_players;
+        if (p != null && t >= MIN_COMPARISON_SAMPLE && p >= 50) {
+            text += `\uD83C\uDFC5 Faster than ${p}% of players today\n`;
+        }
+    }
+
+    text += `\nCan you beat it?\n${APP_CONFIG.publicUrl}`;
     return text;
 }
 
+// Keep old name as alias so any callers still work
+function generateShareText() { return buildDailyShareText(); }
+
 function share() {
-    const text = generateShareText();
+    if (typeof gtag !== 'undefined') {
+        gtag('event', 'result_shared', {
+            puzzle_num: currentPuzzle.puzzleNum,
+            is_perfect: (playState.moves === PERFECT_MOVES && playState.undoCount === 0)
+        });
+    }
+    trackEvent('share_clicked', currentPuzzle.puzzleNum, currentPuzzle.isSpeakeasy === true);
+    const text = buildDailyShareText();
+    // Copy first (silent), then open native share sheet if available
+    navigator.clipboard.writeText(text).catch(() => {});
     if (navigator.share) {
-        navigator.share({ text }).catch(() => copyToClipboard(text));
-    } else { copyToClipboard(text); }
+        navigator.share({ text }).catch(() => {});
+    }
+    showToast('Copied!');
 }
 
 function copyToClipboard(text) {
@@ -1913,6 +2270,29 @@ function renderCalendar() {
 // Supabase tracking
 let lastPercentileData = null;
 
+async function trackArchivePlay(success) {
+    if (!currentPuzzle.isArchive) return;
+    try {
+        const solveTime = playState.startTime
+            ? Math.round((playState.endTime - playState.startTime) / 1000)
+            : 0;
+        const headers = await getAuthHeaders();
+        await fetch(`${SUPABASE_URL}/rest/v1/archive_plays`, {
+            method: 'POST',
+            headers: { ...headers, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({
+                device_id: gameState.deviceId,
+                puzzle_num: currentPuzzle.puzzleNum,
+                solved: success,
+                solve_time_seconds: solveTime
+            })
+        });
+    } catch (e) {
+        // Fire-and-forget — never block the game on analytics
+        console.warn('[make24] trackArchivePlay failed silently:', e);
+    }
+}
+
 async function trackPlay(success) {
     if (currentPuzzle.isArchive) return null;
     try {
@@ -1926,7 +2306,8 @@ async function trackPlay(success) {
             p_moves: playState.moves,
             p_solve_time: solveTime,
             p_operators: playState.operatorHistory,
-            p_undos: playState.undoCount
+            p_undos: playState.undoCount,
+            p_is_speakeasy: currentPuzzle.isSpeakeasy === true
         };
 
         const headers = await getAuthHeaders();
@@ -1954,9 +2335,9 @@ async function trackPlay(success) {
 }
 
 async function syncStreakToSupabase() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session?.user?.id) return;
     try {
+        const { data: { session } } = await make24Db.getSession();
+        if (!session?.user?.id) return;
         const headers = await getAuthHeaders();
         const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_player_streak`, {
             method: 'POST',
@@ -2090,15 +2471,8 @@ function updateShakeToggleUI() {
 }
 
 function getIOSGuidanceHTML() {
-    return `
-        <p>Safari asks for permission each visit. To allow permanently:</p>
-        <ol class="guidance-steps">
-            <li>Open <b>Settings</b> on your iPhone</li>
-            <li>Scroll to <b>Safari</b> → <b>Advanced</b> → <b>Website Data</b></li>
-            <li>Find <b>make24.app</b> and enable <b>Motion & Orientation</b></li>
-        </ol>
-        <p>Or in Safari: tap <b>aA</b> in the address bar → <b>Website Settings</b> → enable <b>Motion & Orientation</b>.</p>
-    `;
+    // Safari requests motion permission per-session via user gesture; no permanent setting exists.
+    return '<p>Tap the toggle each session to allow motion access.</p>';
 }
 
 async function handleShakeToggle() {
@@ -2142,27 +2516,37 @@ if (document.getElementById('shakeToggle')) {
 // EVENT LISTENERS
 // ============================================================
 document.querySelectorAll('.op-btn').forEach(btn => {
-    btn.addEventListener('click', () => applyOperation(btn.dataset.op));
+    btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        applyOperation(btn.dataset.op);
+    });
 });
 
 document.getElementById('undoBtn').addEventListener('click', animatedUndo);
 document.getElementById('hintBtn').addEventListener('click', useHint);
 
-// Sync nudge toast handlers
-document.getElementById('syncNudgeLink').addEventListener('click', nudgeOpenSignIn);
-document.getElementById('syncNudgeDismiss').addEventListener('click', dismissSyncNudge);
+// Auth event listeners — elements are present only when auth UI is enabled.
+document.getElementById('syncNudgeLink')?.addEventListener('click', nudgeOpenSignIn);
+document.getElementById('syncNudgeDismiss')?.addEventListener('click', dismissSyncNudge);
+document.getElementById('googleSignInBtn')?.addEventListener('click', signInWithGoogle);
+document.getElementById('otpSendBtn')?.addEventListener('click', sendOtpCode);
+document.getElementById('otpVerifyBtn')?.addEventListener('click', verifyOtpCode);
+document.getElementById('syncSignOutBtn')?.addEventListener('click', promptSignOut);
+document.getElementById('exportProgressBtn').addEventListener('click', exportProgressToFile);
+document.getElementById('importProgressBtn').addEventListener('click', () => {
+    document.getElementById('importProgressFile').click();
+});
+document.getElementById('importProgressFile').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    await importProgressFromFile(file);
+    e.target.value = '';
+});
 
-// Auth: Google + OTP handlers
-document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
-document.getElementById('otpSendBtn').addEventListener('click', sendOtpCode);
-document.getElementById('otpVerifyBtn').addEventListener('click', verifyOtpCode);
-document.getElementById('syncSignOutBtn').addEventListener('click', promptSignOut);
-
-// Allow Enter key in OTP inputs
-document.getElementById('otpEmailInput').addEventListener('keydown', (e) => {
+// Enter-key shortcut for OTP inputs (only present when auth UI is enabled)
+document.getElementById('otpEmailInput')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendOtpCode();
 });
-document.getElementById('otpCodeInput').addEventListener('keydown', (e) => {
+document.getElementById('otpCodeInput')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') verifyOtpCode();
 });
 
@@ -2206,9 +2590,9 @@ function showPuzzleDetails(puzzleNum) {
         const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
         const isFast = isPerfect && history.solveTime && history.solveTime <= FAST_SOLVE_THRESHOLD_S;
 
-        if (isFast) { statusEl.textContent = 'Perfect + Fast'; statusEl.className = 'details-status perfect'; }
-        else if (isPerfect) { statusEl.textContent = 'Perfect'; statusEl.className = 'details-status perfect'; }
-        else { statusEl.textContent = 'Solved'; statusEl.className = 'details-status solved'; }
+        const detailTitle = getSolveTitle({ hinted: !!history.hinted, moves: history.moves, undos: history.undos || 0, solveTime: history.solveTime });
+        statusEl.textContent = detailTitle.badge;
+        statusEl.className = 'details-status' + (detailTitle.badgeClass ? ` ${detailTitle.badgeClass}` : ' solved');
 
         // Stats
         const addStat = (value, label) => {
@@ -2300,6 +2684,7 @@ function generateFakePrelude(numbers, extraMoves) {
 }
 
 function startReplay(puzzleNum) {
+    trackEvent('replay_clicked', puzzleNum, currentPuzzle.isSpeakeasy === true);
     const history = gameState.history[puzzleNum];
     const numbers = generatePuzzle(puzzleNum);
 
@@ -2405,18 +2790,11 @@ function showReplayVictoryCard() {
     const history = gameState.history[puzzleNum];
     if (!history) return;
 
-    const isPerfect = history.moves === PERFECT_MOVES && (history.undos || 0) === 0;
-    const isFast = isPerfect && history.solveTime && history.solveTime <= FAST_SOLVE_THRESHOLD_S;
-
-    let badge = 'Solved';
-    let badgeClass = '';
-    if (isFast) { badge = 'Perfect + Fast'; badgeClass = 'perfect'; }
-    else if (isPerfect) { badge = 'Perfect'; badgeClass = 'perfect'; }
-    if (history.hinted) { badge += ' (with hint)'; }
+    const replayTitle = getSolveTitle({ hinted: !!history.hinted, moves: history.moves, undos: history.undos || 0, solveTime: history.solveTime });
 
     showVictoryCard({
-        badge,
-        badgeClass,
+        badge: replayTitle.badge,
+        badgeClass: replayTitle.badgeClass,
         date: formatPuzzleDateLong(puzzleNum),
         time: formatTimeHuman(history.solveTime),
         moves: String(history.moves),
@@ -2695,7 +3073,7 @@ document.getElementById('closeArchive').addEventListener('click', () => {
 });
 
 document.getElementById('shareBtn').addEventListener('click', share);
-document.getElementById('challengeBtn').addEventListener('click', shareChallenge);
+document.getElementById('playAnotherBtn').addEventListener('click', playAnother);
 document.getElementById('shareHistoryBtn').addEventListener('click', shareHistoryGrid);
 
 // Tap the big green "24" to replay the solution
@@ -2728,6 +3106,185 @@ document.getElementById('closeSettings').addEventListener('click', () => {
     document.getElementById('settingsModal').classList.remove('show');
 });
 document.getElementById('settingsModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+});
+
+// ============================================================
+// DIAGNOSTIC (Storage Detective)
+// ============================================================
+function runDiagnostic() {
+    const content = document.getElementById('diagnosticContent');
+    if (!content) return;
+
+    // Detect display mode
+    let mode = 'Browser tab';
+    let badgeClass = 'diag-badge-browser';
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        mode = 'Standalone PWA (home screen)';
+        badgeClass = 'diag-badge-pwa';
+    }
+
+    // Find make24 state — check common key names
+    const possibleKeys = ['make24_v5', 'make24_v4', 'make24_v3', 'make24_v2', 'make24_state', 'make24'];
+    let stateKey = null;
+    let stateData = null;
+    for (const k of possibleKeys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+            stateKey = k;
+            try { stateData = JSON.parse(raw); } catch(e) { stateData = null; }
+            break;
+        }
+    }
+    // Fallback scan
+    if (!stateKey) {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.toLowerCase().includes('make24')) {
+                stateKey = k;
+                try { stateData = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+                break;
+            }
+        }
+    }
+
+    // Auth state
+    let authFound = false;
+    let authEmail = '—';
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.includes('supabase') && k.includes('auth')) {
+            authFound = true;
+            try {
+                const d = JSON.parse(localStorage.getItem(k));
+                if (d?.user?.email) authEmail = d.user.email;
+                else if (d?.currentSession?.user?.email) authEmail = d.currentSession.user.email;
+            } catch(e) {}
+        }
+    }
+
+    // All keys
+    const allKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k);
+        allKeys.push({ key: k, size: v ? v.length : 0 });
+    }
+    allKeys.sort((a, b) => a.key.localeCompare(b.key));
+
+    // History count
+    let historyCount = 0;
+    if (stateData?.history && typeof stateData.history === 'object') {
+        historyCount = Object.keys(stateData.history).length;
+    }
+
+    // Speakeasy detection
+    let speakeasy = 'not found in state';
+    if (stateData) {
+        if (stateData.speakeasyUnlocked !== undefined) speakeasy = String(stateData.speakeasyUnlocked);
+        else if (stateData.isSpeakeasy !== undefined) speakeasy = String(stateData.isSpeakeasy);
+        else if (stateData.speakeasy !== undefined) speakeasy = String(stateData.speakeasy);
+        else if (stateData.afterHours !== undefined) speakeasy = 'afterHours: ' + String(stateData.afterHours);
+    }
+
+    // Live values from in-memory gameState (if available)
+    let liveDeviceId = '—';
+    let liveStreak = '—';
+    if (typeof gameState !== 'undefined') {
+        liveDeviceId = gameState.deviceId || '—';
+        liveStreak = gameState.streak !== undefined ? gameState.streak : '—';
+    }
+
+    // Build fingerprint object
+    const fp = {
+        mode,
+        url: window.location.href,
+        storageKey: stateKey || 'none',
+        deviceId: stateData?.deviceId || 'none',
+        liveDeviceId,
+        streak: stateData?.streak !== undefined ? stateData.streak : null,
+        liveStreak,
+        maxStreak: stateData?.maxStreak !== undefined ? stateData.maxStreak : null,
+        historyCount,
+        lastPlayed: stateData?.lastPlayedDate || 'none',
+        totalKeys: localStorage.length,
+        ts: new Date().toISOString()
+    };
+
+    const row = (label, value, cls) =>
+        `<div class="diag-row"><span class="diag-label">${label}</span><span class="diag-value ${cls || ''}">${value}</span></div>`;
+
+    let html = '';
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Browser Context</div>`;
+    html += row('Mode', `<span class="diag-badge ${badgeClass}">${mode}</span>`);
+    html += row('URL', window.location.href, 'muted');
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Game State</div>`;
+    html += row('Storage key', stateKey ? `<span class="good">${stateKey}</span>` : '<span class="bad">Not found</span>');
+    html += row('Device ID (stored)', stateData?.deviceId ? `<span class="diag-mono">${stateData.deviceId}</span>` : '—');
+    html += row('Device ID (live)', `<span class="diag-mono">${liveDeviceId}</span>`);
+    html += row('Current streak', stateData?.streak !== undefined ? stateData.streak : '—', stateData?.streak > 0 ? 'good' : 'warn');
+    html += row('Live streak', String(liveStreak), '');
+    html += row('Max streak', stateData?.maxStreak !== undefined ? stateData.maxStreak : '—');
+    html += row('Games in history', historyCount);
+    html += row('Last played', stateData?.lastPlayedDate || '—');
+    html += row('Freezes', stateData?.freezes !== undefined ? stateData.freezes : '—');
+    html += row('Speakeasy', speakeasy);
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Auth</div>`;
+    html += row('Supabase session', authFound ? '<span class="good">Found</span>' : '<span class="muted">None</span>');
+    html += row('Email', authEmail);
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">All localStorage Keys (${allKeys.length})</div>`;
+    for (const k of allKeys) {
+        const sizeLabel = k.size > 1024 ? (k.size / 1024).toFixed(1) + ' KB' : k.size + ' B';
+        html += row(k.key, sizeLabel, 'muted');
+    }
+    html += `</div>`;
+
+    const fpStr = JSON.stringify(fp, null, 2);
+    html += `<div class="diag-fingerprint">`;
+    html += `<p style="font-size:12px;color:#888;margin:0 0 8px;">Copy from both contexts to compare</p>`;
+    html += `<button class="diag-copy-btn" id="diagCopyBtn">Copy Fingerprint</button>`;
+    html += `<code>${fpStr.replace(/</g, '&lt;')}</code>`;
+    html += `</div>`;
+
+    content.innerHTML = html;
+
+    document.getElementById('diagCopyBtn')?.addEventListener('click', () => {
+        navigator.clipboard?.writeText(fpStr).then(() => {
+            const btn = document.getElementById('diagCopyBtn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Fingerprint', 2000); }
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = fpStr;
+            ta.style.cssText = 'position:fixed;left:-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            const btn = document.getElementById('diagCopyBtn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Fingerprint', 2000); }
+        });
+    });
+}
+
+document.getElementById('diagnosticBtn')?.addEventListener('click', () => {
+    runDiagnostic();
+    document.getElementById('diagnosticModal')?.classList.add('show');
+});
+document.getElementById('closeDiagnostic')?.addEventListener('click', () => {
+    document.getElementById('diagnosticModal')?.classList.remove('show');
+});
+document.getElementById('diagnosticModal')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
 });
 
@@ -2938,11 +3495,12 @@ async function boot() {
 
     // Wait for the Supabase auth state to be fully resolved before rendering.
     // getSession() restores any persisted session from storage.
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await make24Db.getSession();
     await updateSyncUI();
 
     if (session) {
         await ensureCanonicalDeviceId();
+        await backfillLocalHistoryToSupabase();
     }
 
     await syncFromSupabase();
@@ -2964,6 +3522,224 @@ boot();
 
 // Initialize shake-to-undo from saved preference
 initShakeSetting();
+
+// ============================================================
+// ADD TO HOME SCREEN PROMPT (iOS Safari, one-time)
+// ============================================================
+(function initA2HS() {
+    const A2HS_KEY = 'make24_a2hs_dismissed';
+
+    // Only run in browser
+    if (typeof window === 'undefined') return;
+
+    // Must be iOS Safari (not Chrome or Firefox on iOS)
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    // Already installed as standalone
+    const isStandalone = navigator.standalone === true;
+    // Already dismissed
+    const isDismissed = localStorage.getItem(A2HS_KEY) === '1';
+
+    if (!isIOS || !isSafari || isStandalone || isDismissed) return;
+
+    const prompt = document.getElementById('a2hsPrompt');
+    const instruction = document.getElementById('a2hsInstruction');
+    const addBtn = document.getElementById('a2hsTapAdd');
+    const dismissBtn = document.getElementById('a2hsDismiss');
+    if (!prompt || !instruction || !addBtn || !dismissBtn) return;
+
+    function hideAll() {
+        prompt.classList.remove('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'true');
+        instruction.classList.remove('a2hs-visible');
+        instruction.setAttribute('aria-hidden', 'true');
+        localStorage.setItem(A2HS_KEY, '1');
+    }
+
+    addBtn.addEventListener('click', () => {
+        prompt.classList.remove('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'true');
+        instruction.classList.add('a2hs-visible');
+        instruction.setAttribute('aria-hidden', 'false');
+        setTimeout(() => {
+            instruction.classList.remove('a2hs-visible');
+            instruction.setAttribute('aria-hidden', 'true');
+        }, 5000);
+        localStorage.setItem(A2HS_KEY, '1');
+    });
+
+    dismissBtn.addEventListener('click', hideAll);
+
+    // Hide when user starts interacting with the board
+    document.addEventListener('pointerdown', function onInteract(e) {
+        if (e.target.closest('.board-cell, .slot, #gameBoard')) {
+            hideAll();
+            document.removeEventListener('pointerdown', onInteract);
+        }
+    }, { passive: true });
+
+    // Show with a short delay so it doesn't block page render
+    setTimeout(() => {
+        prompt.classList.add('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'false');
+    }, 2000);
+})();
+
+// ============================================================
+// KEYBOARD SHORTCUTS (desktop play)
+// ============================================================
+(function initKeyboardHandler() {
+    let keyBuffer = '';
+    let keyBufferTimeout = null;
+
+    const MODAL_IDS = [
+        'settingsModal', 'calendarModal', 'diagnosticModal',
+        'successMessage', 'failMessage', 'archiveModal',
+        'detailsModal', 'replayOverlay'
+    ];
+
+    function isModalOpen() {
+        return MODAL_IDS.some(id => {
+            const el = document.getElementById(id);
+            return el && el.classList.contains('show');
+        });
+    }
+
+    function clearBuffer() {
+        keyBuffer = '';
+        if (keyBufferTimeout) {
+            clearTimeout(keyBufferTimeout);
+            keyBufferTimeout = null;
+        }
+    }
+
+    function getActiveTiles() {
+        return playState.cards
+            .map((c, i) => ({ value: c.value, index: i, used: c.used }))
+            .filter(t => !t.used);
+    }
+
+    function findTileIndex(value) {
+        // Find the first unselected, non-used card with the given value
+        for (let i = 0; i < playState.cards.length; i++) {
+            if (!playState.cards[i].used &&
+                playState.cards[i].value === value &&
+                !playState.selected.includes(i)) {
+                return i;
+            }
+        }
+        // If all matching tiles are already selected, allow re-selecting (deselect)
+        for (let i = 0; i < playState.cards.length; i++) {
+            if (!playState.cards[i].used && playState.cards[i].value === value) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function commitBuffer() {
+        keyBufferTimeout = null;
+        const num = parseInt(keyBuffer, 10);
+        keyBuffer = '';
+        if (isNaN(num)) return;
+        const idx = findTileIndex(num);
+        if (idx !== -1) selectCard(idx);
+    }
+
+    function hasLongerPrefixMatch(buf, activeTiles) {
+        // Check if any active tile's string value starts with buf and is longer
+        return activeTiles.some(t => {
+            const vs = String(t.value);
+            return vs.startsWith(buf) && vs.length > buf.length;
+        });
+    }
+
+    function handleDigit(digit) {
+        keyBuffer += digit;
+        if (keyBufferTimeout) {
+            clearTimeout(keyBufferTimeout);
+            keyBufferTimeout = null;
+        }
+
+        const activeTiles = getActiveTiles();
+        const num = parseInt(keyBuffer, 10);
+        const hasExact = activeTiles.some(t => t.value === num);
+        const hasLonger = hasLongerPrefixMatch(keyBuffer, activeTiles);
+
+        if (hasExact && !hasLonger) {
+            // Only exact match, no ambiguity — select immediately
+            keyBuffer = '';
+            const idx = findTileIndex(num);
+            if (idx !== -1) selectCard(idx);
+        } else if (hasExact || hasLonger) {
+            // Ambiguous or partial — wait for more digits
+            keyBufferTimeout = setTimeout(commitBuffer, 600);
+        } else {
+            // No match at all — discard
+            keyBuffer = '';
+        }
+    }
+
+    const OP_KEYS = {
+        '+': '+',
+        '-': '-',
+        '*': '*',
+        'x': '*',
+        '/': '/'
+    };
+
+    document.addEventListener('keydown', function(e) {
+        // Don't interfere with browser shortcuts
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        // Don't process game keys when a modal is open
+        if (isModalOpen()) return;
+
+        // Don't process game keys when the game is completed
+        if (playState.completed) return;
+
+        const key = e.key;
+
+        // Digit keys
+        if (key >= '0' && key <= '9') {
+            e.preventDefault();
+            handleDigit(key);
+            return;
+        }
+
+        // Operator keys
+        const op = OP_KEYS[key] || (key === 'X' ? '*' : null);
+        if (op) {
+            e.preventDefault();
+            // Commit any pending buffer first
+            if (keyBuffer) {
+                if (keyBufferTimeout) clearTimeout(keyBufferTimeout);
+                commitBuffer();
+            }
+            if (playState.selected.length === 2) {
+                applyOperation(op);
+            }
+            return;
+        }
+
+        // Undo
+        if (key === 'Backspace' || key === 'z' || key === 'Z') {
+            e.preventDefault();
+            clearBuffer();
+            undo();
+            return;
+        }
+
+        // Escape — deselect all
+        if (key === 'Escape') {
+            clearBuffer();
+            playState.selected = [];
+            hideOperators();
+            renderCards();
+            return;
+        }
+    });
+})();
 
 // ============================================================
 // EXPORTS FOR TESTING (Node.js only)

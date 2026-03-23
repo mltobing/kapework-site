@@ -978,6 +978,148 @@ function shareChallenge() {
 }
 
 // ============================================================
+// BACKUP — export / import progress (device-local)
+// ============================================================
+function setBackupStatus(message, type = '') {
+    const status = document.getElementById('backupStatus');
+    if (!status) return;
+    status.textContent = message;
+    status.className = `sync-status${type ? ` ${type}` : ''}`;
+}
+
+function collectMake36LocalStorageDump() {
+    const dump = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (key === STORAGE_KEY || key.startsWith('make36')) {
+            dump[key] = localStorage.getItem(key);
+        }
+    }
+    return dump;
+}
+
+function hasReplayData(entry) {
+    if (!entry) return false;
+    return (Array.isArray(entry.solutionSteps) && entry.solutionSteps.length > 0)
+        || (Array.isArray(entry.replaySequence) && entry.replaySequence.length > 0);
+}
+
+function chooseRicherHistoryEntry(currentEntry, importedEntry) {
+    if (!currentEntry) return importedEntry;
+    if (!importedEntry) return currentEntry;
+    const currentReplay = hasReplayData(currentEntry);
+    const importedReplay = hasReplayData(importedEntry);
+    if (currentReplay !== importedReplay) {
+        return importedReplay ? importedEntry : currentEntry;
+    }
+    const currentCompleted = !!currentEntry.completed;
+    const importedCompleted = !!importedEntry.completed;
+    if (currentCompleted && importedCompleted) {
+        const currentMoves = Number(currentEntry.moves ?? Infinity);
+        const importedMoves = Number(importedEntry.moves ?? Infinity);
+        if (Number.isFinite(importedMoves) && importedMoves < currentMoves) return importedEntry;
+        if (Number.isFinite(currentMoves) && currentMoves < importedMoves) return currentEntry;
+        const currentTime = Number(currentEntry.solveTime ?? Infinity);
+        const importedTime = Number(importedEntry.solveTime ?? Infinity);
+        if (Number.isFinite(importedTime) && importedTime < currentTime) return importedEntry;
+        if (Number.isFinite(currentTime) && currentTime < importedTime) return currentEntry;
+    }
+    return currentEntry;
+}
+
+function mergeStoredGameState(currentState, importedState) {
+    const safeCurrent = currentState && typeof currentState === 'object' ? currentState : {};
+    const safeImported = importedState && typeof importedState === 'object' ? importedState : {};
+    const merged = { ...safeCurrent, ...safeImported };
+    const currentHistory = safeCurrent.history && typeof safeCurrent.history === 'object' ? safeCurrent.history : {};
+    const importedHistory = safeImported.history && typeof safeImported.history === 'object' ? safeImported.history : {};
+    const mergedHistory = { ...currentHistory };
+    const puzzleNums = new Set([...Object.keys(currentHistory), ...Object.keys(importedHistory)]);
+    for (const puzzleNum of puzzleNums) {
+        const currentEntry = currentHistory[puzzleNum];
+        const importedEntry = importedHistory[puzzleNum];
+        if (currentEntry?.completed && importedEntry?.completed) {
+            const richer = chooseRicherHistoryEntry(currentEntry, importedEntry);
+            mergedHistory[puzzleNum] = { ...richer, completed: true };
+        } else if (currentEntry?.completed || importedEntry?.completed) {
+            mergedHistory[puzzleNum] = {
+                ...(currentEntry?.completed ? currentEntry : importedEntry),
+                completed: true
+            };
+        } else if (currentEntry || importedEntry) {
+            mergedHistory[puzzleNum] = chooseRicherHistoryEntry(currentEntry, importedEntry);
+        }
+    }
+    merged.history = mergedHistory;
+    merged.streak = Math.max(Number(safeCurrent.streak || 0), Number(safeImported.streak || 0));
+    merged.freezes = Math.max(Number(safeCurrent.freezes || 0), Number(safeImported.freezes || 0));
+    merged.lastPlayedDate = Math.max(
+        Number(safeCurrent.lastPlayedDate || 0),
+        Number(safeImported.lastPlayedDate || 0)
+    ) || null;
+    return merged;
+}
+
+function exportProgressToFile() {
+    try {
+        const payload = {
+            version: 1,
+            app: 'make36',
+            exportedAt: new Date().toISOString(),
+            localStorage: collectMake36LocalStorageDump()
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const stamp = payload.exportedAt.replace(/[:.]/g, '-');
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `make36-progress-${stamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        setBackupStatus('Progress exported.', 'success');
+    } catch (e) {
+        console.error('Export failed:', e);
+        setBackupStatus('Export failed.', 'error');
+    }
+}
+
+async function importProgressFromFile(file) {
+    if (!file) return;
+    try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const isValid = parsed
+            && parsed.version === 1
+            && parsed.app === 'make36'
+            && parsed.localStorage
+            && typeof parsed.localStorage === 'object';
+        if (!isValid) {
+            setBackupStatus('Invalid backup file.', 'error');
+            return;
+        }
+        const ok = confirm('This will merge/overwrite local progress with imported data. Continue?');
+        if (!ok) return;
+        const currentStored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        const importedStored = JSON.parse(parsed.localStorage[STORAGE_KEY] || '{}');
+        const merged = mergeStoredGameState(currentStored, importedStored);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        for (const [key, value] of Object.entries(parsed.localStorage)) {
+            if (key === STORAGE_KEY) continue;
+            if (key.startsWith('make36')) {
+                localStorage.setItem(key, value);
+            }
+        }
+        setBackupStatus('Import complete. Reloading...', 'success');
+        setTimeout(() => window.location.reload(), 250);
+    } catch (e) {
+        console.error('Import failed:', e);
+        setBackupStatus('Import failed. Check JSON file.', 'error');
+    }
+}
+
+// ============================================================
 // CORE GAME ENGINE
 // ============================================================
 function mulberry32(seed) {
@@ -1215,6 +1357,24 @@ function initPuzzle(puzzleNum, isArchive = false) {
     }
 }
 
+function getNearestEarlierUnsolvedPuzzle(fromPuzzleNum) {
+    for (let num = fromPuzzleNum - 1; num >= 1; num--) {
+        if (!gameState.history[num]?.completed) return num;
+    }
+    return null;
+}
+
+function playAnother() {
+    const next = getNearestEarlierUnsolvedPuzzle(currentPuzzle.puzzleNum);
+    hideVictoryCard();
+    if (next !== null) {
+        initPuzzle(next, next !== getTodayPuzzleNumber());
+    } else {
+        // All earlier puzzles solved — fall back to the history picker
+        showArchive();
+    }
+}
+
 function showVictoryCard(opts) {
     const { badge, badgeClass, date, time, moves, streak, percentileText } = opts;
     document.getElementById('victoryBadge').textContent = badge;
@@ -1226,6 +1386,9 @@ function showVictoryCard(opts) {
     const pEl = document.getElementById('victoryPercentile');
     pEl.textContent = percentileText || '';
     pEl.className = 'victory-percentile';
+    // Footer only shown for today's puzzle, not archive replays
+    const footerEl = document.getElementById('victoryFooter');
+    if (footerEl) footerEl.style.display = currentPuzzle.isArchive ? 'none' : '';
     document.getElementById('victoryBackdrop').classList.add('show');
 }
 
@@ -2637,9 +2800,20 @@ document.getElementById('closeArchive').addEventListener('click', () => {
     document.getElementById('archiveModal').classList.remove('show');
 });
 
+document.getElementById('playAnotherBtn').addEventListener('click', playAnother);
 document.getElementById('shareBtn').addEventListener('click', share);
 document.getElementById('challengeBtn').addEventListener('click', shareChallenge);
 document.getElementById('shareHistoryBtn').addEventListener('click', shareHistoryGrid);
+
+document.getElementById('exportProgressBtn').addEventListener('click', exportProgressToFile);
+document.getElementById('importProgressBtn').addEventListener('click', () => {
+    document.getElementById('importProgressFile').click();
+});
+document.getElementById('importProgressFile').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    await importProgressFromFile(file);
+    e.target.value = '';
+});
 
 // Tap the big green "36" to replay the solution
 document.getElementById('resultDisplay').addEventListener('click', () => {
@@ -2907,6 +3081,363 @@ boot();
 
 // Initialize shake-to-undo from saved preference
 initShakeSetting();
+
+// ============================================================
+// STORAGE DETECTIVE (diagnostic modal)
+// ============================================================
+function runDiagnostic() {
+    const content = document.getElementById('diagnosticContent');
+    if (!content) return;
+
+    // Detect display mode
+    let mode = 'Browser tab';
+    let badgeClass = 'diag-badge-browser';
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+        mode = 'Standalone PWA (home screen)';
+        badgeClass = 'diag-badge-pwa';
+    }
+
+    // Find make36 state
+    const possibleKeys = ['make36_v1', 'make36_v2', 'make36_state', 'make36'];
+    let stateKey = null;
+    let stateData = null;
+    for (const k of possibleKeys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+            stateKey = k;
+            try { stateData = JSON.parse(raw); } catch(e) { stateData = null; }
+            break;
+        }
+    }
+    if (!stateKey) {
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.toLowerCase().includes('make36')) {
+                stateKey = k;
+                try { stateData = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+                break;
+            }
+        }
+    }
+
+    // Auth state
+    let authFound = false;
+    let authEmail = '—';
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.includes('supabase') && k.includes('auth')) {
+            authFound = true;
+            try {
+                const d = JSON.parse(localStorage.getItem(k));
+                if (d?.user?.email) authEmail = d.user.email;
+                else if (d?.currentSession?.user?.email) authEmail = d.currentSession.user.email;
+            } catch(e) {}
+        }
+    }
+
+    // All keys
+    const allKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k);
+        allKeys.push({ key: k, size: v ? v.length : 0 });
+    }
+    allKeys.sort((a, b) => a.key.localeCompare(b.key));
+
+    let historyCount = 0;
+    if (stateData?.history && typeof stateData.history === 'object') {
+        historyCount = Object.keys(stateData.history).length;
+    }
+
+    let liveDeviceId = '—';
+    let liveStreak = '—';
+    if (typeof gameState !== 'undefined') {
+        liveDeviceId = gameState.deviceId || '—';
+        liveStreak = gameState.streak !== undefined ? gameState.streak : '—';
+    }
+
+    const fp = {
+        mode,
+        url: window.location.href,
+        storageKey: stateKey || 'none',
+        deviceId: stateData?.deviceId || 'none',
+        liveDeviceId,
+        streak: stateData?.streak !== undefined ? stateData.streak : null,
+        liveStreak,
+        maxStreak: stateData?.maxStreak !== undefined ? stateData.maxStreak : null,
+        historyCount,
+        lastPlayed: stateData?.lastPlayedDate || 'none',
+        totalKeys: localStorage.length,
+        ts: new Date().toISOString()
+    };
+
+    const row = (label, value, cls) =>
+        `<div class="diag-row"><span class="diag-label">${label}</span><span class="diag-value ${cls || ''}">${value}</span></div>`;
+
+    let html = '';
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Browser Context</div>`;
+    html += row('Mode', `<span class="diag-badge ${badgeClass}">${mode}</span>`);
+    html += row('URL', window.location.href, 'muted');
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Game State</div>`;
+    html += row('Storage key', stateKey ? `<span class="good">${stateKey}</span>` : '<span class="bad">Not found</span>');
+    html += row('Device ID (stored)', stateData?.deviceId ? `<span class="diag-mono">${stateData.deviceId}</span>` : '—');
+    html += row('Device ID (live)', `<span class="diag-mono">${liveDeviceId}</span>`);
+    html += row('Current streak', stateData?.streak !== undefined ? stateData.streak : '—', stateData?.streak > 0 ? 'good' : 'warn');
+    html += row('Live streak', String(liveStreak), '');
+    html += row('Max streak', stateData?.maxStreak !== undefined ? stateData.maxStreak : '—');
+    html += row('Games in history', historyCount);
+    html += row('Last played', stateData?.lastPlayedDate || '—');
+    html += row('Freezes', stateData?.freezes !== undefined ? stateData.freezes : '—');
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">Auth</div>`;
+    html += row('Supabase session', authFound ? '<span class="good">Found</span>' : '<span class="muted">None</span>');
+    html += row('Email', authEmail);
+    html += `</div>`;
+
+    html += `<div class="diag-section">`;
+    html += `<div class="diag-section-title">All localStorage Keys (${allKeys.length})</div>`;
+    for (const k of allKeys) {
+        const sizeLabel = k.size > 1024 ? (k.size / 1024).toFixed(1) + ' KB' : k.size + ' B';
+        html += row(k.key, sizeLabel, 'muted');
+    }
+    html += `</div>`;
+
+    const fpStr = JSON.stringify(fp, null, 2);
+    html += `<div class="diag-fingerprint">`;
+    html += `<p style="font-size:12px;color:#888;margin:0 0 8px;">Copy from both contexts to compare</p>`;
+    html += `<button class="diag-copy-btn" id="diagCopyBtn">Copy Fingerprint</button>`;
+    html += `<code>${fpStr.replace(/</g, '&lt;')}</code>`;
+    html += `</div>`;
+
+    content.innerHTML = html;
+
+    document.getElementById('diagCopyBtn')?.addEventListener('click', () => {
+        navigator.clipboard?.writeText(fpStr).then(() => {
+            const btn = document.getElementById('diagCopyBtn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Fingerprint', 2000); }
+        }).catch(() => {
+            const ta = document.createElement('textarea');
+            ta.value = fpStr;
+            ta.style.cssText = 'position:fixed;left:-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            const btn = document.getElementById('diagCopyBtn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Fingerprint', 2000); }
+        });
+    });
+}
+
+document.getElementById('diagnosticBtn')?.addEventListener('click', () => {
+    runDiagnostic();
+    document.getElementById('diagnosticModal')?.classList.add('show');
+});
+document.getElementById('closeDiagnostic')?.addEventListener('click', () => {
+    document.getElementById('diagnosticModal')?.classList.remove('show');
+});
+document.getElementById('diagnosticModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+});
+
+// ============================================================
+// ADD TO HOME SCREEN PROMPT (iOS Safari, one-time)
+// ============================================================
+(function initA2HS() {
+    const A2HS_KEY = 'make36_a2hs_dismissed';
+
+    if (typeof window === 'undefined') return;
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+    const isStandalone = navigator.standalone === true;
+    const isDismissed = localStorage.getItem(A2HS_KEY) === '1';
+
+    if (!isIOS || !isSafari || isStandalone || isDismissed) return;
+
+    const prompt = document.getElementById('a2hsPrompt');
+    const instruction = document.getElementById('a2hsInstruction');
+    const addBtn = document.getElementById('a2hsTapAdd');
+    const dismissBtn = document.getElementById('a2hsDismiss');
+    if (!prompt || !instruction || !addBtn || !dismissBtn) return;
+
+    function hideAll() {
+        prompt.classList.remove('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'true');
+        instruction.classList.remove('a2hs-visible');
+        instruction.setAttribute('aria-hidden', 'true');
+        localStorage.setItem(A2HS_KEY, '1');
+    }
+
+    addBtn.addEventListener('click', () => {
+        prompt.classList.remove('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'true');
+        instruction.classList.add('a2hs-visible');
+        instruction.setAttribute('aria-hidden', 'false');
+        setTimeout(() => {
+            instruction.classList.remove('a2hs-visible');
+            instruction.setAttribute('aria-hidden', 'true');
+        }, 5000);
+        localStorage.setItem(A2HS_KEY, '1');
+    });
+
+    dismissBtn.addEventListener('click', hideAll);
+
+    document.addEventListener('pointerdown', function onInteract(e) {
+        if (e.target.closest('.board-cell, .slot, #gameBoard')) {
+            hideAll();
+            document.removeEventListener('pointerdown', onInteract);
+        }
+    }, { passive: true });
+
+    setTimeout(() => {
+        prompt.classList.add('a2hs-visible');
+        prompt.setAttribute('aria-hidden', 'false');
+    }, 2000);
+})();
+
+// ============================================================
+// KEYBOARD SHORTCUTS (desktop play)
+// ============================================================
+(function initKeyboardHandler() {
+    let keyBuffer = '';
+    let keyBufferTimeout = null;
+
+    const MODAL_IDS = [
+        'settingsModal', 'calendarModal', 'diagnosticModal',
+        'archiveModal', 'detailsModal', 'replayOverlay'
+    ];
+
+    function isModalOpen() {
+        return MODAL_IDS.some(id => {
+            const el = document.getElementById(id);
+            return el && el.classList.contains('show');
+        });
+    }
+
+    function clearBuffer() {
+        keyBuffer = '';
+        if (keyBufferTimeout) {
+            clearTimeout(keyBufferTimeout);
+            keyBufferTimeout = null;
+        }
+    }
+
+    function getActiveTiles() {
+        return playState.cards
+            .map((c, i) => ({ value: c.value, index: i, used: c.used }))
+            .filter(t => !t.used);
+    }
+
+    function findTileIndex(value) {
+        for (let i = 0; i < playState.cards.length; i++) {
+            if (!playState.cards[i].used &&
+                playState.cards[i].value === value &&
+                !playState.selected.includes(i)) {
+                return i;
+            }
+        }
+        for (let i = 0; i < playState.cards.length; i++) {
+            if (!playState.cards[i].used && playState.cards[i].value === value) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function commitBuffer() {
+        keyBufferTimeout = null;
+        const num = parseInt(keyBuffer, 10);
+        keyBuffer = '';
+        if (isNaN(num)) return;
+        const idx = findTileIndex(num);
+        if (idx !== -1) selectCard(idx);
+    }
+
+    function hasLongerPrefixMatch(buf, activeTiles) {
+        return activeTiles.some(t => {
+            const vs = String(t.value);
+            return vs.startsWith(buf) && vs.length > buf.length;
+        });
+    }
+
+    function handleDigit(digit) {
+        keyBuffer += digit;
+        if (keyBufferTimeout) {
+            clearTimeout(keyBufferTimeout);
+            keyBufferTimeout = null;
+        }
+        const activeTiles = getActiveTiles();
+        const num = parseInt(keyBuffer, 10);
+        const hasExact = activeTiles.some(t => t.value === num);
+        const hasLonger = hasLongerPrefixMatch(keyBuffer, activeTiles);
+        if (hasExact && !hasLonger) {
+            keyBuffer = '';
+            const idx = findTileIndex(num);
+            if (idx !== -1) selectCard(idx);
+        } else if (hasExact || hasLonger) {
+            keyBufferTimeout = setTimeout(commitBuffer, 600);
+        } else {
+            keyBuffer = '';
+        }
+    }
+
+    const OP_KEYS = {
+        '+': '+',
+        '-': '-',
+        '*': '*',
+        'x': '*',
+        '/': '/'
+    };
+
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (isModalOpen()) return;
+        if (playState.completed) return;
+
+        const key = e.key;
+
+        if (key >= '0' && key <= '9') {
+            e.preventDefault();
+            handleDigit(key);
+            return;
+        }
+
+        const op = OP_KEYS[key] || (key === 'X' ? '*' : null);
+        if (op) {
+            e.preventDefault();
+            if (keyBuffer) {
+                if (keyBufferTimeout) clearTimeout(keyBufferTimeout);
+                commitBuffer();
+            }
+            if (playState.selected.length === 2) {
+                applyOperation(op);
+            }
+            return;
+        }
+
+        if (key === 'Backspace' || key === 'z' || key === 'Z') {
+            e.preventDefault();
+            clearBuffer();
+            undo();
+            return;
+        }
+
+        if (key === 'Escape') {
+            clearBuffer();
+            playState.selected = [];
+            hideOperators();
+            renderCards();
+            return;
+        }
+    });
+})();
 
 // ============================================================
 // EXPORTS FOR TESTING (Node.js only)

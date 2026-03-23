@@ -1,0 +1,816 @@
+/* =============================================================
+   SPEAKEASY — "After Hours" sequence-run mode for Make24
+   All structural selectors prefixed .spk- to avoid collisions.
+   Cards (.card, .selected, .first, .second) and operator buttons
+   (.op-btn, .operators-grid) intentionally reuse base-game classes
+   from style.css so they look pixel-identical to the daily puzzle.
+
+   TUNE: SECONDS_PER_TARGET lives in speakeasy.js.
+   ============================================================= */
+
+/* ---------------------------------------------------------------
+   OVERLAY  (z-index 600: above victory card at 100, below confetti at 1000)
+   --------------------------------------------------------------- */
+.spk-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: flex-end;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.spk-overlay.spk-visible {
+    display: flex;
+    animation: spk-fade-in 0.2s ease-out;
+}
+/* Centered variant — used for intro card and thin-market notice */
+.spk-overlay.spk-overlay-center {
+    align-items: center;
+    justify-content: center;
+}
+@keyframes spk-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ---------------------------------------------------------------
+   GAME SCREEN  (full overlay, flex column)
+   --------------------------------------------------------------- */
+.spk-game-screen {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 440px;
+    height: 100dvh;
+    background: #0f172a;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------------------------------------------------------------
+   TOP BAR
+   --------------------------------------------------------------- */
+.spk-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 10px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #1e293b;
+}
+.spk-back-btn {
+    background: none; border: none;
+    color: #94a3b8; font-size: 1.5rem;
+    cursor: pointer; padding: 6px 8px;
+    border-radius: 8px; min-width: 44px;
+    text-align: center; line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+.spk-back-btn:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); }
+
+.spk-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.spk-topbar-progress {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+/* SPEAKEASY badge */
+.spk-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fbbf24;
+    padding: 3px 8px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 6px;
+    line-height: 1;
+}
+
+/* Difficulty stars in topbar */
+.spk-stars {
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+/* Topbar 🔑 key (placement A — injected after #streakDisplay in the app header) */
+.spk-key-topbar {
+    background: none; border: none;
+    font-size: 1rem; cursor: pointer;
+    opacity: 0.45; padding: 4px;
+    border-radius: 8px; line-height: 1;
+    transition: opacity 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+}
+.spk-key-topbar:hover { opacity: 1; }
+
+.spk-game-label {
+    font-size: 0.875rem; font-weight: 600; color: #f1f5f9;
+    flex: 1; text-align: center; padding: 0 8px;
+}
+
+/* ---------------------------------------------------------------
+   TARGET DISPLAY  (large number showing what to make)
+   --------------------------------------------------------------- */
+.spk-target-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 16px 4px;
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.spk-target-label {
+    font-size: 0.8125rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.spk-target-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #22d3ee;
+    line-height: 1;
+    min-width: 60px;
+    text-align: center;
+}
+
+/* ---------------------------------------------------------------
+   TIMER BAR  (4px tall, sits below target)
+   --------------------------------------------------------------- */
+.spk-timer-bar-track {
+    width: 100%;
+    height: 4px;
+    background: #1e293b;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.spk-timer-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: #22d3ee;
+    transform-origin: left;
+    transition: transform 0.1s linear, background-color 0.3s;
+}
+
+.spk-timer-bar-fill.spk-timer-warn {
+    background: #fbbf24;
+}
+
+.spk-timer-bar-fill.spk-timer-danger {
+    background: #ef4444;
+    animation: spk-timer-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes spk-timer-pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spk-timer-bar-fill { transition: none; }
+    .spk-timer-bar-fill.spk-timer-danger { animation: none; }
+}
+
+/* ---------------------------------------------------------------
+   SEQUENCE CHIPS ROW  (horizontal scroll of targets)
+   --------------------------------------------------------------- */
+.spk-chips-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px 12px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    border-top: 1px solid #1e293b;
+}
+.spk-chips-row::-webkit-scrollbar { display: none; }
+
+.spk-seq-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    min-width: 28px;
+    flex-shrink: 0;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+/* Pending chip — dim */
+.spk-seq-chip-pending {
+    background: none;
+    border: 1.5px solid #1e293b;
+    color: #334155;
+}
+
+/* Active chip — cyan outline, bright */
+.spk-seq-chip-active {
+    background: rgba(34, 211, 238, 0.1);
+    border: 1.5px solid #22d3ee;
+    color: #22d3ee;
+    animation: spk-chip-glow 1.5s ease-in-out infinite alternate;
+}
+@keyframes spk-chip-glow {
+    from { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    to   { box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.25); }
+}
+
+/* Done chip — green */
+.spk-seq-chip-done {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1.5px solid #10b981;
+    color: #10b981;
+}
+
+/* Missed chip (on end screen) */
+.spk-seq-chip-missed {
+    background: none;
+    border: 1.5px solid #1e293b;
+    color: #475569;
+}
+
+/* ---------------------------------------------------------------
+   GAME ARENA  (diamond grid, takes remaining height)
+   --------------------------------------------------------------- */
+.spk-arena {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* ---------------------------------------------------------------
+   DIAMOND GRID  — identical layout to the base game.
+   Cards inside use the base-game's .card class from style.css.
+   --------------------------------------------------------------- */
+.spk-diamond-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 12px;
+    width: 320px;
+    height: 320px;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+}
+.spk-slot { display: flex; align-items: center; justify-content: center; }
+.spk-slot-top    { grid-column: 2; grid-row: 1; }
+.spk-slot-left   { grid-column: 1; grid-row: 2; }
+.spk-slot-right  { grid-column: 3; grid-row: 2; }
+.spk-slot-bottom { grid-column: 2; grid-row: 3; }
+
+/* Undo row */
+.spk-undo-row {
+    position: relative; z-index: 2;
+    height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.spk-undo-btn {
+    background: none; border: none;
+    color: #64748b; font-size: 0.875rem;
+    cursor: pointer; padding: 6px 14px; border-radius: 8px;
+    transition: color 0.15s, background 0.15s;
+}
+.spk-undo-btn:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); }
+
+/* Inline microfeedback ("+1", "Already done", etc.) */
+.spk-inline-fb {
+    position: relative; z-index: 2;
+    height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.875rem; font-weight: 600;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+.spk-inline-fb.spk-fb-show { opacity: 1; }
+.spk-inline-fb.spk-fb-new  { color: #10b981; }
+.spk-inline-fb.spk-fb-dupe { color: #f59e0b; }
+.spk-inline-fb.spk-fb-bad  { color: #ef4444; }
+.spk-inline-fb.spk-fb-skip { color: #94a3b8; }
+
+/* ---------------------------------------------------------------
+   OPERATOR OVERLAY  (absolute inside .spk-arena)
+   Uses base-game .operators-grid + .op-btn for identical look.
+   --------------------------------------------------------------- */
+.spk-op-overlay {
+    position: absolute; inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 10;
+}
+.spk-op-overlay.spk-op-show { display: flex; }
+
+/* Inline operator display for solution replay (centered in diamond grid) */
+.spk-sol-op-display {
+    grid-column: 2; grid-row: 2;
+    font-family: 'Space Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #22d3ee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.spk-sol-op-display.visible { opacity: 1; }
+
+/* ---------------------------------------------------------------
+   RESULT SCREEN  (end of game — completion or game over)
+   --------------------------------------------------------------- */
+.spk-result {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 28px 24px;
+    text-align: center;
+    overflow-y: auto;
+    animation: spk-fade-in 0.3s ease-out;
+}
+/* Badge / heading classification */
+.spk-result-badge {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+.spk-heading-perfect { color: #fbbf24; }
+.spk-heading-partial { color: #10b981; }
+.spk-heading-none    { color: #94a3b8; }
+
+.spk-result-date {
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+/* Stats row — mirrors victory-stats from main game */
+.spk-result-stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 8px;
+}
+.spk-result-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.spk-result-stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+.spk-result-stat-label {
+    font-size: 0.6875rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Legacy aliases kept for backwards compat */
+.spk-result-icon    { font-size: 2.75rem; line-height: 1; margin-bottom: 2px; }
+.spk-result-heading { font-size: 1.375rem; font-weight: 700; color: #f1f5f9; }
+.spk-result-stat    { font-family: 'Space Mono', monospace; font-size: 1.125rem; color: #22d3ee; font-weight: 700; }
+.spk-result-sub     { font-size: 0.875rem; color: #94a3b8; }
+.spk-result-streak  { font-size: 0.875rem; color: #fbbf24; font-weight: 600; }
+.spk-result-hint    { font-size: 0.75rem; color: #475569; }
+
+/* Full order book on the end screen */
+.spk-result-book {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+    max-width: 340px;
+    margin-top: 4px;
+}
+
+/* Chips: shared base — reusing for result screen */
+.spk-chip-found,
+.spk-chip-missed {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    min-width: 28px;
+}
+.spk-chip-found  { background: rgba(16, 185, 129, 0.15); border: 1.5px solid #10b981; color: #10b981; }
+.spk-chip-missed { background: none; border: 1.5px solid #1e293b; color: #475569; }
+/* Tappable missed chip (has a stored solution) */
+.spk-chip-tappable {
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.spk-chip-tappable:hover {
+    border-color: #64748b;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Result action buttons */
+.spk-result-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%; max-width: 280px;
+    margin-top: 12px;
+}
+.spk-btn {
+    border-radius: 8px;
+    font-size: 0.875rem; font-weight: 600;
+    padding: 10px 20px;
+    cursor: pointer; border: none;
+    transition: background 0.15s, transform 0.1s;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.spk-btn:active { transform: scale(0.97); }
+.spk-btn-primary { background: #22d3ee; color: #0f172a; }
+.spk-btn-primary:hover { background: #0891b2; }
+.spk-btn-share   { background: #0f172a; color: #22d3ee; border: 1px solid #22d3ee; }
+.spk-btn-share:hover { background: #0c3a4a; }
+.spk-btn-ghost   { background: none; color: #94a3b8; border: 1px solid #334155; }
+.spk-btn-ghost:hover { color: #f1f5f9; border-color: #64748b; }
+
+/* ---------------------------------------------------------------
+   PERFECT COMPLETION  (.spk-result.spk-result-perfect)
+   --------------------------------------------------------------- */
+.spk-result.spk-result-perfect { gap: 12px; }
+
+.spk-result.spk-result-perfect .spk-result-icon {
+    font-size: 3.25rem;
+    animation: spk-result-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes spk-result-pop {
+    from { transform: scale(0.3); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+
+.spk-result.spk-result-perfect .spk-result-heading {
+    font-size: 1.75rem;
+    color: #22d3ee;
+    letter-spacing: 0.02em;
+}
+.spk-result.spk-result-perfect .spk-result-badge {
+    font-size: 1.25rem;
+    color: #fbbf24;
+}
+
+.spk-result.spk-result-perfect .spk-result-stat {
+    font-size: 1.25rem;
+    color: #fbbf24;
+}
+
+/* All found-chips get a green tint on a perfect run */
+.spk-result.spk-result-perfect .spk-chip-found {
+    background: rgba(16, 185, 129, 0.18);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+/* ---------------------------------------------------------------
+   INTRO CARD  (first-run modal, centred in the overlay)
+   --------------------------------------------------------------- */
+.spk-intro-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    max-width: 320px;
+    width: calc(100% - 40px);
+    text-align: center;
+    animation: spk-intro-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes spk-intro-in {
+    from { transform: scale(0.86); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+.spk-intro-icon  { font-size: 3rem; line-height: 1; margin-bottom: 14px; }
+.spk-intro-title { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin-bottom: 10px; }
+.spk-intro-body  { font-size: 1rem; color: #94a3b8; line-height: 1.5; margin-bottom: 12px; }
+.spk-intro-tag   { font-size: 0.8125rem; color: #22d3ee; font-weight: 500; margin-bottom: 24px; }
+.spk-intro-start,
+.spk-intro-close { width: auto; padding: 12px 36px; display: inline-block; }
+
+/* ---------------------------------------------------------------
+   SOLUTION MODAL  (tapped from end screen, layered above game screen)
+   --------------------------------------------------------------- */
+.spk-solution-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 15, 28, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    animation: spk-fade-in 0.18s ease-out;
+    padding: 24px 20px;
+}
+
+.spk-sol-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 18px;
+    padding: 24px 20px 20px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    animation: spk-intro-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.spk-sol-heading {
+    font-size: 1rem; font-weight: 700; color: #94a3b8;
+}
+.spk-sol-n {
+    color: #22d3ee;
+    font-size: 1.25rem;
+}
+.spk-sol-expr {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    line-height: 1.4;
+    word-break: break-all;
+}
+.spk-sol-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+.spk-sol-watch,
+.spk-sol-close { width: 100%; padding: 11px 20px; }
+
+/* ---------------------------------------------------------------
+   SOLUTION BOARD  (full-size replay inside the solution modal)
+   Reuses the main diamond grid at a comfortable size.
+   --------------------------------------------------------------- */
+.spk-sol-board {
+    width: min(280px, 70vw);
+    height: min(280px, 70vw);
+    position: relative;
+    flex-shrink: 0;
+}
+.spk-sol-board .spk-diamond-grid {
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------------------------------------------------------------
+   SECRET DOOR  (🔑 key icon — victory card top-right, near the × button)
+   --------------------------------------------------------------- */
+.spk-key-btn {
+    position: absolute;
+    top: 12px; right: 42px;  /* just left of the × close button at right: 12px */
+    background: none; border: none;
+    font-size: 1rem; cursor: pointer;
+    opacity: 0.45; padding: 6px;
+    border-radius: 8px; line-height: 1;
+    transition: opacity 0.2s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 1;
+}
+.spk-key-btn:hover { opacity: 1; background: rgba(255,255,255,0.07); }
+
+/* ---------------------------------------------------------------
+   "TRY SPEAKEASY" BUTTON  (injected into victory card actions)
+   --------------------------------------------------------------- */
+.spk-try-btn {
+    background: none;
+    border: 1.5px solid rgba(251, 191, 36, 0.4);
+    border-radius: 12px;
+    color: #fbbf24;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.15s, border-color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.spk-try-btn:hover {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: #fbbf24;
+}
+
+/* ---------------------------------------------------------------
+   PAYWALL MODAL  (reuses .spk-intro-card as card base)
+   --------------------------------------------------------------- */
+.spk-paywall-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    align-items: center;
+    margin-top: 4px;
+}
+
+/* "Not now" tertiary dismiss — minimal, no background */
+.spk-paywall-dismiss {
+    background: none; border: none;
+    color: #475569; font-size: 0.875rem;
+    cursor: pointer; padding: 6px 12px;
+    border-radius: 8px;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+}
+.spk-paywall-dismiss:hover { color: #94a3b8; }
+
+/* ---------------------------------------------------------------
+   LICENSE ENTRY MODAL
+   --------------------------------------------------------------- */
+.spk-license-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #f1f5f9;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9375rem;
+    letter-spacing: 0.06em;
+    padding: 10px 12px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.15s;
+    margin-top: 4px;
+}
+.spk-license-input:focus { border-color: #22d3ee; }
+
+.spk-license-status {
+    font-size: 0.8125rem;
+    min-height: 1.2em;
+    text-align: center;
+    color: #64748b;
+}
+.spk-license-status.spk-status-ok  { color: #22d3ee; }
+.spk-license-status.spk-status-err { color: #ef4444; }
+
+/* ---------------------------------------------------------------
+   SETTINGS — AFTER HOURS SECTION
+   --------------------------------------------------------------- */
+.settings-section-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin: 18px 0 6px;
+}
+
+.spk-settings-ah {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.spk-settings-ah-status {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin: 0;
+}
+.spk-settings-ah-status strong { color: #22d3ee; }
+
+.spk-settings-ah-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------
+   DEV PANEL  (only shown when ?dev=1)
+   --------------------------------------------------------------- */
+.spk-dev-panel {
+    position: fixed;
+    bottom: 80px;
+    left: 8px;
+    z-index: 9999;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #94a3b8;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: all;
+}
+.spk-dev-title {
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 2px;
+}
+.spk-dev-panel button {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #94a3b8;
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+    text-align: left;
+}
+.spk-dev-panel button:hover { color: #f1f5f9; border-color: #475569; }
+.spk-dev-meta {
+    font-size: 10px;
+    color: #475569;
+    margin-top: 4px;
+    line-height: 1.5;
+    word-break: break-all;
+}
+
+/* ---------------------------------------------------------------
+   FEEDBACK MODAL  (Settings → "Send feedback")
+   --------------------------------------------------------------- */
+.spk-feedback-card {
+    width: 100%;
+    max-width: 360px;
+}
+
+.spk-feedback-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #f1f5f9;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 10px 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    margin-top: 4px;
+}
+.spk-feedback-textarea:focus { border-color: #22d3ee; }
+
+.spk-feedback-email {
+    width: 100%;
+    box-sizing: border-box;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #f1f5f9;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.spk-feedback-email:focus { border-color: #22d3ee; }
+.spk-feedback-email::placeholder { color: #475569; }
+
+/* ---------------------------------------------------------------
+   SETTINGS — SUPPORT ROW  (optional tip link)
+   --------------------------------------------------------------- */
+.spk-settings-support-row,
+.spk-settings-feedback-row {
+    margin-bottom: 6px;
+}

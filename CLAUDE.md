@@ -120,3 +120,24 @@ Before considering a feature complete, verify:
 - [ ] Edge cases and failure modes considered
 - [ ] Any shortcuts are tracked as issues
 - [ ] Time logic uses UTC storage with local display conversion
+
+---
+
+## 12. Git Workflow for Claude Code
+
+- main is the only long-lived branch.
+- Do not create a new branch unless I explicitly ask, or unless I have clearly asked for a distinct feature or fix that should live on its own branch.
+- Always work on the currently checked-out branch.
+- If you think a new branch is appropriate, propose the branch name first instead of creating it automatically.
+- Use short-lived branches named app-or-area/task.
+- Good examples:
+  - rainbow-rules/rebuild
+  - blinkgrid/daily-upgrade
+  - prim4/hints
+  - site/home-link-cleanup
+  - shared/supabase-audit
+- Never create random branch names like claude/* or codex/*.
+- Never push directly to main unless I explicitly ask.
+- After a PR is merged, assume the branch should be deleted.
+- If a branch appears abandoned or superseded, ask whether it should be deleted.
+
