@@ -8,14 +8,17 @@
  *   node scripts/build-longshot-board-bank.mjs
  *
  * How it works:
- *   1. Loads common-words.txt (one word per line, 5+ letters).
+ *   1. Loads longshot-common-words.txt — the filtered gameplay lexicon built
+ *      from the vendored wordfreq-en-25000 source (run build-longshot-lexicon.mjs
+ *      first to regenerate it).
  *   2. Iterates over the curated SEED_GRIDS list below.
  *   3. For each 4×4 grid, runs DFS path-finding to find all valid traceable
  *      words using 8-direction adjacency, no tile reuse.
  *   4. Picks the featured Longshot word (longest), derives medal thresholds,
  *      assembles the full board entry.
  *   5. Writes board-bank.json — the single source of truth for runtime
- *      validation. The game never re-derives allowed words at runtime.
+ *      validation. Runtime looks up submitted words in board.allowed (binary
+ *      search on the sorted per-board word set).
  *
  * To add more boards: append 16-char strings to SEED_GRIDS and re-run.
  * Board grids are row-major: positions 0-3 = row 0, 4-7 = row 1, etc.
@@ -28,7 +31,7 @@ import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT  = join(__dirname, '..');
-const WORDS_FILE = join(REPO_ROOT, 'apps/longshot/data/common-words.txt');
+const WORDS_FILE = join(REPO_ROOT, 'apps/longshot/data/longshot-common-words.txt');
 const OUT_FILE   = join(REPO_ROOT, 'apps/longshot/data/board-bank.json');
 
 // ── Load dictionary ──────────────────────────────────────────────────────────

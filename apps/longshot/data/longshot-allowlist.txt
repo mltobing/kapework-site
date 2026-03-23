@@ -1,0 +1,13 @@
+# Longshot allowlist — words to force-include in the gameplay lexicon
+# regardless of their wordfreq rank.
+#
+# Use this for clearly common English words that fall outside the rank
+# cutoff or were otherwise excluded. One word per line. Comments with #.
+#
+# Format: one word per line, lowercase, letters only, 5+ chars.
+
+# Common verb inflections sometimes just outside the cutoff
+gratin
+greats
+oaken
+stoic

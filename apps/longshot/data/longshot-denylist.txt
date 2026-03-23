@@ -1,0 +1,115 @@
+# Longshot denylist — words to exclude from the gameplay lexicon
+# even if they appear in the wordfreq top-N set.
+#
+# Use this for:
+#   - Obscure archaic / legalistic terms (most players won't know them)
+#   - Highly domain-specific jargon players wouldn't expect in a word game
+#   - Words that appear frequently in text but are abbreviations or
+#     fragments (havin, gonna, wanna, etc.)
+#
+# Words that are primarily proper nouns but happen to be lowercase in
+# the wordfreq corpus should also go here.
+# Format: one word per line, lowercase, 5+ chars. Comments with #.
+
+# ── Contractions / informal fragments (lowercase in corpus) ────────────────────
+havin
+gonna
+wanna
+gotta
+dunno
+lemme
+gimme
+tryna
+kinda
+sorta
+lotsa
+outta
+hafta
+woulda
+coulda
+shoulda
+musta
+oughta
+
+# ── Archaic / legalistic / overly specialist ───────────────────────────────────
+droit       # legal term for "right/entitlement" — obscure
+sprue       # industrial/botanical
+sprit       # nautical
+fleam       # archaic medical tool
+fleer       # archaic "to mock"
+groat       # historical coin
+stoep       # South African porch
+imago       # entomology
+terce       # canonical hours
+nodus       # archaic knot/difficulty
+ergot       # fungal disease — specialist
+godet       # sewing term
+genet       # animal/heraldry
+recto       # printing term
+verso       # printing term
+raphe       # anatomy
+tsuba       # Japanese sword guard
+voila       # French (not English)
+dixit       # Latin
+
+# ── Proper nouns that appear as lowercase in wordfreq ─────────────────────────
+# (people's names, place names, brand names etc.)
+# These appear in wordfreq because they occur in running text, but they're
+# not words a player would expect in a word game.
+amelia
+austin
+beatrice
+brixton
+calais
+claire
+cooper
+dallas
+dante
+dayton
+dubai
+emily
+essex
+exeter
+fatima
+fresno
+garcia
+giulia
+hawaii
+hirsch
+houston
+isabel
+julius
+laurie
+leroy
+lucia
+madrid
+manila
+manuel
+marcia
+marina
+naomi
+nordic
+pascal
+pierre
+pietro
+punjab
+rachel
+rahman
+ramona
+rhodes
+robbie
+romani
+romero
+rosie
+russia
+rwanda
+santos
+sergio
+sienna
+sophia
+stefan
+tucker
+venice
+viktor
+vivian
+yasmin

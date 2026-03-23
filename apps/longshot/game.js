@@ -3,9 +3,16 @@
  *
  * Responsible for:
  * - Tracking the current tile selection path
- * - Validating word submissions against the board's allowed word set
+ * - Validating word submissions against the board's precomputed allowed set
  * - Managing shot count and game completion
  * - Deriving medal results
+ *
+ * Validation model:
+ *   board.allowed is built at deploy-time by running DFS over each board grid
+ *   against the full filtered wordfreq-en-25000 lexicon (~15k words). Any word
+ *   that can be traced via 8-way adjacency AND is in the common-word lexicon is
+ *   in board.allowed. Runtime does a single binary search against this sorted
+ *   array — no path-finding needed at runtime.
  *
  * No DOM access — pure game state.
  */
@@ -17,16 +24,14 @@ var MIN_WORD_LENGTH = 5;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 var _board   = null;   // board object from board-bank
-var _lexicon = null;   // Set of common words (loaded at runtime)
 var _path    = [];     // array of tile indices forming current selection
 var _shots   = [];     // array of valid submitted words (max 3)
 var _done    = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-function init(board, savedState, lexiconSet) {
-  _board   = board;
-  _lexicon = lexiconSet || null;
-  _path    = [];
+function init(board, savedState) {
+  _board = board;
+  _path  = [];
 
   if (savedState && savedState.shots) {
     _shots = savedState.shots.slice(0, MAX_SHOTS);
@@ -93,10 +98,11 @@ function getPath() {
 // Validation order:
 //   1. Too short (< 5 letters)
 //   2. Already submitted this run
-//   3. Not in the common-word lexicon
+//   3. Not in board.allowed (the board's full pre-DFS'd word set, built from
+//      the wordfreq-en-25000-derived lexicon at deploy time)
 //
-// Path validity is already enforced by tile selection — if the word was built
-// by tapping tiles in the grid, every step was adjacency-checked in real time.
+// board.allowed is a sorted array — binary search is O(log n).
+// Path adjacency is enforced at tile-selection time, not here.
 function submitWord() {
   var word = getCurrentWord();
 
@@ -108,11 +114,16 @@ function submitWord() {
     return { valid: false, reason: 'Already submitted this run', word: word };
   }
 
-  // Lexicon check — validate against the common-word list loaded at runtime.
-  // This is the trust-first approach: any word the player can trace + is
-  // in the common English lexicon is accepted.
-  var inLexicon = _lexicon ? _lexicon.has(word) : false;
-  if (!inLexicon) {
+  // Binary search in board.allowed (sorted array)
+  var allowed = _board.allowed;
+  var lo = 0, hi = allowed.length - 1, found = false;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (allowed[mid] === word)      { found = true; break; }
+    if (allowed[mid] < word) lo = mid + 1; else hi = mid - 1;
+  }
+
+  if (!found) {
     return { valid: false, reason: 'Not in our word list', word: word };
   }
 
