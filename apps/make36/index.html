@@ -7,6 +7,8 @@
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/apps/make36/manifest.json">
+    <link rel="apple-touch-icon" href="/apps/make36/icons/icon-512.png">
     <title>Make 36</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,9 +106,11 @@
             </div>
             <div class="victory-percentile" id="victoryPercentile"></div>
             <div class="victory-actions">
-                <button class="btn btn-primary" id="shareBtn" aria-label="Share result">Share</button>
+                <button class="btn btn-primary" id="playAnotherBtn" aria-label="Play another unsolved puzzle">Play Another</button>
+                <button class="btn btn-secondary" id="shareBtn" aria-label="Share result">Share</button>
                 <button class="btn btn-challenge" id="challengeBtn" aria-label="Challenge a friend">Challenge</button>
             </div>
+            <div class="victory-footer" id="victoryFooter">New puzzle tomorrow</div>
         </div>
     </div>
 
@@ -182,6 +186,26 @@
             </div>
             <div class="shake-guidance" id="shakeGuidance"></div>
 
+            <!-- B: Backup -->
+            <div class="backup-section">
+                <div class="sync-label">Backup</div>
+                <p class="settings-backup-note">Progress is stored on this device. Export or import to move it.</p>
+                <div class="sync-methods">
+                    <button class="email-send-btn" id="exportProgressBtn" aria-label="Export progress">Export progress</button>
+                    <button class="otp-verify-btn" id="importProgressBtn" aria-label="Import progress">Import progress</button>
+                    <input type="file" id="importProgressFile" accept="application/json" style="display:none;">
+                </div>
+                <div class="sync-status" id="backupStatus"></div>
+            </div>
+
+            <!-- D: Diagnostic -->
+            <div class="backup-section">
+                <div class="sync-label">Diagnostic</div>
+                <div class="sync-methods">
+                    <button class="email-send-btn" id="diagnosticBtn" aria-label="Run diagnostic">Storage Detective</button>
+                </div>
+            </div>
+
             <div class="sync-section" id="syncSection">
                 <div class="sync-label" id="syncLabel">Keep your streak across devices</div>
                 <div class="sync-methods" id="syncMethods">
@@ -230,6 +254,28 @@
 
     <div class="confetti-container" id="confetti"></div>
     <canvas class="share-canvas" id="shareCanvas"></canvas>
+
+    <!-- Add to Home Screen prompt (iOS Safari only, shown once) -->
+    <div class="a2hs-prompt" id="a2hsPrompt" aria-hidden="true">
+        <span class="a2hs-text">Add Make36 to your home screen for the daily puzzle</span>
+        <div class="a2hs-actions">
+            <button class="a2hs-btn a2hs-btn-add" id="a2hsTapAdd">Add</button>
+            <button class="a2hs-btn a2hs-btn-dismiss" id="a2hsDismiss">Dismiss</button>
+        </div>
+    </div>
+    <!-- Add to Home Screen instruction (shown after tapping Add) -->
+    <div class="a2hs-instruction" id="a2hsInstruction" aria-hidden="true">
+        Tap <strong>Share</strong> → <strong>Add to Home Screen</strong>
+    </div>
+
+    <!-- Diagnostic overlay -->
+    <div class="modal-overlay" id="diagnosticModal">
+        <div class="modal" style="max-height:85vh;overflow-y:auto;">
+            <h2>Storage Detective</h2>
+            <div id="diagnosticContent"></div>
+            <button class="modal-close" id="closeDiagnostic" aria-label="Close">Close</button>
+        </div>
+    </div>
 
     <script src="/shared/config.js"></script>
     <script src="app.js"></script>

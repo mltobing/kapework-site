@@ -1,4 +1,8 @@
 * {
+  touch-action: manipulation;
+}
+
+* {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -270,6 +274,26 @@ body {
 }
 .shake-guidance .guidance-steps li {
     margin-bottom: 3px;
+}
+/* Collapsed <details> wrapper for shake guidance */
+.shake-guidance .guidance-details {
+    cursor: pointer;
+}
+.shake-guidance .guidance-details summary {
+    font-size: 0.75rem;
+    color: #22d3ee;
+    list-style: none;
+    margin-bottom: 4px;
+}
+.shake-guidance .guidance-details summary::-webkit-details-marker { display: none; }
+.shake-guidance .guidance-details[open] summary { margin-bottom: 8px; }
+
+/* Note beneath backup section label */
+.settings-backup-note {
+    font-size: 0.75rem;
+    color: #475569;
+    margin: 0 0 8px;
+    line-height: 1.4;
 }
 
 /* Sync section in archive modal */
@@ -825,6 +849,7 @@ body {
     display: flex;
     gap: 8px;
     justify-content: center;
+    flex-wrap: wrap;
 }
 
 .btn {
@@ -832,17 +857,39 @@ body {
     font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 600;
     cursor: pointer; transition: all 0.15s ease;
 }
-.btn-primary { background: #22d3ee; color: #0f172a; }
-.btn-primary:hover { background: #0891b2; }
+.btn-primary {
+    background: #10b981;
+    color: #fff;
+    border: 2px solid #10b981;
+}
+.btn-primary:hover { background: #059669; border-color: #059669; }
+
+.btn-secondary {
+    background: transparent;
+    color: #94a3b8;
+    border: 2px solid #334155;
+}
+.btn-secondary:hover {
+    border-color: #94a3b8;
+    color: #f1f5f9;
+}
 
 .btn-challenge {
     background: transparent;
     color: #94a3b8;
-    border: 1px solid #334155;
+    border: 2px solid #334155;
 }
 .btn-challenge:hover {
     border-color: #94a3b8;
     color: #f1f5f9;
+}
+
+.victory-footer {
+    margin-top: 14px;
+    font-size: 0.75rem;
+    color: #475569;
+    text-align: center;
+    letter-spacing: 0.01em;
 }
 
 /* Archive Modal */
@@ -1197,6 +1244,8 @@ body {
 }
 .details-status.solved { color: #10b981; }
 .details-status.perfect { color: #fbbf24; }
+.details-status.clean { color: #2dd4bf; }
+.details-status.hinted { color: #94a3b8; }
 .details-status.missed { color: #64748b; }
 
 .details-stats-row {
@@ -1599,3 +1648,161 @@ body {
         animation-duration: 0.01ms !important;
     }
 }
+
+/* ============================================================
+   ADD TO HOME SCREEN PROMPT (iOS Safari, shown once)
+   ============================================================ */
+.a2hs-prompt {
+    position: fixed;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 500;
+    width: min(88vw, 360px);
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    transition: transform 0.35s ease, opacity 0.35s ease;
+    pointer-events: none;
+}
+.a2hs-prompt.a2hs-visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+.a2hs-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+.a2hs-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.a2hs-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.a2hs-btn-add {
+    background: #22d3ee;
+    color: #0f172a;
+}
+.a2hs-btn-add:hover { background: #0891b2; }
+.a2hs-btn-dismiss {
+    background: transparent;
+    color: #64748b;
+    border: 1px solid #334155;
+}
+.a2hs-btn-dismiss:hover { color: #94a3b8; border-color: #94a3b8; }
+
+.a2hs-instruction {
+    position: fixed;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 500;
+    width: min(88vw, 360px);
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    text-align: center;
+    opacity: 0;
+    transition: transform 0.35s ease, opacity 0.35s ease;
+    pointer-events: none;
+}
+.a2hs-instruction.a2hs-visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+/* Diagnostic styles */
+.diag-section { margin-bottom: 16px; }
+.diag-section-title {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+.diag-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.diag-row:last-child { border-bottom: none; }
+.diag-label { font-size: 13px; color: #999; }
+.diag-value {
+    font-size: 13px;
+    color: #fff;
+    font-weight: 600;
+    text-align: right;
+    max-width: 60%;
+    word-break: break-all;
+}
+.diag-value.good { color: #22c55e; }
+.diag-value.warn { color: #f59e0b; }
+.diag-value.bad  { color: #ef4444; }
+.diag-value.muted { color: #666; font-weight: 400; }
+.diag-mono {
+    font-family: monospace;
+    font-size: 11px;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.diag-fingerprint {
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+    text-align: center;
+}
+.diag-fingerprint code {
+    display: block;
+    font-size: 10px;
+    color: #f59e0b;
+    word-break: break-all;
+    margin-top: 8px;
+    text-align: left;
+    white-space: pre-wrap;
+    user-select: all;
+}
+.diag-copy-btn {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.diag-copy-btn:active { background: rgba(255,255,255,0.2); }
+.diag-badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+.diag-badge-pwa     { background: #1e3a5f; color: #60a5fa; }
+.diag-badge-browser { background: #3b1f0b; color: #fb923c; }
