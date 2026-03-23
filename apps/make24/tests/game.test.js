@@ -65,6 +65,19 @@ global.confirm = () => false;
 global.alert = () => {};
 global.fetch = () => Promise.resolve({ ok: false, json: () => Promise.resolve(null) });
 
+// Mock make24Db global (provided by supabase-service.js in the browser)
+global.make24Db = {
+    url: '',
+    key: '',
+    getSession:        () => Promise.resolve({ data: { session: null } }),
+    signInWithGoogle:  () => Promise.resolve({}),
+    sendOtp:           () => Promise.resolve({}),
+    verifyOtp:         () => Promise.resolve({}),
+    signOut:           () => Promise.resolve({}),
+    onAuthStateChange: () => {},
+    rpc:               () => Promise.resolve({ data: null, error: null }),
+};
+
 // Mock supabase global
 global.supabase = {
     createClient() {

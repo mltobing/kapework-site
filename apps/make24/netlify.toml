@@ -1,0 +1,11 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+# Rewrite /api/ls/validate → Netlify function (keeps CORS transparent to browser)
+[[redirects]]
+  from   = "/api/ls/validate"
+  to     = "/.netlify/functions/ls-validate"
+  status = 200
