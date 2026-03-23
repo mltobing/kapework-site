@@ -53,6 +53,16 @@ body {
     user-select: none;
 }
 
+/* Back link */
+.back-btn {
+    background: none; border: none;
+    color: var(--text-muted); font-family: inherit; font-size: 0.78rem; font-weight: 700;
+    cursor: pointer; padding: 6px 6px 6px 0;
+    border-radius: 8px; transition: color 0.15s;
+    white-space: nowrap; flex-shrink: 0; text-decoration: none;
+}
+.back-btn:hover { color: var(--text); }
+
 /* Header */
 .header {
     width: 100%;
