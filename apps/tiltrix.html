@@ -34,6 +34,8 @@ body{
 /* ── Header ── */
 .game-header{width:100%;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .game-title{font-size:1.35rem;font-weight:800;letter-spacing:-0.4px}
+.back-btn{background:none;border:none;color:var(--muted);font-size:0.78rem;font-weight:700;cursor:pointer;padding:0 0 4px;border-radius:8px;transition:color 0.15s;font-family:inherit;white-space:nowrap;text-decoration:none;display:block}
+.back-btn:hover{color:var(--text)}
 .game-sub{font-size:0.74rem;color:var(--muted);margin-top:2px;line-height:1.35;max-width:190px}
 .hud{display:flex;gap:14px;align-items:flex-start;flex-shrink:0}
 .hud-box{display:flex;flex-direction:column;align-items:flex-end}
@@ -136,6 +138,7 @@ body{
 
   <div class="game-header">
     <div class="title-wrap">
+      <a class="back-btn" href="https://braingym.kapework.com/" aria-label="Back to Brain Gym">← Brain Gym</a>
       <h1 class="game-title">Tiltrix</h1>
       <p class="game-sub">Place pieces. Tip the board to reshape the stack.</p>
     </div>

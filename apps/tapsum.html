@@ -15,6 +15,8 @@
   .wrap{max-width:560px;margin:0 auto;padding:16px 16px 24px}
   header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   h1{margin:0;font-size:20px}
+  .back-btn{background:none;border:none;color:var(--muted);font-size:0.78rem;font-weight:700;cursor:pointer;padding:6px 6px 6px 0;border-radius:8px;transition:color 0.15s;font-family:inherit;white-space:nowrap;text-decoration:none;flex-shrink:0}
+  .back-btn:hover{color:var(--ink)}
   .stats{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border:1px solid var(--bd);border-radius:999px;background:#0e1729}
   .pill strong{font-weight:800}
@@ -58,6 +60,7 @@
 <body>
 <div class="wrap">
   <header>
+    <a class="back-btn" href="https://numbercrunch.kapework.com/" aria-label="Back to Number Crunch">← Number Crunch</a>
     <h1>TapSum</h1>
     <div class="stats">
       <span class="pill">Today <strong id="today">0</strong></span>
