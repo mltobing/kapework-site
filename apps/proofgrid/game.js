@@ -26,7 +26,10 @@ var locked = [];      // 4x4 boolean
 var cellEls = [];     // 4x4 DOM refs
 var won = false;
 var checksLeft = 2;
+var failedChecks = 0;
 var firstInteraction = false;
+var startTime = null;   // timestamp of loadPuzzle
+var isPracticeMode = false;
 
 /* ── Analytics helper ────────────────────────────────────── */
 
@@ -46,6 +49,18 @@ var helpModal  = document.getElementById("help-modal");
 var helpClose  = document.getElementById("help-close");
 var subtitleEl = document.getElementById("subtitle");
 
+/* ── Result modal DOM refs ───────────────────────────────── */
+var resultModal       = document.getElementById("result-modal");
+var resultTierEl      = document.getElementById("result-tier");
+var resultDateEl      = document.getElementById("result-date");
+var resultPillEl      = document.getElementById("result-pill");
+var resultTimeEl      = document.getElementById("result-time");
+var resultChecksEl    = document.getElementById("result-checks");
+var resultStreakEl    = document.getElementById("result-streak");
+var resultPlayAnother = document.getElementById("result-play-another");
+var resultShare       = document.getElementById("result-share");
+var resultHardMode    = document.getElementById("result-hard-mode");
+
 /* ── Help modal — exposed for the shell's "How to play" item ─ */
 
 window.openHelpModal = function () {
@@ -57,13 +72,131 @@ helpModal.addEventListener("click", function (e) {
   if (e.target === helpModal) helpModal.hidden = true;
 });
 
+/* ── Streak helpers ──────────────────────────────────────── */
+
+function getLocalDateStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function loadStreakData() {
+  try { return JSON.parse(localStorage.getItem('proofgrid_streak') || 'null') || {}; }
+  catch (e) { return {}; }
+}
+
+function saveStreakData(data) {
+  try { localStorage.setItem('proofgrid_streak', JSON.stringify(data)); } catch (e) {}
+}
+
+function recordAndGetStreak() {
+  var today = getLocalDateStr();
+  var data = loadStreakData();
+
+  // Already recorded today — return stored streak
+  if (data.lastDate === today) return data.count || 1;
+
+  var newCount = 1;
+  if (data.lastDate) {
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    var yd = yesterday.getFullYear() + '-' +
+      String(yesterday.getMonth() + 1).padStart(2, '0') + '-' +
+      String(yesterday.getDate()).padStart(2, '0');
+    if (data.lastDate === yd) newCount = (data.count || 1) + 1;
+  }
+
+  saveStreakData({ lastDate: today, count: newCount });
+  return newCount;
+}
+
+/* ── Time / difficulty helpers ───────────────────────────── */
+
+function formatTime(ms) {
+  var s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  var m = Math.floor(s / 60), sec = s % 60;
+  return m + 'm' + (sec > 0 ? ' ' + sec + 's' : '');
+}
+
+function getDifficultyLabel() {
+  if (!puzzle) return 'Medium';
+  return puzzle.clues.length <= 5 ? 'Hard' : 'Medium';
+}
+
+function getResultTier(failed) {
+  if (failed === 0) return 'Perfect';
+  if (failed === 1) return 'Clean';
+  return 'Solved';
+}
+
+/* ── Result modal ────────────────────────────────────────── */
+
+function showResultModal(tier, elapsedMs, failed, streak) {
+  resultTierEl.textContent = tier;
+  resultDateEl.textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+  resultPillEl.textContent = getDifficultyLabel();
+  resultTimeEl.textContent = formatTime(elapsedMs);
+  resultChecksEl.textContent = failed + '/2';
+  resultStreakEl.textContent = streak;
+  resultModal.hidden = false;
+}
+
+resultModal.addEventListener("click", function (e) {
+  if (e.target === resultModal) resultModal.hidden = true;
+});
+
+resultPlayAnother.addEventListener("click", function () {
+  resultModal.hidden = true;
+  var rng = ProofEngine.mulberry32((Date.now() ^ 0xdeadbeef) >>> 0);
+  var practice = ProofEngine.generatePuzzle(rng);
+  if (practice) {
+    isPracticeMode = true;
+    loadPuzzle(practice);
+    subtitleEl.textContent = "Practice board";
+    track('practice_start');
+  }
+});
+
+resultShare.addEventListener("click", function () {
+  var day = ProofEngine.dayIndex();
+  var tier = resultTierEl.textContent;
+  var failed = parseInt(resultChecksEl.textContent, 10) || 0;
+  var timeStr = resultTimeEl.textContent;
+  var text =
+    'Proof Grid #' + day + '\n' +
+    tier + '\n' +
+    failed + '/2 checks \u00b7 ' + timeStr + '\n' +
+    'proofgrid.kapework.com';
+
+  if (navigator.share) {
+    navigator.share({ text: text }).catch(function () {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function () {
+      resultShare.textContent = 'Copied!';
+      setTimeout(function () { resultShare.textContent = 'Share'; }, 2000);
+    }).catch(function () {});
+  }
+  track('share_result', { tier: tier });
+});
+
+resultHardMode.addEventListener("click", function () {
+  track('hard_mode_click');
+  window.location.href = 'https://proofgrid36.kapework.com/';
+});
+
 /* ── Load puzzle ─────────────────────────────────────────── */
 
 function loadPuzzle(p) {
   puzzle = p;
   won = false;
   checksLeft = 2;
+  failedChecks = 0;
   firstInteraction = false;
+  startTime = Date.now();
   grid = [];
   locked = [];
   cellEls = [];
@@ -235,19 +368,32 @@ function onCheck() {
 
   if (isBoardCorrect()) {
     won = true;
-    statusEl.textContent = "Solved!";
-    statusEl.style.color = "var(--ok)";
+    var elapsed = startTime ? Date.now() - startTime : 0;
+    var tier = getResultTier(failedChecks);
+
+    // Win animation
     for (var r = 0; r < 4; r++)
       for (var c = 0; c < 4; c++) {
         cellEls[r][c].classList.add("win");
         cellEls[r][c].style.animationDelay = (r * 4 + c) * 60 + "ms";
       }
+
     updateCheckBtn();
-    track('solve_success');
+    track('solve_success', { tier: tier, checks_failed: failedChecks, time_ms: elapsed });
+
+    // Streak only counts for the daily, not practice
+    var streak = isPracticeMode ? 1 : recordAndGetStreak();
+
+    // Show result modal after animation settles
+    setTimeout(function () {
+      showResultModal(tier, elapsed, failedChecks, streak);
+    }, 1200);
+
     return;
   }
 
   // Wrong answer
+  failedChecks++;
   checksLeft--;
   if (checksLeft > 0) {
     statusEl.textContent = checksLeft + " check left.";
@@ -283,6 +429,7 @@ function init() {
   if (typeof ProofEngine !== "undefined" && ProofEngine.dailyPuzzle) {
     var daily = ProofEngine.dailyPuzzle();
     if (daily) {
+      isPracticeMode = false;
       loadPuzzle(daily);
       subtitleEl.textContent = "Daily puzzle \u00b7 " +
         new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });

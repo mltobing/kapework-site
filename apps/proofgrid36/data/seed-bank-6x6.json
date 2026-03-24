@@ -1,0 +1,114 @@
+[
+  {
+    "id": "z3xz2-algebraic",
+    "sourceType": "algebraic",
+    "isotopyClass": "abelian-group-z3xz2",
+    "notes": "Canonical Z3×Z2 Cayley table. Entry[i][j] = componentwise addition in Z3×Z2. shapeIndex=floor(v/2), fillIndex=v%2. Specified in task brief.",
+    "grid": [
+      [0,1,2,3,4,5],
+      [1,0,3,2,5,4],
+      [2,3,4,5,0,1],
+      [3,2,5,4,1,0],
+      [4,5,0,1,2,3],
+      [5,4,1,0,3,2]
+    ]
+  },
+  {
+    "id": "z6-cyclic",
+    "sourceType": "algebraic",
+    "isotopyClass": "abelian-group-z6",
+    "notes": "Cayley table of Z6. Entry[i][j] = (i+j) mod 6. Z6 ≅ Z3×Z2 so isotopic to z3xz2-algebraic, but different structure as a Latin square.",
+    "grid": [
+      [0,1,2,3,4,5],
+      [1,2,3,4,5,0],
+      [2,3,4,5,0,1],
+      [3,4,5,0,1,2],
+      [4,5,0,1,2,3],
+      [5,0,1,2,3,4]
+    ]
+  },
+  {
+    "id": "s3-dihedral",
+    "sourceType": "algebraic",
+    "isotopyClass": "non-abelian-group-s3",
+    "notes": "Cayley table of S3 / D3. Elements: 0=e, 1=r, 2=r², 3=s, 4=sr, 5=sr², where r³=e, s²=e, srs=r⁻¹. Non-abelian: different isotopy class from Z6/Z3×Z2.",
+    "grid": [
+      [0,1,2,3,4,5],
+      [1,2,0,5,3,4],
+      [2,0,1,4,5,3],
+      [3,4,5,0,2,1],
+      [4,5,3,1,0,2],
+      [5,3,4,2,1,0]
+    ]
+  },
+  {
+    "id": "s3-relabeled",
+    "sourceType": "algebraic",
+    "isotopyClass": "non-abelian-group-s3",
+    "notes": "S3 Cayley table with symbol permutation [0,3,1,4,2,5] applied. Same isotopy class as s3-dihedral but distinct seed for scrambling diversity.",
+    "grid": [
+      [0,3,1,4,2,5],
+      [3,1,0,5,4,2],
+      [1,0,3,2,5,4],
+      [4,2,5,0,1,3],
+      [2,5,4,3,0,1],
+      [5,4,2,1,3,0]
+    ]
+  },
+  {
+    "id": "z3xz2-rowperm",
+    "sourceType": "algebraic",
+    "isotopyClass": "abelian-group-z3xz2",
+    "notes": "Z3×Z2 with row permutation [2,0,4,1,5,3] applied. Isotopic to z3xz2-algebraic; provides a distinct starting layout for gameplay variety.",
+    "grid": [
+      [2,3,4,5,0,1],
+      [0,1,2,3,4,5],
+      [4,5,0,1,2,3],
+      [1,0,3,2,5,4],
+      [5,4,1,0,3,2],
+      [3,2,5,4,1,0]
+    ]
+  },
+  {
+    "id": "s3-rowperm",
+    "sourceType": "algebraic",
+    "isotopyClass": "non-abelian-group-s3",
+    "notes": "S3 with row permutation [3,1,4,0,5,2] applied. Isotopic to s3-dihedral; distinct layout for scrambling.",
+    "grid": [
+      [3,4,5,0,2,1],
+      [1,2,0,5,3,4],
+      [4,5,3,1,0,2],
+      [0,1,2,3,4,5],
+      [5,3,4,2,1,0],
+      [2,0,1,4,5,3]
+    ]
+  },
+  {
+    "id": "z3xz2-colperm",
+    "sourceType": "algebraic",
+    "isotopyClass": "abelian-group-z3xz2",
+    "notes": "Z3×Z2 with column permutation [3,1,5,0,4,2] applied. Isotopic to z3xz2-algebraic; distinct layout.",
+    "grid": [
+      [3,1,5,0,4,2],
+      [2,0,4,1,5,3],
+      [5,3,1,2,0,4],
+      [4,2,0,3,1,5],
+      [1,5,3,4,2,0],
+      [0,4,2,5,3,1]
+    ]
+  },
+  {
+    "id": "back-circulant",
+    "sourceType": "algebraic",
+    "isotopyClass": "abelian-group-z6",
+    "notes": "Back-circulant (negacirculant). Entry[i][j] = (j-i+6) mod 6. Isotopic to Z6; distinct layout for scrambling diversity.",
+    "grid": [
+      [0,1,2,3,4,5],
+      [5,0,1,2,3,4],
+      [4,5,0,1,2,3],
+      [3,4,5,0,1,2],
+      [2,3,4,5,0,1],
+      [1,2,3,4,5,0]
+    ]
+  }
+]

@@ -67,6 +67,38 @@
   </div>
 </div>
 
+<!-- Result modal -->
+<div id="result-modal" class="modal-overlay" hidden>
+  <div class="modal result-modal-inner">
+    <div id="result-tier" class="result-tier">Perfect</div>
+    <div id="result-date" class="result-date"></div>
+    <div id="result-pill" class="result-pill">Medium</div>
+
+    <div class="result-stats">
+      <div class="result-stat">
+        <div id="result-time" class="result-stat-value">—</div>
+        <div class="result-stat-label">Time</div>
+      </div>
+      <div class="result-stat">
+        <div id="result-checks" class="result-stat-value">—</div>
+        <div class="result-stat-label">Checks</div>
+      </div>
+      <div class="result-stat">
+        <div id="result-streak" class="result-stat-value">—</div>
+        <div class="result-stat-label">Streak</div>
+      </div>
+    </div>
+
+    <div class="result-btn-group">
+      <button id="result-play-another" class="btn btn-muted">Play Another</button>
+      <button id="result-share" class="btn">Share</button>
+      <button id="result-hard-mode" class="btn btn-hard">Hard Mode &#8599;</button>
+    </div>
+
+    <div class="result-footer">New puzzle tomorrow</div>
+  </div>
+</div>
+
 <!-- Shared config (GA ID baked in at build time) + analytics -->
 <script src="/shared/config.js"></script>
 <script src="/shared/analytics.js"></script>

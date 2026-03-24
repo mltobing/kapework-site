@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Proof Grid 6×6 · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Kapework shared shell styles -->
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <a class="back-btn" href="https://braingym.kapework.com/">&#8592; Brain Gym</a>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <h1 class="title">Proof Grid <span class="title-badge">6&#xD7;6</span></h1>
+    <p class="subtitle" id="subtitle6">Expert daily</p>
+  </div>
+
+  <!-- Board — built entirely by JS -->
+  <div class="board6" id="board6"></div>
+
+  <!-- Status / actions -->
+  <div class="actions">
+    <div id="status6" class="status6"></div>
+    <div class="btn-row">
+      <button id="check-btn6" class="btn" disabled>
+        <span id="check-text6">Check (1)</span>
+      </button>
+      <button id="reset-btn6" class="btn btn-muted">Reset</button>
+    </div>
+  </div>
+
+  <div class="footer6">Kapework &middot; Proof Grid 6&times;6</div>
+</div>
+
+<!-- Help modal -->
+<div id="help-modal6" class="modal-overlay" hidden>
+  <div class="modal">
+    <h2>How to Play</h2>
+    <p>Fill the 6&#xD7;6 grid so every <strong>row</strong> and <strong>column</strong> contains all 6 symbols exactly once. Tap a cell to cycle through symbols.</p>
+
+    <div class="sym-legend6">
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>Hollow Circle</div>
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><circle cx="16" cy="16" r="10" fill="currentColor"/></svg>Filled Circle</div>
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>Hollow Square</div>
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="2" fill="currentColor"/></svg>Filled Square</div>
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><polygon points="16,5 27,27 5,27" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>Hollow Triangle</div>
+      <div class="sym-legend6-item"><svg class="sym6" viewBox="0 0 32 32"><polygon points="16,5 27,27 5,27" fill="currentColor"/></svg>Filled Triangle</div>
+    </div>
+
+    <p>Clues sit <strong>between</strong> adjacent cells:</p>
+    <div class="clue-legend6">
+      <div class="clue-legend6-row">
+        <div class="clue-sample6 clue6-outline"></div>
+        Same <strong>shape</strong> (both circles, both squares, or both triangles)
+      </div>
+      <div class="clue-legend6-row">
+        <div class="clue-sample6 clue6-solid"></div>
+        Same <strong>fill</strong> (both hollow or both filled)
+      </div>
+    </div>
+
+    <p>No clue means unknown — it does <strong>not</strong> mean "different."</p>
+    <p>You have <strong>1 check</strong>. The board must be fully filled before you can check.</p>
+    <p>Triangles are new — this is the hard mode. 6&#xD7;6 is much deeper than 4&#xD7;4.</p>
+
+    <button data-close class="btn" style="margin-top:16px;width:100%">Got it</button>
+  </div>
+</div>
+
+<!-- Result modal -->
+<div id="result-modal6" class="modal-overlay" hidden>
+  <div class="modal result-modal-inner">
+    <div id="rm6-tier" class="result-tier">Perfect</div>
+    <div id="rm6-date" class="result-date"></div>
+    <div id="rm6-pill" class="result-pill">Expert</div>
+
+    <div class="result-stats">
+      <div class="result-stat">
+        <div id="rm6-time" class="result-stat-value">—</div>
+        <div class="result-stat-label">Time</div>
+      </div>
+      <div class="result-stat">
+        <div id="rm6-checks" class="result-stat-value">—</div>
+        <div class="result-stat-label">Checks</div>
+      </div>
+      <div class="result-stat">
+        <div id="rm6-streak" class="result-stat-value">—</div>
+        <div class="result-stat-label">Streak</div>
+      </div>
+    </div>
+
+    <div class="result-btn-group">
+      <button id="rm6-play-another" class="btn btn-muted">Play Another</button>
+      <button id="rm6-share" class="btn">Share</button>
+    </div>
+
+    <div class="rm6-footer result-footer">New puzzle tomorrow</div>
+  </div>
+</div>
+
+<!-- Shared config (GA ID baked in at build time) + analytics -->
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<!-- Shared shell (⋮ menu + feedback modal) -->
+<script src="/shared/kapework-shell.js"></script>
+
+<!-- Proof Grid 6×6 modules -->
+<script src="seed-bank.js"></script>
+<script src="solver.js"></script>
+<script src="generator.js"></script>
+<script src="storage.js"></script>
+<script src="share.js"></script>
+<script src="game.js"></script>
+<script src="ui.js"></script>
+<script src="help.js"></script>
+<script src="result-modal.js"></script>
+<script src="main.js"></script>
+
+<script>
+  // Init analytics
+  KapeworkAnalytics.init('proofgrid36');
+
+  // Init shell — help item routes to help modal
+  KapeworkShell.init({
+    appSlug: 'proofgrid36',
+    mountId: 'kw-shell-mount',
+    menuItems: [
+      {
+        id: 'how-to-play',
+        icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        label: 'How to play',
+        onClick: function () {
+          window.openHelpModal6 && window.openHelpModal6();
+          KapeworkAnalytics.track('how_to_open');
+        }
+      }
+    ]
+  });
+</script>
+</body>
+</html>
