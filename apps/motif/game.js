@@ -82,12 +82,12 @@ function getLocalDateStr() {
 }
 
 function loadStreakData() {
-  try { return JSON.parse(localStorage.getItem('proofgrid_streak') || 'null') || {}; }
+  try { return JSON.parse(localStorage.getItem('motif_streak') || 'null') || {}; }
   catch (e) { return {}; }
 }
 
 function saveStreakData(data) {
-  try { localStorage.setItem('proofgrid_streak', JSON.stringify(data)); } catch (e) {}
+  try { localStorage.setItem('motif_streak', JSON.stringify(data)); } catch (e) {}
 }
 
 function recordAndGetStreak() {
@@ -167,10 +167,10 @@ resultShare.addEventListener("click", function () {
   var failed = parseInt(resultChecksEl.textContent, 10) || 0;
   var timeStr = resultTimeEl.textContent;
   var text =
-    'Proof Grid #' + day + '\n' +
+    'Motif #' + day + '\n' +
     tier + '\n' +
     failed + '/2 checks \u00b7 ' + timeStr + '\n' +
-    'proofgrid.kapework.com';
+    'motif.kapework.com';
 
   if (navigator.share) {
     navigator.share({ text: text }).catch(function () {});
@@ -185,7 +185,7 @@ resultShare.addEventListener("click", function () {
 
 resultHardMode.addEventListener("click", function () {
   track('hard_mode_click');
-  window.location.href = 'https://proofgrid36.kapework.com/';
+  window.location.href = 'https://motif6x6.kapework.com/';
 });
 
 /* ── Load puzzle ─────────────────────────────────────────── */
@@ -431,7 +431,7 @@ function init() {
     if (daily) {
       isPracticeMode = false;
       loadPuzzle(daily);
-      subtitleEl.textContent = "Daily puzzle \u00b7 " +
+      subtitleEl.textContent = "Daily symbol logic \u00b7 " +
         new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
       return;
     }

@@ -21,10 +21,10 @@ var PG36Share = (function () {
     var timeStr   = formatTime(opts.timeMs || 0);
 
     return (
-      'Proof Grid 6\u00d76 #' + number + '\n' +
+      'Motif Expert 6\u00d76 #' + number + '\n' +
       tier + '\n' +
       failed + '/' + maxChecks + ' checks \u00b7 ' + timeStr + '\n' +
-      'proofgrid36.kapework.com'
+      'motif6x6.kapework.com'
     );
   }
 
