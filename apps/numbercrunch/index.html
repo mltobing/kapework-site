@@ -16,19 +16,15 @@
 :root {
   --bg:        #0a1628;
   --surface:   #121e33;
-  --surface2:  #1a2a44;
   --cyan:      #00e5cc;
   --cyan-dim:  rgba(0,229,204,0.15);
   --text:      #e8edf5;
   --muted:     rgba(232,237,245,0.5);
+  --muted-dim: rgba(232,237,245,0.3);
   --border:    rgba(232,237,245,0.08);
 }
 
-html, body {
-  height: 100%;
-  background: var(--bg);
-  overscroll-behavior: none;
-}
+html, body { height: 100%; background: var(--bg); overscroll-behavior: none; }
 
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -43,106 +39,60 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
-/* ─── Page layout ──────────────────────────────────────────── */
 .page {
   width: 100%;
   max-width: 480px;
-  padding: 16px 16px env(safe-area-inset-bottom, 16px);
+  padding: 12px 16px env(safe-area-inset-bottom, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex: 1;
 }
 
-/* ─── Top bar ──────────────────────────────────────────────── */
 .top-bar {
   width: 100%;
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   align-items: center;
 }
 
-.back-btn {
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
-  transition: color 0.15s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.back-btn:hover { color: var(--text); }
-
-/* ─── Header ───────────────────────────────────────────────── */
+/* ─── Header ── */
 .hub-header { text-align: center; }
-.hub-logo   { font-size: 3rem; line-height: 1; }
-.hub-title  { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 8px; }
-.hub-sub    { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+.hub-logo   { font-size: 2.25rem; line-height: 1; }
+.hub-title  { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 6px; }
+.hub-sub    { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
 
-/* ─── Game cards ───────────────────────────────────────────── */
-.game-cards {
+/* ─── Shelf list ── */
+.shelf-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   width: 100%;
 }
 
-a.game-card {
+a.shelf-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 13px 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
+  gap: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-a.game-card:hover { transform: translateY(-2px); border-color: var(--cyan); box-shadow: 0 0 20px var(--cyan-dim); }
-a.game-card:active { transform: scale(0.98); }
+a.shelf-card:hover { border-color: var(--cyan); box-shadow: 0 0 16px var(--cyan-dim); }
+a.shelf-card:active { opacity: 0.8; }
 
-a.game-card.coming-soon {
-  opacity: 0.5;
-  pointer-events: none;
-}
+.shelf-icon { font-size: 1.75rem; flex-shrink: 0; width: 2.25rem; text-align: center; }
+.shelf-info { flex: 1; min-width: 0; }
+.shelf-name { font-size: 1rem; font-weight: 800; line-height: 1.2; }
+.shelf-desc { font-size: 0.8rem; color: var(--muted); margin-top: 1px; }
 
-.game-icon { font-size: 2.5rem; flex-shrink: 0; }
-.game-info { flex: 1; }
-.game-name { font-size: 1.1rem; font-weight: 800; }
-.game-desc { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
-
-.game-play {
-  font-size: 0.8rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--cyan-dim);
-  color: var(--cyan);
-  border: 1px solid var(--cyan);
-  flex-shrink: 0;
-}
-
-.game-soon {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(232,237,245,0.05);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-/* ─── Footer ───────────────────────────────────────────────── */
+/* ─── Footer ── */
 .hub-footer {
   margin-top: auto;
-  color: var(--muted);
+  color: var(--muted-dim);
   font-size: 0.75rem;
   text-align: center;
   padding-bottom: 8px;
@@ -153,57 +103,53 @@ a.game-card.coming-soon {
 
 <div class="page">
 
-  <div class="top-bar" style="justify-content:flex-end">
+  <div class="top-bar">
     <div id="kw-shell-mount"></div>
   </div>
 
   <div class="hub-header">
     <div class="hub-logo">🔢</div>
     <h1 class="hub-title">Number Crunch</h1>
-    <p class="hub-sub">Daily math puzzles</p>
+    <p class="hub-sub">Math puzzles and quick drills</p>
   </div>
 
-  <div class="game-cards">
+  <div class="shelf-list">
 
-    <a class="game-card" href="https://make24.app" target="_blank" rel="noopener">
-      <div class="game-icon">➗</div>
-      <div class="game-info">
-        <div class="game-name">Make 24</div>
-        <div class="game-desc">4 numbers · make 24</div>
+    <a class="shelf-card" href="https://make24.app" target="_blank" rel="noopener">
+      <div class="shelf-icon">➗</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Make 24</div>
+        <div class="shelf-desc">Make-24 puzzle</div>
       </div>
-      <div class="game-play">Play</div>
     </a>
 
-    <a class="game-card" href="https://make36.kapework.com/">
-      <div class="game-icon">➗</div>
-      <div class="game-info">
-        <div class="game-name">Make 36</div>
-        <div class="game-desc">4 numbers · make 36</div>
+    <a class="shelf-card" href="https://prim4.kapework.com/">
+      <div class="shelf-icon">🔢</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Prim4</div>
+        <div class="shelf-desc">Prime code</div>
       </div>
-      <div class="game-play">Play</div>
     </a>
 
-    <a class="game-card" href="https://tapsum.kapework.com/">
-      <div class="game-icon">➕</div>
-      <div class="game-info">
-        <div class="game-name">TapSum</div>
-        <div class="game-desc">Quick sums · beat your streak</div>
+    <a class="shelf-card" href="https://make36.kapework.com/">
+      <div class="shelf-icon">➗</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Make 36</div>
+        <div class="shelf-desc">Make-36 puzzle</div>
       </div>
-      <div class="game-play">Play</div>
     </a>
 
-    <a class="game-card" href="https://prim4.kapework.com/">
-      <div class="game-icon">🔢</div>
-      <div class="game-info">
-        <div class="game-name">Prim4</div>
-        <div class="game-desc">Guess the 4-digit prime · 6 tries</div>
+    <a class="shelf-card" href="https://tapsum.kapework.com/">
+      <div class="shelf-icon">➕</div>
+      <div class="shelf-info">
+        <div class="shelf-name">TapSum</div>
+        <div class="shelf-desc">Quick mental math</div>
       </div>
-      <div class="game-play">Play</div>
     </a>
 
   </div>
 
-  <div class="hub-footer">Kapework · Number Crunch v1</div>
+  <div class="hub-footer">Kapework · Number Crunch</div>
 
 </div>
 

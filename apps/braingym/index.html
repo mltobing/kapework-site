@@ -16,7 +16,6 @@
 :root {
   --bg:        #0a1628;
   --surface:   #121e33;
-  --surface2:  #1a2a44;
   --cyan:      #00e5cc;
   --cyan-dim:  rgba(0,229,204,0.15);
   --text:      #e8edf5;
@@ -25,11 +24,7 @@
   --border:    rgba(232,237,245,0.08);
 }
 
-html, body {
-  height: 100%;
-  background: var(--bg);
-  overscroll-behavior: none;
-}
+html, body { height: 100%; background: var(--bg); overscroll-behavior: none; }
 
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -44,19 +39,17 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
-/* ─── Page layout ──────────────────────────────────────────── */
 .page {
   width: 100%;
   max-width: 480px;
-  padding: 16px 16px env(safe-area-inset-bottom, 16px);
+  padding: 12px 16px env(safe-area-inset-bottom, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   flex: 1;
 }
 
-/* ─── Top bar ──────────────────────────────────────────────── */
 .top-bar {
   width: 100%;
   display: flex;
@@ -64,100 +57,52 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
 }
 
-/* ─── Header ───────────────────────────────────────────────── */
+/* ─── Header ── */
 .hub-header { text-align: center; }
-.hub-logo   { font-size: 3rem; line-height: 1; }
-.hub-title  { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 8px; }
-.hub-sub    { font-size: 0.9rem; color: var(--muted); margin-top: 4px; }
+.hub-logo   { font-size: 2.25rem; line-height: 1; }
+.hub-title  { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.5px; margin-top: 6px; }
+.hub-sub    { font-size: 0.85rem; color: var(--muted); margin-top: 3px; }
 
-/* ─── Section ──────────────────────────────────────────────── */
-.game-section {
-  width: 100%;
+/* ─── Shelf list ── */
+.shelf-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.section-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 0 4px;
-}
-
-.game-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
-/* ─── Primary cards (Daily picks) ─────────────────────────── */
-a.game-card {
+a.shelf-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 13px 16px;
   display: flex;
   align-items: center;
   gap: 14px;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-a.game-card:hover { transform: translateY(-2px); border-color: var(--cyan); box-shadow: 0 0 20px var(--cyan-dim); }
-a.game-card:active { transform: scale(0.98); }
+a.shelf-card:hover { border-color: var(--cyan); box-shadow: 0 0 16px var(--cyan-dim); }
+a.shelf-card:active { opacity: 0.8; }
 
-/* ─── Secondary cards (More games) ────────────────────────── */
-a.game-card-secondary {
-  background: rgba(18,30,51,0.6);
-  border: 1px solid rgba(232,237,245,0.05);
-  border-radius: 16px;
-  padding: 15px 18px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  cursor: pointer;
-}
-a.game-card-secondary:hover { transform: translateY(-2px); border-color: rgba(0,229,204,0.4); box-shadow: 0 0 16px rgba(0,229,204,0.08); }
-a.game-card-secondary:active { transform: scale(0.98); }
+.shelf-icon { font-size: 1.75rem; flex-shrink: 0; width: 2.25rem; text-align: center; }
+.shelf-info { flex: 1; min-width: 0; }
+.shelf-name { font-size: 1rem; font-weight: 800; line-height: 1.2; }
+.shelf-desc { font-size: 0.8rem; color: var(--muted); margin-top: 1px; }
 
-/* ─── Card contents ────────────────────────────────────────── */
-.game-icon { font-size: 2rem; flex-shrink: 0; }
-.game-card-secondary .game-icon { font-size: 1.75rem; opacity: 0.8; }
-
-.game-info { flex: 1; min-width: 0; }
-.game-name { font-size: 1.05rem; font-weight: 800; }
-.game-card-secondary .game-name { font-size: 0.95rem; color: var(--muted); }
-
-.game-desc { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
-.game-card-secondary .game-desc { font-size: 0.8rem; color: var(--muted-dim); }
-
-/* ─── Status pills ─────────────────────────────────────────── */
-.game-pill {
-  font-size: 0.68rem;
+.shelf-pill {
+  font-size: 0.63rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   flex-shrink: 0;
   background: var(--cyan-dim);
   color: var(--cyan);
-  border: 1px solid rgba(0,229,204,0.3);
+  border: 1px solid rgba(0,229,204,0.25);
 }
 
-/* ─── Divider ──────────────────────────────────────────────── */
-.section-divider {
-  width: 100%;
-  height: 1px;
-  background: var(--border);
-  margin: 4px 0;
-}
-
-/* ─── Footer ───────────────────────────────────────────────── */
+/* ─── Footer ── */
 .hub-footer {
   margin-top: auto;
   color: var(--muted-dim);
@@ -178,96 +123,68 @@ a.game-card-secondary:active { transform: scale(0.98); }
   <div class="hub-header">
     <div class="hub-logo">◈</div>
     <h1 class="hub-title">Brain Gym</h1>
-    <p class="hub-sub">Daily logic, memory, and puzzle games</p>
+    <p class="hub-sub">Logic, memory, and puzzle games</p>
   </div>
 
-  <!-- Section 1: Daily picks -->
-  <div class="game-section">
-    <div class="section-label">Daily picks</div>
-    <div class="game-cards">
+  <div class="shelf-list">
 
-      <a class="game-card" href="https://motif.kapework.com/">
-        <div class="game-icon">◧</div>
-        <div class="game-info">
-          <div class="game-name">Motif</div>
-          <div class="game-desc">Daily symbol logic · deduce every symbol</div>
-        </div>
-        <div class="game-pill">Daily</div>
-      </a>
+    <a class="shelf-card" href="https://motif.kapework.com/">
+      <div class="shelf-icon">◧</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Motif</div>
+        <div class="shelf-desc">Symbol logic</div>
+      </div>
+    </a>
 
-      <a class="game-card" href="https://blinkgrid4.kapework.com/">
-        <div class="game-icon">✨</div>
-        <div class="game-info">
-          <div class="game-name">BlinkGrid</div>
-          <div class="game-desc">Daily memory · survive 6 rounds</div>
-        </div>
-        <div class="game-pill">Daily</div>
-      </a>
+    <a class="shelf-card" href="https://blinkgrid4.kapework.com/">
+      <div class="shelf-icon">✨</div>
+      <div class="shelf-info">
+        <div class="shelf-name">BlinkGrid</div>
+        <div class="shelf-desc">Memory sprint</div>
+      </div>
+    </a>
 
-      <a class="game-card" href="https://rainbowrules.kapework.com/">
-        <div class="game-icon">🌈</div>
-        <div class="game-info">
-          <div class="game-name">Rainbow Rules</div>
-          <div class="game-desc">Daily color code · crack the sequence</div>
-        </div>
-        <div class="game-pill">Daily</div>
-      </a>
+    <a class="shelf-card" href="https://rainbowrules.kapework.com/">
+      <div class="shelf-icon">🌈</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Rainbow Rules</div>
+        <div class="shelf-desc">Color code</div>
+      </div>
+    </a>
 
-      <a class="game-card" href="https://longshot.kapework.com/">
-        <div class="game-icon">🧩</div>
-        <div class="game-info">
-          <div class="game-name">Longshot</div>
-          <div class="game-desc">Daily word hunt · 3 shots only</div>
-        </div>
-        <div class="game-pill">Daily</div>
-      </a>
+    <a class="shelf-card" href="https://longshot.kapework.com/">
+      <div class="shelf-icon">🧩</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Longshot</div>
+        <div class="shelf-desc">Word hunt</div>
+      </div>
+    </a>
 
-    </div>
-  </div>
+    <a class="shelf-card" href="https://motif6x6.kapework.com/">
+      <div class="shelf-icon">◧</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Motif Expert 6×6</div>
+        <div class="shelf-desc">Expert symbol logic</div>
+      </div>
+      <div class="shelf-pill">Expert</div>
+    </a>
 
-  <div class="section-divider"></div>
+    <a class="shelf-card" href="https://tiltrix.kapework.com/">
+      <div class="shelf-icon">⬡</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Tiltrix</div>
+        <div class="shelf-desc">Tilt to clear lines</div>
+      </div>
+    </a>
 
-  <!-- Section 2: Expert -->
-  <div class="game-section">
-    <div class="section-label">Expert</div>
-    <div class="game-cards">
+    <a class="shelf-card" href="https://tiltgarden.kapework.com/">
+      <div class="shelf-icon">🌿</div>
+      <div class="shelf-info">
+        <div class="shelf-name">Tilt Garden</div>
+        <div class="shelf-desc">Settle drifting shapes</div>
+      </div>
+    </a>
 
-      <a class="game-card" href="https://motif6x6.kapework.com/">
-        <div class="game-icon">◧</div>
-        <div class="game-info">
-          <div class="game-name">Motif Expert 6×6</div>
-          <div class="game-desc">Expert symbol logic · 6×6 challenge</div>
-        </div>
-        <div class="game-pill">Expert</div>
-      </a>
-
-    </div>
-  </div>
-
-  <div class="section-divider"></div>
-
-  <!-- Section 3: More games -->
-  <div class="game-section">
-    <div class="section-label">More games</div>
-    <div class="game-cards">
-
-      <a class="game-card-secondary" href="https://tiltrix.kapework.com/">
-        <div class="game-icon">⬡</div>
-        <div class="game-info">
-          <div class="game-name">Tiltrix</div>
-          <div class="game-desc">Tilt to clear lines</div>
-        </div>
-      </a>
-
-      <a class="game-card-secondary" href="https://tiltgarden.kapework.com/">
-        <div class="game-icon">🌿</div>
-        <div class="game-info">
-          <div class="game-name">Tilt Garden</div>
-          <div class="game-desc">Settle drifting shapes</div>
-        </div>
-      </a>
-
-    </div>
   </div>
 
   <div class="hub-footer">Kapework · Brain Gym</div>
