@@ -21,7 +21,7 @@ import { renderCommentList }                       from './comment-list.js';
 export function renderPostCard(post, { showComments = false } = {}) {
   const profile     = post.ma_profiles ?? {};
   const attachments = post.ma_attachments ?? [];
-  const photo       = attachments.find(a => a.mime_type?.startsWith('image/'));
+  const photo       = attachments.find(a => a.mime_type?.startsWith('image/') || a.object_path);
 
   const card = document.createElement('article');
   card.className = 'post-card';
@@ -48,7 +48,7 @@ export function renderPostCard(post, { showComments = false } = {}) {
   // Load photo signed URL asynchronously
   if (photo) {
     const photoEl = card.querySelector('.post-photo');
-    getPhotoUrl(photo.storage_path)
+    getPhotoUrl(photo.object_path)
       .then(url => {
         photoEl.classList.remove('post-photo--loading');
         const img = document.createElement('img');

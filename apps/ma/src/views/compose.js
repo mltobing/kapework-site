@@ -166,11 +166,13 @@ export async function mount(container, { familyId, user }) {
 
       // 2. Upload photo and record attachment if one was chosen
       if (selectedFile) {
-        const storagePath = await uploadPhoto(familyId, post.id, selectedFile);
+        const objectPath = await uploadPhoto(familyId, post.id, selectedFile);
         await createAttachment({
-          postId:      post.id,
-          storagePath,
-          mimeType:    selectedFile.type,
+          postId:     post.id,
+          familyId,
+          uploaderId: user.id,
+          objectPath,
+          mimeType:   selectedFile.type,
         });
       }
 
