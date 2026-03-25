@@ -149,7 +149,7 @@
       loadPuzzle(puzzle, false);
     }
 
-    subtitleEl.textContent = 'Expert daily \u00b7 ' +
+    subtitleEl.textContent = 'Expert symbol logic \u00b7 ' +
       new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     track('game_start');

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0a1628">
-  <title>Proof Grid 6×6 · Kapework</title>
+  <title>Motif Expert 6×6 · Kapework</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -25,8 +25,8 @@
 
   <!-- Header -->
   <div class="header">
-    <h1 class="title">Proof Grid <span class="title-badge">6&#xD7;6</span></h1>
-    <p class="subtitle" id="subtitle6">Expert daily</p>
+    <h1 class="title">Motif Expert <span class="title-badge">6&#xD7;6</span></h1>
+    <p class="subtitle" id="subtitle6">Expert symbol logic</p>
   </div>
 
   <!-- Board — built entirely by JS -->
@@ -43,7 +43,7 @@
     </div>
   </div>
 
-  <div class="footer6">Kapework &middot; Proof Grid 6&times;6</div>
+  <div class="footer6">Kapework &middot; Motif Expert 6&times;6</div>
 </div>
 
 <!-- Help modal -->
@@ -75,7 +75,7 @@
 
     <p>No clue means unknown — it does <strong>not</strong> mean "different."</p>
     <p>You have <strong>1 check</strong>. The board must be fully filled before you can check.</p>
-    <p>Triangles are new — this is the hard mode. 6&#xD7;6 is much deeper than 4&#xD7;4.</p>
+    <p>Triangles are new to Motif Expert 6&#xD7;6. This is the expert challenge — much deeper than the 4&#xD7;4.</p>
 
     <button data-close class="btn" style="margin-top:16px;width:100%">Got it</button>
   </div>
@@ -118,7 +118,7 @@
 <!-- Shared shell (⋮ menu + feedback modal) -->
 <script src="/shared/kapework-shell.js"></script>
 
-<!-- Proof Grid 6×6 modules -->
+<!-- Motif Expert 6×6 modules -->
 <script src="seed-bank.js"></script>
 <script src="solver.js"></script>
 <script src="generator.js"></script>
@@ -132,11 +132,11 @@
 
 <script>
   // Init analytics
-  KapeworkAnalytics.init('proofgrid36');
+  KapeworkAnalytics.init('motif6x6');
 
   // Init shell — help item routes to help modal
   KapeworkShell.init({
-    appSlug: 'proofgrid36',
+    appSlug: 'motif6x6',
     mountId: 'kw-shell-mount',
     menuItems: [
       {
