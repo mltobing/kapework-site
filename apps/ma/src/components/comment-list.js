@@ -33,7 +33,7 @@ export async function renderCommentList(container, postId) {
 }
 
 function _render(container, postId, comments) {
-  const { user, profile } = getState();
+  const { user, profile, familyId } = getState();
 
   const listHtml = comments.map(c => {
     const name = c.ma_profiles?.display_name || 'Family';
@@ -77,7 +77,7 @@ function _render(container, postId, comments) {
     submitBtn.disabled = true;
 
     try {
-      await addComment(postId, user.id, body);
+      await addComment(postId, familyId, user.id, body);
       input.value = '';
 
       // Optimistic UI — append immediately

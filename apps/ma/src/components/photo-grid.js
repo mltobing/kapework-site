@@ -30,7 +30,7 @@ export function renderPhotoGrid(container, photos) {
 
     const caption = photo.ma_posts?.body || photo.ma_posts?.title || '';
 
-    getPhotoUrl(photo.storage_path)
+    getPhotoUrl(photo.object_path)
       .then(url => {
         item.classList.remove('photo-grid-item--loading');
         item.innerHTML = '';
