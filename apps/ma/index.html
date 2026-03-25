@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- Private site — no indexing -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="googlebot" content="noindex, nofollow">
+
+  <!-- PWA / iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Ma">
+  <meta name="theme-color" content="#FAF7F4">
+
+  <title>Ma · Family</title>
+
+  <!--
+    shared/config.js is written at Netlify build time by scripts/generate-config.js.
+    It sets window.KapeworkConfig = { supabaseUrl, supabaseAnonKey, ... }
+    The /shared/ prefix is a pass-through in the subdomain edge router,
+    so this loads correctly from ma.kapework.com.
+  -->
+  <script src="/shared/config.js"></script>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <div class="app-loading" id="app-loading">
+      <div class="app-loading-spinner"></div>
+    </div>
+  </div>
+
+  <noscript>
+    <div style="padding:2rem;font-family:system-ui,sans-serif;font-size:1.1rem;text-align:center;">
+      Ma requires JavaScript. Please enable it in your browser settings.
+    </div>
+  </noscript>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
