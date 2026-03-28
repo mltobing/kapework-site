@@ -3,22 +3,20 @@
  *
  * Manages transitions between the 4 screens:
  *   pack → detail → play → result
- *
- * Each screen is a div with class pf-screen; only one is active at a time.
  */
 
 import { generatePack, instantiatePuzzle } from './generator.js';
-import { saveLastPack, saveRecentSeed }     from './storage.js';
+import { saveLastPack, loadLastPack, saveRecentSeed } from './storage.js';
 import { renderPlay as renderTargetForge }  from './families/target-forge.js';
 import { renderPlay as renderOrderRepair }  from './families/order-repair.js';
 import { renderPlay as renderPathTrace }    from './families/path-trace.js';
 import { FAMILIES }                         from './seeds.js';
 
 // ── State ──────────────────────────────────────────────────────────────────
-let currentPack       = [];
-let selectedSeed      = null;
+let currentPack        = [];
+let selectedSeed       = null;
 let selectedDifficulty = 'medium';
-let currentPuzzle     = null;
+let currentPuzzle      = null;  // stored so Reset can re-render the same puzzle
 
 // ── Screen refs ────────────────────────────────────────────────────────────
 let screens;
@@ -35,7 +33,12 @@ export function init() {
   document.getElementById('btn-refresh-pack').addEventListener('click', refreshPack);
   document.getElementById('btn-back-to-pack').addEventListener('click', () => showScreen('pack'));
   document.getElementById('btn-back-to-detail').addEventListener('click', () => showScreen('detail'));
-  document.getElementById('btn-reset-play').addEventListener('click', startPlay);
+
+  // Reset re-renders the current puzzle from scratch (same numbers/layout, fresh state)
+  document.getElementById('btn-reset-play').addEventListener('click', () => {
+    if (currentPuzzle) renderPlayScreen(currentPuzzle);
+  });
+
   document.getElementById('btn-play').addEventListener('click', startPlay);
 
   // Difficulty buttons
@@ -47,17 +50,25 @@ export function init() {
   });
 
   // Result actions
-  document.getElementById('btn-remix').addEventListener('click', remixSeed);
-  document.getElementById('btn-try-another').addEventListener('click', () => {
-    showScreen('pack');
+  document.getElementById('btn-try-again').addEventListener('click', () => {
+    // Replay the exact same puzzle instance
+    if (currentPuzzle) renderPlayScreen(currentPuzzle);
+    showScreen('play');
   });
+  document.getElementById('btn-remix').addEventListener('click', remixSeed);
+  document.getElementById('btn-try-another').addEventListener('click', () => showScreen('pack'));
   document.getElementById('btn-result-refresh').addEventListener('click', () => {
     refreshPack();
-    showScreen('pack');
   });
 
-  // Initial pack
-  refreshPack();
+  // Restore last pack from localStorage, or generate a fresh one
+  const saved = loadLastPack();
+  if (saved && saved.length === 8) {
+    currentPack = saved;
+    renderPackScreen();
+  } else {
+    refreshPack();
+  }
 }
 
 // ── Screen switching ───────────────────────────────────────────────────────
@@ -83,8 +94,11 @@ function renderPackScreen() {
   const grid = document.getElementById('seed-grid');
   grid.innerHTML = '';
 
-  currentPack.forEach(seed => {
+  currentPack.forEach((seed, i) => {
     const card = buildSeedCard(seed);
+    // Stagger entrance
+    card.style.animationDelay = `${i * 40}ms`;
+    card.classList.add('pf-card-enter');
     card.addEventListener('click', () => openSeed(seed));
     grid.appendChild(card);
   });
@@ -100,7 +114,7 @@ function buildSeedCard(seed) {
   card.innerHTML = `
     <div class="pf-seed-family">
       <div class="pf-family-badge">${familyMeta.badge}</div>
-      <div class="pf-family-label">${familyMeta.label}</div>
+      <div class="pf-family-label">${escHtml(familyMeta.label)}</div>
     </div>
     <div class="pf-seed-name">${escHtml(seed.name)}</div>
     <div class="pf-seed-hook">${escHtml(seed.hook)}</div>
@@ -119,7 +133,7 @@ function openSeed(seed) {
   card.style.setProperty('--family-color',     familyMeta.color);
   card.style.setProperty('--family-color-dim', familyMeta.colorDim);
 
-  document.getElementById('detail-badge').textContent       = familyMeta.badge;
+  document.getElementById('detail-badge').textContent        = familyMeta.badge;
   document.getElementById('detail-family-label').textContent = familyMeta.label;
   document.getElementById('detail-name').textContent         = seed.name;
   document.getElementById('detail-hook').textContent         = seed.hook;
@@ -127,7 +141,7 @@ function openSeed(seed) {
   const tagsEl = document.getElementById('detail-tags');
   tagsEl.innerHTML = seed.tags.map(t => `<span class="pf-tag">${escHtml(t)}</span>`).join('');
 
-  // Reset difficulty selector
+  // Reset difficulty selector to medium
   document.querySelectorAll('.pf-diff-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.diff === 'medium');
   });
@@ -147,12 +161,15 @@ function startPlay() {
 
   const puzzle = instantiatePuzzle(selectedSeed.twist, selectedDifficulty);
   if (!puzzle) {
-    // Generation failed — show brief error and stay on detail screen
+    // Generation failed (rare) — pulse the button and retry once
     const btn = document.getElementById('btn-play');
-    const orig = btn.textContent;
-    btn.textContent = 'Try again';
     btn.disabled = true;
-    setTimeout(() => { btn.textContent = orig; btn.disabled = false; startPlay(); }, 800);
+    btn.textContent = 'Generating…';
+    setTimeout(() => {
+      btn.textContent = 'Play';
+      btn.disabled = false;
+      startPlay();
+    }, 600);
     return;
   }
 
@@ -171,9 +188,9 @@ function startPlay() {
 }
 
 function renderPlayScreen(puzzle) {
-  // Set header
   document.getElementById('play-title').textContent       = selectedSeed.name;
-  document.getElementById('play-family-line').textContent = selectedSeed.familyMeta.label + ' · ' + capFirst(selectedDifficulty);
+  document.getElementById('play-family-line').textContent =
+    selectedSeed.familyMeta.label + ' · ' + capFirst(selectedDifficulty);
 
   const board = document.getElementById('play-board');
   board.innerHTML = '';
@@ -185,12 +202,9 @@ function renderPlayScreen(puzzle) {
   };
 
   const renderer = renderers[puzzle.family];
-  if (!renderer) {
-    board.textContent = 'Unknown family.';
-    return;
+  if (renderer) {
+    renderer(board, puzzle, onPuzzleComplete);
   }
-
-  renderer(board, puzzle, onPuzzleComplete);
 }
 
 function onPuzzleComplete({ solved, puzzle, ...extras }) {
@@ -207,27 +221,42 @@ function onPuzzleComplete({ solved, puzzle, ...extras }) {
 
 // ── Result screen ──────────────────────────────────────────────────────────
 function showResultScreen(solved, puzzle, extras) {
-  document.getElementById('result-icon').textContent  = solved ? '✓' : '✕';
+  const box  = document.getElementById('result-box');
+  const icon = document.getElementById('result-icon');
+
+  icon.textContent = solved ? '✓' : '✕';
+  icon.className   = solved ? 'pf-result-icon pf-result-icon--solved' : 'pf-result-icon pf-result-icon--failed';
+
   document.getElementById('result-title').textContent = solved ? 'Solved!' : 'Not quite';
   document.getElementById('result-sub').textContent   = solved
     ? getSuccessLine(puzzle, extras)
-    : 'Give it another try.';
+    : 'Give it another try, or try a different seed.';
 
-  // Style icon
-  const icon = document.getElementById('result-icon');
-  icon.style.color = solved ? 'var(--success)' : 'var(--danger)';
+  // Box styling
+  box.className = solved ? 'pf-result-box pf-result-box--solved' : 'pf-result-box pf-result-box--failed';
+
+  // Button visibility: on fail show "Try again" as primary; on success show "Remix"
+  document.getElementById('btn-try-again').hidden = solved;
+  document.getElementById('btn-remix').hidden     = !solved;
 
   showScreen('result');
 }
 
 function getSuccessLine(puzzle, extras) {
-  if (puzzle.family === FAMILIES.ORDER_REPAIR && extras.moves !== undefined) {
-    return `Sorted in ${extras.moves} move${extras.moves !== 1 ? 's' : ''}.`;
+  switch (puzzle.family) {
+    case FAMILIES.TARGET_FORGE:
+      return `Target ${puzzle.target} reached!`;
+    case FAMILIES.ORDER_REPAIR:
+      return extras.moves !== undefined
+        ? `Sorted in ${extras.moves} move${extras.moves !== 1 ? 's' : ''}.`
+        : 'Row sorted!';
+    case FAMILIES.PATH_TRACE:
+      return extras.steps !== undefined
+        ? `Path traced in ${extras.steps} step${extras.steps !== 1 ? 's' : ''}.`
+        : 'Path complete!';
+    default:
+      return 'Well done.';
   }
-  if (puzzle.family === FAMILIES.PATH_TRACE && extras.steps !== undefined) {
-    return `Path traced in ${extras.steps} step${extras.steps !== 1 ? 's' : ''}.`;
-  }
-  return 'Well done.';
 }
 
 // ── Remix ──────────────────────────────────────────────────────────────────
@@ -238,9 +267,8 @@ function remixSeed() {
     KapeworkAnalytics.track('puzzle_foundry_remixed', { seed_id: selectedSeed.id });
   }
 
-  // Re-instantiate a new puzzle from same seed + difficulty
   const puzzle = instantiatePuzzle(selectedSeed.twist, selectedDifficulty);
-  if (!puzzle) { startPlay(); return; } // fallback: re-trigger full start
+  if (!puzzle) { startPlay(); return; }
   currentPuzzle = puzzle;
   renderPlayScreen(puzzle);
   showScreen('play');

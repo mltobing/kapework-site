@@ -98,13 +98,15 @@
   <!-- ── Result screen ───────────────────────────────────────────────────── -->
   <div id="screen-result" class="pf-screen">
 
-    <div class="pf-result-box">
+    <div id="result-box" class="pf-result-box">
       <div id="result-icon"  class="pf-result-icon"></div>
       <div id="result-title" class="pf-result-title"></div>
       <div id="result-sub"   class="pf-result-sub"></div>
     </div>
 
     <div class="pf-result-actions">
+      <!-- btn-try-again is shown on fail; btn-remix is shown on success -->
+      <button id="btn-try-again"      class="pf-result-btn primary" hidden>Try again</button>
       <button id="btn-remix"          class="pf-result-btn primary">Remix this seed</button>
       <button id="btn-try-another"    class="pf-result-btn">Try another seed</button>
       <button id="btn-result-refresh" class="pf-result-btn">Refresh pack</button>
