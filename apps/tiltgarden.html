@@ -39,9 +39,9 @@ body{
 .hud-box{display:flex;flex-direction:column;align-items:flex-end}
 .hud-val{font-size:1.3rem;font-weight:800;color:var(--accent);line-height:1}
 .hud-lbl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-top:1px}
-.next-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+.next-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
 .next-lbl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em}
-#next-canvas{display:block;border-radius:6px;background:var(--board-bg)}
+#next-canvas{display:block;border-radius:8px;background:var(--board-bg);border:1px solid rgba(127,188,152,0.18)}
 
 /* ── Board ── */
 .board-area{position:relative}
@@ -102,16 +102,19 @@ body{
 /* ── Controls ── */
 .controls{width:100%;display:flex;gap:7px;align-items:center}
 .ctrl-btn{
-  flex:1;height:44px;background:var(--surface);border:1px solid var(--border);
-  border-radius:12px;color:var(--text);font-size:1.15rem;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
+  flex:1;height:48px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+  border-radius:12px;color:var(--text);font-size:1.1rem;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
   transition:transform 0.12s,background 0.12s;font-family:inherit;
 }
-.ctrl-btn:active{transform:scale(0.91);background:var(--surface2)}
+.ctrl-btn:active{transform:scale(0.91);background:rgba(255,255,255,0.06)}
+.ci{font-size:1.1rem;line-height:1;display:block}
+.cl{font-size:0.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;line-height:1;display:block}
 .ctrl-settle{
-  flex:1.4;font-size:1.1rem;font-weight:700;
+  flex:1.4;
   background:var(--accent-d);border-color:rgba(127,188,152,0.3);color:var(--accent);
 }
+.ctrl-settle .cl{color:var(--accent);opacity:0.75}
 .ctrl-settle:active{background:var(--accent-b)}
 
 /* ── Stats overflow menu ── */
@@ -132,6 +135,37 @@ body{
 .menu-feedback-btn:hover{color:var(--text)}
 
 .hidden{display:none!important}
+
+/* ── Lean window ring ── */
+.lean-ring{
+  position:absolute;inset:0;border-radius:14px;
+  box-shadow:inset 0 0 0 2px rgba(127,188,152,0.55);
+  pointer-events:none;
+  animation:leanRingPulse 0.7s ease-in-out infinite;
+}
+@keyframes leanRingPulse{
+  0%,100%{opacity:0.25}
+  50%{opacity:0.9}
+}
+
+/* ── Onboarding hint ── */
+.hint-overlay{
+  position:absolute;inset:0;border-radius:14px;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:22px;pointer-events:none;
+  transition:opacity 1.4s ease;
+  z-index:10;
+}
+.hint-overlay.fade-out{opacity:0}
+.hint-inner{
+  text-align:center;background:rgba(8,13,9,0.82);
+  border-radius:12px;padding:9px 18px;gap:2px;
+  display:flex;flex-direction:column;
+  border:1px solid rgba(127,188,152,0.18);
+  backdrop-filter:blur(6px);
+}
+.hint-line{font-size:0.77rem;color:rgba(221,232,226,0.72);line-height:1.6}
+.hint-accent{color:var(--accent);font-weight:700;font-size:0.8rem}
 .back-btn{background:none;border:none;color:var(--muted);font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;padding:6px 6px 6px 0;border-radius:8px;transition:color .15s;white-space:nowrap;flex-shrink:0;text-decoration:none;align-self:flex-start}
 .back-btn:hover{color:var(--text)}
 </style>
@@ -144,7 +178,7 @@ body{
   <div class="game-header">
     <div class="title-wrap">
       <h1 class="game-title">Tilt Garden</h1>
-      <p class="game-sub">Settle shapes gently and watch the board respond.</p>
+      <p class="game-sub">Place a piece · then swipe to tilt the garden.</p>
     </div>
     <div class="hud">
       <div class="next-wrap">
@@ -171,6 +205,13 @@ body{
     <div id="board-wrap" class="board-wrap">
       <canvas id="board" aria-label="Tilt Garden game board"></canvas>
     </div>
+    <div id="lean-ring" class="lean-ring hidden"></div>
+    <div id="hint-overlay" class="hint-overlay hidden">
+      <div class="hint-inner">
+        <div class="hint-line">Tap to rotate · swipe ↕ to move</div>
+        <div class="hint-line hint-accent">After each piece: swipe ← → to tilt</div>
+      </div>
+    </div>
     <div id="end-overlay" class="end-overlay hidden">
       <div class="end-inner">
         <div class="end-title">Your garden settled.</div>
@@ -181,12 +222,12 @@ body{
     </div>
   </div>
 
-  <!-- Always-visible minimal controls -->
+    <!-- Controls -->
   <div class="controls">
-    <button id="btn-left"   class="ctrl-btn" aria-label="Move left">◀</button>
-    <button id="btn-rotate" class="ctrl-btn" aria-label="Rotate">↺</button>
-    <button id="btn-right"  class="ctrl-btn" aria-label="Move right">▶</button>
-    <button id="btn-settle" class="ctrl-settle ctrl-btn" aria-label="Settle piece">▼</button>
+    <button id="btn-left"   class="ctrl-btn" aria-label="Move left"><span class="ci">◀</span><span class="cl">left</span></button>
+    <button id="btn-rotate" class="ctrl-btn" aria-label="Rotate"><span class="ci">↺</span><span class="cl">rotate</span></button>
+    <button id="btn-right"  class="ctrl-btn" aria-label="Move right"><span class="ci">▶</span><span class="cl">right</span></button>
+    <button id="btn-settle" class="ctrl-settle ctrl-btn" aria-label="Drop piece"><span class="ci">▼</span><span class="cl">drop</span></button>
   </div>
 
 
@@ -203,7 +244,7 @@ body{
   const SLIDE_MS       = 1000;  // block slide animation — slow, gentle
   const CLEAR_MS       = 340;   // clear flash
   const LOCK_MS        = 140;   // lock flash
-  const LEAN_WINDOW_MS = 700;   // post-settle swipe window
+  const LEAN_WINDOW_MS = 850;   // post-settle swipe window
   const HOLD_MS        = 360;   // long-press threshold
 
   // ─── Piece data — warm, soft palette ────────────────────────────────────
@@ -238,6 +279,7 @@ body{
   const endOverlay = document.getElementById('end-overlay');
   const endDetail  = document.getElementById('end-detail');
   const boardWrap    = document.getElementById('board-wrap');
+  const leanRing     = document.getElementById('lean-ring');
   const menuDropdown = document.getElementById('menu-dropdown');
   const statPlaced   = document.getElementById('stat-placed');
   const statCleared  = document.getElementById('stat-cleared');
@@ -248,7 +290,7 @@ body{
     const fromW = Math.floor((Math.min(window.innerWidth, 400) - 24) / COLS);
     const fromH = Math.floor((window.innerHeight - 152) / ROWS);
     CELL      = Math.max(30, Math.min(50, Math.min(fromW, fromH)));
-    NEXT_CELL = Math.max(10, Math.round(CELL * 0.36));
+    NEXT_CELL = Math.max(16, Math.round(CELL * 0.52));
     canvas.width     = COLS * CELL;
     canvas.height    = ROWS * CELL;
     const ns = NEXT_CELL * 4 + 4;
@@ -347,6 +389,7 @@ body{
     placed++;
     animating=true;
     lockFlashEnd=performance.now()+LOCK_MS;
+    if (navigator.vibrate) navigator.vibrate(12);
 
     // Direct line clears
     const dc=clearLines(board);
@@ -371,12 +414,14 @@ body{
     leanWindowOpen=true;
     leanWindowEnd=performance.now()+LEAN_WINDOW_MS;
     turnCount++;
+    leanRing.classList.remove('hidden');
     leanWindowTimer=setTimeout(autoCloseLeanWindow, LEAN_WINDOW_MS);
   }
   function closeLeanWindow() {
     clearTimeout(leanWindowTimer); leanWindowTimer=null; leanWindowOpen=false;
+    leanRing.classList.add('hidden');
   }
-  function autoCloseLeanWindow() { leanWindowOpen=false; finishTurn(); }
+  function autoCloseLeanWindow() { closeLeanWindow(); finishTurn(); }
 
   // ─── Block slide move computation ──────────────────────────────────────────
   // Returns [{fx,fy,midX,midY,tx,ty,color}]:
@@ -411,6 +456,7 @@ body{
     const wasWindow=leanWindowOpen;
     animating=true;
     if (wasWindow) closeLeanWindow();
+    if (navigator.vibrate) navigator.vibrate([10,4,8]);
     track('lean',{dir,fromWindow:wasWindow,placed,cleared});
 
     // Compute animation moves BEFORE applying physics
@@ -558,44 +604,47 @@ body{
 
   // ─── Lean window canvas hints ──────────────────────────────────────────────
   function drawLeanHints(now) {
-    // Edge affordances: always subtly visible while a piece is active,
-    // brighter + pulsing during the lean window to invite the swipe.
+    // Edge affordances: subtly visible while a piece is active,
+    // bright + pulsing during the lean window to invite the swipe.
     const isWindow  = leanWindowOpen;
     const isPlaying = !sessionOver && !animating && !!piece;
     if (!isPlaying && !isWindow) return;
 
-    const baseA = isPlaying ? 0.10 : 0;
-    const winA  = isWindow  ? (0.20 + 0.09*Math.sin(now/230)) : 0;
+    const baseA = isPlaying ? 0.08 : 0;
+    const winA  = isWindow  ? (0.28 + 0.12*Math.sin(now/220)) : 0;
     const edgeA = baseA + winA;
     if (edgeA < 0.01) return;
 
-    // Gradient strips on left & right edges
+    // Gradient strips on left & right edges — wider during lean window
+    const stripW = isWindow ? 44 : 28;
     ctx.globalAlpha = edgeA;
-    const gl = ctx.createLinearGradient(0,0,30,0);
+    const gl = ctx.createLinearGradient(0,0,stripW,0);
     gl.addColorStop(0,'#8ecfb0'); gl.addColorStop(1,'transparent');
-    ctx.fillStyle = gl; ctx.fillRect(0,0,30,canvas.height);
+    ctx.fillStyle = gl; ctx.fillRect(0,0,stripW,canvas.height);
 
-    const gr = ctx.createLinearGradient(canvas.width,0,canvas.width-30,0);
+    const gr = ctx.createLinearGradient(canvas.width,0,canvas.width-stripW,0);
     gr.addColorStop(0,'#8ecfb0'); gr.addColorStop(1,'transparent');
-    ctx.fillStyle = gr; ctx.fillRect(canvas.width-30,0,30,canvas.height);
+    ctx.fillStyle = gr; ctx.fillRect(canvas.width-stripW,0,stripW,canvas.height);
 
-    // Chevron arrows — brighter than the strip
-    const chevA = Math.min(1, edgeA*2.8);
+    // Chevron arrows — larger during lean window
+    const chevA = Math.min(1, edgeA*3.2);
     ctx.globalAlpha = chevA;
     ctx.fillStyle = '#8ecfb0';
-    ctx.font = 'bold 14px sans-serif';
-    const cy = (canvas.height/2+6)|0;
-    ctx.textAlign = 'left';  ctx.fillText('‹', 6, cy);
-    ctx.textAlign = 'right'; ctx.fillText('›', canvas.width-6, cy);
+    const chevSize = isWindow ? 'bold 18px sans-serif' : 'bold 13px sans-serif';
+    ctx.font = chevSize;
+    const cy = (canvas.height/2+7)|0;
+    ctx.textAlign = 'left';  ctx.fillText('‹', isWindow?5:6, cy);
+    ctx.textAlign = 'right'; ctx.fillText('›', canvas.width-(isWindow?5:6), cy);
     ctx.textAlign = 'left';
 
-    // First-run text hint (only while lean window is open)
-    if (isWindow && turnCount<=3) {
-      ctx.globalAlpha = Math.min(0.65, winA*3);
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
-      ctx.font = `bold 12px 'DM Sans',sans-serif`;
+    // Instructional text hint during lean window (first several turns)
+    if (isWindow && turnCount<=6) {
+      const hintAlpha = Math.min(0.82, winA*3.5);
+      ctx.globalAlpha = hintAlpha;
+      ctx.fillStyle = '#8ecfb0';
+      ctx.font = `600 12px 'DM Sans',sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('← swipe to lean →', canvas.width/2, canvas.height/2+5);
+      ctx.fillText('← tilt the garden →', canvas.width/2, canvas.height/2+5);
       ctx.textAlign = 'left';
     }
     ctx.globalAlpha = 1;
@@ -684,7 +733,7 @@ body{
       for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
         if (!piece.shape[r][c]) continue;
         const gx=piece.x+c,gyr=gy+r;
-        if (gyr>=0&&gyr<ROWS) { ctx.fillStyle='rgba(255,255,255,0.06)'; ctx.fillRect(gx*CELL+2,gyr*CELL+2,CELL-4,CELL-4); }
+        if (gyr>=0&&gyr<ROWS) { ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(gx*CELL+2,gyr*CELL+2,CELL-4,CELL-4); }
       }
       const alpha=gravityPaused?(0.58+0.42*Math.sin(now/210)):1;
       ctx.globalAlpha=alpha;
@@ -798,6 +847,24 @@ body{
     menuDropdown.classList.toggle('open');
   });
   document.addEventListener('pointerdown', () => menuDropdown.classList.remove('open'));
+
+  // ─── Onboarding hint (show once, first session) ────────────────────────────
+  const hintOverlay = document.getElementById('hint-overlay');
+  const HINT_KEY = 'tiltgarden_hint_v1';
+  (function initHint() {
+    if (localStorage.getItem(HINT_KEY)) return; // already seen
+    hintOverlay.classList.remove('hidden');
+    let dismissed = false;
+    const dismissHint = () => {
+      if (dismissed) return;
+      dismissed = true;
+      hintOverlay.classList.add('fade-out');
+      setTimeout(() => hintOverlay.classList.add('hidden'), 1400);
+      try { localStorage.setItem(HINT_KEY, '1'); } catch {}
+    };
+    setTimeout(dismissHint, 5000);
+    canvas.addEventListener('pointerdown', dismissHint, { once: true });
+  })();
 
   updateStatsBar();
   startSession();
