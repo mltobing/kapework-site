@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>Puzzle Foundry · Kapework</title>
+  <meta name="description" content="Fresh puzzle sparks. Tap one and play. Three families, eight seeds, one tap to start.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <link rel="stylesheet" href="/apps/puzzlefoundry/styles.css">
+</head>
+<body>
+
+<div class="pf-page">
+
+  <!-- Top bar: back link + ⋮ shell mount -->
+  <div class="pf-top-bar">
+    <a class="pf-back-btn" href="https://braingym.kapework.com/">&#8592; Brain Gym</a>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- ── Pack screen ─────────────────────────────────────────────────────── -->
+  <div id="screen-pack" class="pf-screen active">
+
+    <div class="pf-header">
+      <div class="pf-logo">⚗</div>
+      <h1 class="pf-title">Puzzle Foundry</h1>
+      <p class="pf-sub">Fresh puzzle sparks. Tap one and play.</p>
+    </div>
+
+    <div id="seed-grid" class="pf-seed-grid">
+      <!-- Seed cards injected by ui.js -->
+    </div>
+
+    <div class="pf-pack-controls">
+      <button id="btn-refresh-pack" class="pf-refresh-btn">
+        ↺ New pack
+      </button>
+    </div>
+
+    <div class="pf-footer">Eight seeds · Three families · One tap to start</div>
+
+  </div>
+
+  <!-- ── Detail screen ───────────────────────────────────────────────────── -->
+  <div id="screen-detail" class="pf-screen">
+
+    <div class="pf-top-bar" style="width:100%;">
+      <button id="btn-back-to-pack" class="pf-back-btn">&#8592; Back</button>
+    </div>
+
+    <div id="detail-card" class="pf-detail-card">
+      <div class="pf-detail-family">
+        <div id="detail-badge" class="pf-detail-badge"></div>
+        <div id="detail-family-label" class="pf-detail-family-label"></div>
+      </div>
+      <div id="detail-name" class="pf-detail-name"></div>
+      <div id="detail-hook" class="pf-detail-hook"></div>
+      <div id="detail-tags" class="pf-detail-tags"></div>
+    </div>
+
+    <div class="pf-difficulty-section">
+      <div class="pf-difficulty-label">Difficulty</div>
+      <div class="pf-difficulty-btns">
+        <button class="pf-diff-btn" data-diff="easy">Easy</button>
+        <button class="pf-diff-btn active" data-diff="medium">Medium</button>
+        <button class="pf-diff-btn" data-diff="hard">Hard</button>
+      </div>
+    </div>
+
+    <button id="btn-play" class="pf-play-btn">Play</button>
+
+  </div>
+
+  <!-- ── Play screen ─────────────────────────────────────────────────────── -->
+  <div id="screen-play" class="pf-screen">
+
+    <div class="pf-top-bar" style="width:100%; justify-content:space-between;">
+      <button id="btn-back-to-detail" class="pf-back-btn">&#8592; Seeds</button>
+      <button id="btn-reset-play" class="pf-back-btn">Reset ↺</button>
+    </div>
+
+    <div class="pf-play-header" style="width:100%;">
+      <div id="play-title"       class="pf-play-title"></div>
+      <div id="play-family-line" class="pf-play-family-line"></div>
+    </div>
+
+    <div id="play-board" class="pf-play-board">
+      <!-- Family-specific board injected by ui.js -->
+    </div>
+
+  </div>
+
+  <!-- ── Result screen ───────────────────────────────────────────────────── -->
+  <div id="screen-result" class="pf-screen">
+
+    <div class="pf-result-box">
+      <div id="result-icon"  class="pf-result-icon"></div>
+      <div id="result-title" class="pf-result-title"></div>
+      <div id="result-sub"   class="pf-result-sub"></div>
+    </div>
+
+    <div class="pf-result-actions">
+      <button id="btn-remix"          class="pf-result-btn primary">Remix this seed</button>
+      <button id="btn-try-another"    class="pf-result-btn">Try another seed</button>
+      <button id="btn-result-refresh" class="pf-result-btn">Refresh pack</button>
+    </div>
+
+  </div>
+
+</div><!-- /.pf-page -->
+
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('puzzlefoundry');
+  KapeworkShell.init({ appSlug: 'puzzlefoundry', mountId: 'kw-shell-mount' });
+</script>
+<script type="module">
+  import { init } from '/apps/puzzlefoundry/ui.js';
+  init();
+</script>
+</body>
+</html>
