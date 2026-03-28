@@ -146,6 +146,7 @@ html, body {
 .cell.tapped {
   background: #d6ecff;
   border-color: #9dc7f5;
+  animation: tapBounce 0.17s ease;
 }
 .cell.tapped-correct {
   background: #baedc4;
@@ -162,6 +163,12 @@ html, body {
   0%,100% { transform: translateX(0); }
   25%      { transform: translateX(-5px); }
   75%      { transform: translateX(5px); }
+}
+
+@keyframes tapBounce {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.11); }
+  100% { transform: scale(1); }
 }
 
 /* ── Sequence dots ───────────────────────────────────── */
@@ -319,6 +326,55 @@ html, body {
 }
 .ghost-btn:active { transform: scale(0.96); }
 
+/* ── Watch → Tap phase transition ───────────────────── */
+/* Cells dim slightly while the pattern is playing */
+.grid.phase-watch .cell:not(.flash) {
+  opacity: 0.72;
+  transition: opacity 0.08s;
+}
+/* Brief activation ring when it becomes the player's turn */
+@keyframes gridActivate {
+  0%   { box-shadow: 0 0 0 0px rgba(78,168,222,0); }
+  28%  { box-shadow: 0 0 0 4px rgba(78,168,222,0.45), 0 4px 20px rgba(78,168,222,0.1); }
+  100% { box-shadow: 0 0 0 0px rgba(78,168,222,0); }
+}
+.grid.phase-input {
+  animation: gridActivate 0.55s ease-out forwards;
+}
+
+/* ── "Tap it back." status bounce-in ─────────────────── */
+@keyframes statusCue {
+  0%  { opacity: 0.1; transform: scale(0.88); }
+  55% { opacity: 1;   transform: scale(1.05); }
+  100%{ opacity: 1;   transform: scale(1); }
+}
+.status.cue { animation: statusCue 0.28s ease forwards; }
+
+/* ── Post-fail reveal cells ──────────────────────────── */
+.cell.reveal {
+  background: #cceffa;
+  border-color: #52b8d8;
+  transform: scale(1.04);
+  transition: background 0.07s, border-color 0.07s, transform 0.07s;
+}
+
+/* ── Result: round-progress pips ─────────────────────── */
+.result-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin: -2px 0 2px;
+}
+.result-rounds-row { display: flex; gap: 8px; }
+.result-round-pip {
+  width: 26px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+}
+.result-round-pip.done { background: var(--flash); }
+
 /* ── Shell overrides — light cream ───────────────────── */
 .kw-more-btn { color: var(--ink); }
 .kw-more-btn:hover { background: rgba(74,47,36,0.08); }
@@ -375,6 +431,7 @@ html, body {
     <div class="result-emoji"    id="result-emoji"></div>
     <div class="result-headline" id="result-headline"></div>
     <div class="result-sub"      id="result-sub"></div>
+    <div class="result-rounds"   id="result-rounds"></div>
     <div class="result-detail"   id="result-detail"></div>
     <button class="share-btn"  id="btn-share">Share result</button>
     <button class="ghost-btn"  id="btn-after">Play Endless instead</button>
@@ -496,7 +553,7 @@ function setCellsDisabled(disabled) {
   cellEls.forEach(c => { c.disabled = disabled; });
 }
 function clearCellClasses() {
-  cellEls.forEach(c => c.classList.remove('flash', 'tapped', 'tapped-correct', 'tapped-wrong'));
+  cellEls.forEach(c => c.classList.remove('flash', 'tapped', 'tapped-correct', 'tapped-wrong', 'reveal'));
 }
 
 // ═══════════════════════════════════════════════════════
@@ -517,6 +574,8 @@ let firstTap    = true;
 async function flashSequence(seq) {
   setCellsDisabled(true);
   clearCellClasses();
+  gridEl.classList.remove('phase-input');
+  gridEl.classList.add('phase-watch');
   const { onMs, offMs } = flashTiming(roundIdx);
   for (let i = 0; i < seq.length; i++) {
     cellEls[seq[i]].classList.add('flash');
@@ -524,6 +583,7 @@ async function flashSequence(seq) {
     cellEls[seq[i]].classList.remove('flash');
     if (i < seq.length - 1) await wait(offMs);
   }
+  gridEl.classList.remove('phase-watch');
   await wait(90);
 }
 
@@ -542,14 +602,15 @@ function onTap(i) {
   const expected = seq[playerInput.length];
 
   if (i !== expected) {
-    // Wrong tap — game over
+    // Wrong tap — lock input, show reveal, then result
     phase = 'done';
+    gridEl.classList.remove('phase-input');
     cellEls[i].classList.add('tapped-wrong');
     if (navigator.vibrate) navigator.vibrate([40, 40, 40]);
     setCellsDisabled(true);
     track('run_fail', { round: roundIdx + 1, seqsCleared });
     setStatus('Wrong tap.', 'fail');
-    setTimeout(() => showResult(false), 700);
+    revealThenResult(seq, playerInput.length);
     return;
   }
 
@@ -558,16 +619,18 @@ function onTap(i) {
   if (navigator.vibrate) navigator.vibrate(6);
 
   if (playerInput.length === seq.length) {
-    // Sequence complete
+    // Sequence complete — staggered green wave
     phase = 'done';
+    gridEl.classList.remove('phase-input');
     seqsCleared++;
     track('sequence_clear', { round: roundIdx + 1, seqsCleared, len: seq.length });
-    // green success confirmation
-    seq.forEach(c => {
-      cellEls[c].classList.remove('tapped');
-      cellEls[c].classList.add('tapped-correct');
+    seq.forEach((c, idx) => {
+      setTimeout(() => {
+        cellEls[c].classList.remove('tapped');
+        cellEls[c].classList.add('tapped-correct');
+      }, idx * 45);
     });
-    setTimeout(() => advanceAfterSequence(), 650);
+    setTimeout(() => advanceAfterSequence(), 700);
   }
 }
 
@@ -628,6 +691,9 @@ async function startSequence() {
   track('sequence_start', { round: roundIdx + 1, seqNum, len: seq.length });
   await flashSequence(seq);
   setStatus('Tap it back.', 'bold');
+  void statusEl.offsetWidth; // force reflow so cue animation restarts cleanly
+  statusEl.classList.add('cue');
+  gridEl.classList.add('phase-input');
   setCellsDisabled(false);
   phase = 'input';
 }
@@ -696,12 +762,49 @@ function beginRun() {
 }
 
 // ═══════════════════════════════════════════════════════
+// Post-fail reveal: flash the remaining sequence so the
+// player sees what they missed before the result card.
+// ═══════════════════════════════════════════════════════
+async function revealThenResult(seq, failIdx) {
+  await wait(460); // let wrong-tap animation settle
+  clearCellClasses();
+  // Show up to 5 remaining cells in a soft reveal colour
+  const remaining = seq.slice(failIdx, failIdx + 5);
+  for (let k = 0; k < remaining.length; k++) {
+    cellEls[remaining[k]].classList.add('reveal');
+    await wait(195);
+    cellEls[remaining[k]].classList.remove('reveal');
+    if (k < remaining.length - 1) await wait(55);
+  }
+  await wait(280);
+  showResult(false);
+}
+
+// ═══════════════════════════════════════════════════════
+// Build the round-progress pip rows for the result card.
+// ═══════════════════════════════════════════════════════
+function buildResultRounds() {
+  const el = document.getElementById('result-rounds');
+  if (!el) return;
+  el.innerHTML = ROUNDS.map(({ seqs }, ri) => {
+    let cleared = 0;
+    if (ri < roundIdx)      cleared = seqs;
+    else if (ri === roundIdx) cleared = seqIdx + (seqsCleared >= TOTAL_SEQS ? 1 : 0);
+    const pips = Array(seqs).fill(null)
+      .map((_, si) => `<div class="result-round-pip${si < cleared ? ' done' : ''}"></div>`)
+      .join('');
+    return `<div class="result-rounds-row">${pips}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
 // Result screen
 // ═══════════════════════════════════════════════════════
 function showResult(success) {
   phase = 'done';
   setCellsDisabled(true);
   clearCellClasses();
+  gridEl.classList.remove('phase-input', 'phase-watch');
 
   const roundReached = roundIdx + 1;
   const isPerfect    = success; // can only win by finishing all 13
@@ -709,17 +812,19 @@ function showResult(success) {
   let emoji, headline, sub;
   if (isPerfect) {
     emoji    = '🌟';
-    headline = 'Perfect!';
-    sub      = '13/13 sequences';
+    headline = 'All clear.';
+    sub      = '13 of 13 sequences';
   } else {
     emoji    = '💥';
     headline = 'Round ' + roundReached;
-    sub      = seqsCleared + ' / ' + TOTAL_SEQS + ' sequences';
+    sub      = seqsCleared + ' of ' + TOTAL_SEQS + ' sequences';
   }
 
   document.getElementById('result-emoji').textContent    = emoji;
   document.getElementById('result-headline').textContent = headline;
   document.getElementById('result-sub').textContent      = sub;
+
+  buildResultRounds();
 
   if (isDaily) {
     saveDailyResult(success, roundReached, seqsCleared);
@@ -754,19 +859,19 @@ function statRow(label, val) {
 function buildShareText() {
   const num       = daysSinceEpoch();
   const isPerfect = seqsCleared === TOTAL_SEQS;
-  // Build a compact emoji grid: one row per round, squares per sequence
-  const rows = ROUNDS.map(({ seqs }, ri) => {
+  // One row per round; 🟧 = cleared sequence, ⬜ = not reached
+  const grid = ROUNDS.map(({ seqs }, ri) => {
     let cleared = 0;
-    if (ri < roundIdx) cleared = seqs;
+    if (ri < roundIdx)        cleared = seqs;
     else if (ri === roundIdx) cleared = seqIdx + (seqsCleared >= TOTAL_SEQS ? 1 : 0);
     return Array(seqs).fill(null).map((_, si) => si < cleared ? '🟧' : '⬜').join('');
-  });
+  }).join('\n');
 
   if (isPerfect) {
-    return 'BlinkGrid #' + num + '\nPerfect ✨\n13/13\n' + rows.join('\n');
+    return 'BlinkGrid #' + num + '\n' + grid + '\nAll clear · 13/13 ✨';
   } else {
-    return 'BlinkGrid #' + num + '\nRound ' + (roundIdx + 1) + '\n'
-      + seqsCleared + '/' + TOTAL_SEQS + '\n' + rows.join('\n');
+    return 'BlinkGrid #' + num + '\n' + grid
+      + '\n' + seqsCleared + '/13 · Round ' + (roundIdx + 1);
   }
 }
 
@@ -857,16 +962,23 @@ function showSavedResult(saved) {
   roundIdx    = saved.roundReached - 1;
   seqsCleared = saved.seqsCleared;
 
+  // Reconstruct seqIdx so buildResultRounds renders correctly
+  let prevSeqs = 0;
+  for (let i = 0; i < roundIdx; i++) prevSeqs += ROUNDS[i].seqs;
+  seqIdx = Math.min(seqsCleared - prevSeqs, ROUNDS[roundIdx].seqs - 1);
+
   modeScreenEl.style.display    = 'none';
   taglineEl.style.display       = 'none';
   roundHeaderEl.style.display   = 'none';
 
   const isPerfect = saved.perfectSolve;
   document.getElementById('result-emoji').textContent    = isPerfect ? '🌟' : (saved.success ? '✅' : '💥');
-  document.getElementById('result-headline').textContent = isPerfect ? 'Perfect!' : 'Round ' + saved.roundReached;
+  document.getElementById('result-headline').textContent = isPerfect ? 'All clear.' : 'Round ' + saved.roundReached;
   document.getElementById('result-sub').textContent      = isPerfect
-    ? '13/13 sequences'
-    : saved.seqsCleared + ' / ' + TOTAL_SEQS + ' sequences';
+    ? '13 of 13 sequences'
+    : saved.seqsCleared + ' of ' + TOTAL_SEQS + ' sequences';
+
+  buildResultRounds();
 
   document.getElementById('result-detail').innerHTML =
     statRow('Puzzle', '#' + saved.puzzleNum) +
