@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>ClipDigest · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <style>
+/* ─── Reset & tokens ───────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:        #0a1628;
+  --surface:   #121e33;
+  --surface2:  #1a2a44;
+  --cyan:      #00e5cc;
+  --cyan-dim:  rgba(0,229,204,0.12);
+  --cyan-glow: rgba(0,229,204,0.20);
+  --text:      #e8edf5;
+  --muted:     rgba(232,237,245,0.50);
+  --muted-dim: rgba(232,237,245,0.30);
+  --border:    rgba(232,237,245,0.08);
+  --border-h:  rgba(232,237,245,0.15);
+  --danger:    #f87171;
+  --success:   #4ade80;
+}
+
+html, body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+
+/* ─── Page shell ───────────────────────────────────────────────────────────── */
+.page {
+  width: 100%;
+  max-width: 520px;
+  padding: 12px 16px env(safe-area-inset-bottom, 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+/* ─── Top bar ──────────────────────────────────────────────────────────────── */
+.top-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+.back-link:hover { color: var(--text); }
+.back-arrow { font-size: 1rem; line-height: 1; }
+
+/* ─── App header ───────────────────────────────────────────────────────────── */
+.app-header {
+  text-align: center;
+  padding-top: 4px;
+}
+.app-logo  { font-size: 2.5rem; line-height: 1; }
+.app-title { font-size: 1.7rem; font-weight: 900; letter-spacing: -0.5px; margin-top: 6px; }
+.app-sub   { font-size: 0.88rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.app-hint  { font-size: 0.78rem; color: var(--muted-dim); margin-top: 3px; }
+
+/* ─── Upload zone ──────────────────────────────────────────────────────────── */
+.upload-zone {
+  border: 2px dashed var(--border-h);
+  border-radius: 20px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  position: relative;
+  min-height: 190px;
+}
+.upload-zone:hover,
+.upload-zone.drag-over {
+  border-color: var(--cyan);
+  background: var(--surface2);
+  box-shadow: 0 0 24px var(--cyan-dim);
+}
+.upload-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+}
+
+.upload-icon  { font-size: 2.6rem; line-height: 1; pointer-events: none; }
+.upload-label { font-size: 1rem; font-weight: 800; pointer-events: none; }
+.upload-hint  { font-size: 0.78rem; color: var(--muted); pointer-events: none; }
+.upload-types { font-size: 0.72rem; color: var(--muted-dim); pointer-events: none; }
+
+/* ─── Settings card ────────────────────────────────────────────────────────── */
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+
+/* Segmented control */
+.seg-ctrl {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.seg-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 8px 6px;
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+}
+.seg-btn.active {
+  background: var(--cyan);
+  color: #0a1628;
+}
+.seg-btn:not(.active):hover { color: var(--text); }
+
+/* ─── Primary action button ────────────────────────────────────────────────── */
+.btn-primary {
+  background: var(--cyan);
+  color: #0a1628;
+  font-weight: 800;
+  font-size: 1rem;
+  border: none;
+  border-radius: 14px;
+  padding: 15px 24px;
+  width: 100%;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-primary:hover:not(:disabled) { opacity: 0.9; }
+.btn-primary:active:not(:disabled) { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.35; cursor: default; }
+
+/* ─── Progress card ────────────────────────────────────────────────────────── */
+.progress-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  text-align: center;
+}
+
+.progress-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.progress-phase {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.progress-bar-wrap {
+  width: 100%;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* ─── Results card ─────────────────────────────────────────────────────────── */
+.results-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.results-title {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.results-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-chip {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.stat-val  { font-size: 1.1rem; font-weight: 800; line-height: 1; }
+.stat-key  { font-size: 0.68rem; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Preview strip */
+.preview-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.preview-thumb {
+  aspect-ratio: 9/16;
+  border-radius: 6px;
+  background: var(--surface2);
+  overflow: hidden;
+  position: relative;
+}
+.preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.preview-thumb .ts {
+  position: absolute;
+  bottom: 3px;
+  left: 0; right: 0;
+  text-align: center;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+
+/* Action buttons row */
+.action-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid var(--border-h);
+  border-radius: 12px;
+  padding: 13px 20px;
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: center;
+}
+.btn-secondary:hover { border-color: var(--cyan); box-shadow: 0 0 12px var(--cyan-dim); }
+.btn-secondary:active { opacity: 0.8; }
+
+.btn-ghost {
+  background: none;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: none;
+  padding: 10px;
+  width: 100%;
+  border-radius: 10px;
+  transition: color 0.15s;
+}
+.btn-ghost:hover { color: var(--text); }
+
+/* ─── Error banner ─────────────────────────────────────────────────────────── */
+.error-banner {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--danger);
+  line-height: 1.5;
+}
+
+/* ─── View visibility ──────────────────────────────────────────────────────── */
+.view { display: none; flex-direction: column; gap: 20px; }
+.view.active { display: flex; }
+
+/* ─── Footer ───────────────────────────────────────────────────────────────── */
+.app-footer {
+  margin-top: auto;
+  font-size: 0.72rem;
+  color: var(--muted-dim);
+  text-align: center;
+  padding-bottom: 8px;
+}
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <a class="back-link" href="https://tools.kapework.com/">
+      <span class="back-arrow">‹</span> Tools
+    </a>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- ── VIEW: Upload ──────────────────────────────────────────────────────── -->
+  <div class="view active" id="view-upload">
+
+    <div class="app-header">
+      <div class="app-logo">🎞️</div>
+      <h1 class="app-title">ClipDigest</h1>
+      <p class="app-sub">Turn a short video into a clean storyboard PDF</p>
+      <p class="app-hint">Great for app demos, playtests, and mobile screen recordings</p>
+    </div>
+
+    <div class="upload-zone" id="upload-zone" role="button" aria-label="Upload video file">
+      <input type="file" id="file-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" aria-label="Choose video file">
+      <div class="upload-icon">📹</div>
+      <div class="upload-label">Drop a video or tap to choose</div>
+      <div class="upload-hint">mp4 · mov · webm</div>
+      <div class="upload-types">Up to 3 min · 250 MB</div>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-label">Detail level</div>
+      <div class="seg-ctrl" role="group" aria-label="Detail level">
+        <button class="seg-btn" data-level="lean" type="button">Lean</button>
+        <button class="seg-btn active" data-level="balanced" type="button">Balanced</button>
+        <button class="seg-btn" data-level="detailed" type="button">Detailed</button>
+      </div>
+    </div>
+
+    <div id="upload-error" class="error-banner" style="display:none;"></div>
+
+    <button class="btn-primary" id="btn-generate" disabled type="button">Generate Digest</button>
+
+  </div>
+
+  <!-- ── VIEW: Processing ──────────────────────────────────────────────────── -->
+  <div class="view" id="view-processing">
+
+    <div class="app-header">
+      <div class="app-logo">🎞️</div>
+      <h1 class="app-title">ClipDigest</h1>
+    </div>
+
+    <div class="progress-card">
+      <div class="progress-title">Building your digest…</div>
+      <div class="progress-phase" id="progress-phase">Reading video</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── VIEW: Results ─────────────────────────────────────────────────────── -->
+  <div class="view" id="view-results">
+
+    <div class="app-header" style="padding-top:0;">
+      <div class="app-logo">✅</div>
+      <h1 class="app-title">Digest ready</h1>
+    </div>
+
+    <div class="results-card">
+      <div class="results-title" id="results-filename"></div>
+
+      <div class="results-stats">
+        <div class="stat-chip">
+          <div class="stat-val" id="stat-duration">—</div>
+          <div class="stat-key">Duration</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-val" id="stat-frames">—</div>
+          <div class="stat-key">Frames</div>
+        </div>
+        <div class="stat-chip">
+          <div class="stat-val" id="stat-level">—</div>
+          <div class="stat-key">Detail</div>
+        </div>
+      </div>
+
+      <div class="preview-strip" id="preview-strip"></div>
+
+      <div class="action-row">
+        <button class="btn-secondary" id="btn-pdf" type="button">Download PDF</button>
+        <button class="btn-secondary" id="btn-zip" type="button">Download ZIP</button>
+        <button class="btn-ghost" id="btn-restart" type="button">Start over</button>
+      </div>
+    </div>
+
+    <div id="results-error" class="error-banner" style="display:none;"></div>
+
+  </div>
+
+  <div class="app-footer">Kapework · ClipDigest</div>
+
+</div>
+
+<!-- Hidden video element for decoding -->
+<video id="decode-video" style="display:none;" playsinline muted preload="metadata"></video>
+<!-- Hidden canvas for frame capture -->
+<canvas id="decode-canvas" style="display:none;"></canvas>
+
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+'use strict';
+
+KapeworkAnalytics.init('clipdigest');
+KapeworkShell.init({ appSlug: 'clipdigest', mountId: 'kw-shell-mount' });
+
+/* ─── Constants ─────────────────────────────────────────────────────────────── */
+const MAX_DURATION_S = 180;   // 3 minutes
+const MAX_FILE_BYTES = 250 * 1024 * 1024; // 250 MB
+
+const LEVEL_CONFIG = {
+  lean:     { minFrames: 12, maxFrames: 20, label: 'Lean' },
+  balanced: { minFrames: 20, maxFrames: 36, label: 'Balanced' },
+  detailed: { minFrames: 36, maxFrames: 60, label: 'Detailed' },
+};
+
+/* ─── State ─────────────────────────────────────────────────────────────────── */
+let selectedFile   = null;
+let selectedLevel  = 'balanced';
+let selectedFrames = [];   // [{time, dataUrl}]
+let videoDuration  = 0;
+
+/* ─── DOM refs ──────────────────────────────────────────────────────────────── */
+const fileInput      = document.getElementById('file-input');
+const uploadZone     = document.getElementById('upload-zone');
+const uploadError    = document.getElementById('upload-error');
+const btnGenerate    = document.getElementById('btn-generate');
+const segBtns        = document.querySelectorAll('.seg-btn');
+const progressPhase  = document.getElementById('progress-phase');
+const progressBar    = document.getElementById('progress-bar');
+const resultsFilename = document.getElementById('results-filename');
+const statDuration   = document.getElementById('stat-duration');
+const statFrames     = document.getElementById('stat-frames');
+const statLevel      = document.getElementById('stat-level');
+const previewStrip   = document.getElementById('preview-strip');
+const btnPdf         = document.getElementById('btn-pdf');
+const btnZip         = document.getElementById('btn-zip');
+const btnRestart     = document.getElementById('btn-restart');
+const resultsError   = document.getElementById('results-error');
+const decodeVideo    = document.getElementById('decode-video');
+const decodeCanvas   = document.getElementById('decode-canvas');
+
+/* ─── View switching ────────────────────────────────────────────────────────── */
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── Segmented control ─────────────────────────────────────────────────────── */
+segBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    segBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedLevel = btn.dataset.level;
+  });
+});
+
+/* ─── Drag-and-drop ─────────────────────────────────────────────────────────── */
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag-over');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const file = e.dataTransfer?.files?.[0];
+  if (file) handleFileSelected(file);
+});
+
+/* ─── File input change ─────────────────────────────────────────────────────── */
+fileInput.addEventListener('change', () => {
+  if (fileInput.files?.[0]) handleFileSelected(fileInput.files[0]);
+});
+
+/* ─── File validation ───────────────────────────────────────────────────────── */
+const ACCEPTED_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+const ACCEPTED_EXTS  = /\.(mp4|mov|webm)$/i;
+
+function handleFileSelected(file) {
+  hideError();
+  const typeOk = ACCEPTED_TYPES.has(file.type) || ACCEPTED_EXTS.test(file.name);
+  if (!typeOk) {
+    showError('Unsupported file type. Please upload an mp4, mov, or webm file.');
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    showError('File is too large. Maximum size is 250 MB.');
+    return;
+  }
+  selectedFile = file;
+  btnGenerate.disabled = false;
+  uploadZone.querySelector('.upload-label').textContent = file.name;
+  uploadZone.querySelector('.upload-icon').textContent = '✅';
+  KapeworkAnalytics.track('clipdigest_upload_started', { file_size: file.size });
+}
+
+/* ─── Error helpers ─────────────────────────────────────────────────────────── */
+function showError(msg) {
+  uploadError.textContent = msg;
+  uploadError.style.display = '';
+}
+function hideError() {
+  uploadError.style.display = 'none';
+  uploadError.textContent = '';
+}
+
+/* ─── Generate button ───────────────────────────────────────────────────────── */
+btnGenerate.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  hideError();
+  showView('view-processing');
+  KapeworkAnalytics.track('clipdigest_analysis_started', { level: selectedLevel });
+  try {
+    await runPipeline(selectedFile, selectedLevel);
+    showResults();
+    KapeworkAnalytics.track('clipdigest_digest_generated', {
+      level: selectedLevel,
+      frame_count: selectedFrames.length,
+      duration: videoDuration,
+    });
+  } catch (err) {
+    console.error('[clipdigest] pipeline error', err);
+    showView('view-upload');
+    showError(friendlyError(err));
+  }
+});
+
+function friendlyError(err) {
+  const msg = (err?.message || '').toLowerCase();
+  if (msg.includes('decode') || msg.includes('load'))
+    return 'Could not read the video. The file may be corrupted or use an unsupported codec.';
+  if (msg.includes('duration') || msg.includes('too long'))
+    return 'Video is too long. Maximum duration is 3 minutes.';
+  if (msg.includes('memory') || msg.includes('quota'))
+    return 'Your device ran out of memory while processing. Try a shorter clip or a lower detail level.';
+  return 'Something went wrong during processing. Please try a different file.';
+}
+
+/* ─── Core pipeline (placeholder stubs — to be filled in Checkpoint 3) ──────── */
+
+async function runPipeline(file, level) {
+  // Phase 1: load video metadata
+  setProgress('Reading video', 5);
+  await loadVideoMetadata(file);
+
+  // Phase 2: scan frames for change analysis
+  setProgress('Analysing change', 20);
+  const scanFrames = await scanVideoFrames(file, level);
+
+  // Phase 3: select representative frames
+  setProgress('Selecting frames', 70);
+  selectedFrames = await selectRepresentativeFrames(scanFrames, level);
+
+  // Phase 4: capture full-res selected frames
+  setProgress('Capturing frames', 85);
+  await captureFullResFrames(selectedFrames);
+
+  setProgress('Done', 100);
+}
+
+function setProgress(phase, pct) {
+  progressPhase.textContent = phase;
+  progressBar.style.width = pct + '%';
+}
+
+/* ── stub: load video metadata ── */
+async function loadVideoMetadata(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    decodeVideo.src = url;
+    decodeVideo.onloadedmetadata = () => {
+      videoDuration = decodeVideo.duration;
+      if (!isFinite(videoDuration) || videoDuration <= 0)
+        return reject(new Error('Could not decode video duration.'));
+      if (videoDuration > MAX_DURATION_S)
+        return reject(new Error('Video is too long.'));
+      resolve();
+    };
+    decodeVideo.onerror = () => reject(new Error('Video decode error.'));
+  });
+}
+
+/* ── stub: scan frames ── */
+async function scanVideoFrames(file, level) {
+  // Full implementation in Checkpoint 3.
+  // Returns array of {time, score} for the phase-2 analysis step.
+  return [];
+}
+
+/* ── stub: select representative frames ── */
+async function selectRepresentativeFrames(scanFrames, level) {
+  // Full implementation in Checkpoint 3.
+  // Returns array of {time, dataUrl: null}.
+  const cfg = LEVEL_CONFIG[level];
+  const count = cfg.minFrames;
+  const step  = videoDuration / (count + 1);
+  const frames = [];
+  for (let i = 1; i <= count; i++) {
+    frames.push({ time: +(step * i).toFixed(2), dataUrl: null });
+  }
+  return frames;
+}
+
+/* ── stub: capture full-res frames ── */
+async function captureFullResFrames(frames) {
+  // Full implementation in Checkpoint 3.
+  // Fills frame.dataUrl by seeking decodeVideo and drawing to decodeCanvas.
+  for (const f of frames) {
+    f.dataUrl = await captureFrame(f.time);
+    setProgress('Capturing frames', 85 + Math.round((frames.indexOf(f) / frames.length) * 10));
+  }
+}
+
+function captureFrame(time) {
+  return new Promise((resolve, reject) => {
+    const video  = decodeVideo;
+    const canvas = decodeCanvas;
+    const onSeeked = () => {
+      canvas.width  = video.videoWidth  || 640;
+      canvas.height = video.videoHeight || 360;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error', onError);
+    };
+    const onError = () => {
+      reject(new Error('Frame capture error at ' + time));
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error', onError);
+    };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    video.addEventListener('error', onError, { once: true });
+    video.currentTime = time;
+  });
+}
+
+/* ─── Results ───────────────────────────────────────────────────────────────── */
+function showResults() {
+  const cfg = LEVEL_CONFIG[selectedLevel];
+  resultsFilename.textContent = selectedFile.name;
+  statDuration.textContent = formatTime(videoDuration);
+  statFrames.textContent   = selectedFrames.length;
+  statLevel.textContent    = cfg.label;
+
+  // Preview strip — first 4 frames
+  previewStrip.innerHTML = '';
+  selectedFrames.slice(0, 4).forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'preview-thumb';
+    if (f.dataUrl) {
+      const img = document.createElement('img');
+      img.src = f.dataUrl;
+      img.alt = 'Frame at ' + formatTimestamp(f.time);
+      div.appendChild(img);
+    }
+    const ts = document.createElement('div');
+    ts.className = 'ts';
+    ts.textContent = formatTimestamp(f.time);
+    div.appendChild(ts);
+    previewStrip.appendChild(div);
+  });
+
+  showView('view-results');
+}
+
+/* ─── PDF export (stub — full impl in Checkpoint 3) ─────────────────────────── */
+btnPdf.addEventListener('click', async () => {
+  btnPdf.disabled = true;
+  btnPdf.textContent = 'Building PDF…';
+  try {
+    await exportPdf();
+    KapeworkAnalytics.track('clipdigest_pdf_downloaded', { frame_count: selectedFrames.length });
+  } catch (err) {
+    console.error('[clipdigest] PDF error', err);
+    resultsError.textContent = 'PDF export failed. Please try again.';
+    resultsError.style.display = '';
+  } finally {
+    btnPdf.disabled = false;
+    btnPdf.textContent = 'Download PDF';
+  }
+});
+
+async function exportPdf() {
+  // Full implementation in Checkpoint 3 using pdf-lib (lazy loaded).
+  // Placeholder: alert for now.
+  alert('PDF export coming in the next build.');
+}
+
+/* ─── ZIP export (stub — full impl in Checkpoint 3) ─────────────────────────── */
+btnZip.addEventListener('click', async () => {
+  btnZip.disabled = true;
+  btnZip.textContent = 'Building ZIP…';
+  try {
+    await exportZip();
+    KapeworkAnalytics.track('clipdigest_zip_downloaded', { frame_count: selectedFrames.length });
+  } catch (err) {
+    console.error('[clipdigest] ZIP error', err);
+    resultsError.textContent = 'ZIP export failed. Please try again.';
+    resultsError.style.display = '';
+  } finally {
+    btnZip.disabled = false;
+    btnZip.textContent = 'Download ZIP';
+  }
+});
+
+async function exportZip() {
+  // Full implementation in Checkpoint 3 using JSZip (lazy loaded).
+  alert('ZIP export coming in the next build.');
+}
+
+/* ─── Restart ───────────────────────────────────────────────────────────────── */
+btnRestart.addEventListener('click', () => {
+  selectedFile   = null;
+  selectedFrames = [];
+  videoDuration  = 0;
+  fileInput.value = '';
+  uploadZone.querySelector('.upload-label').textContent = 'Drop a video or tap to choose';
+  uploadZone.querySelector('.upload-icon').textContent = '📹';
+  btnGenerate.disabled = true;
+  hideError();
+  resultsError.style.display = 'none';
+  URL.revokeObjectURL(decodeVideo.src);
+  decodeVideo.src = '';
+  showView('view-upload');
+});
+
+/* ─── Utilities ─────────────────────────────────────────────────────────────── */
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + String(sec).padStart(2, '0');
+}
+
+function formatTimestamp(s) {
+  const m   = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return String(m).padStart(2, '0') + ':' + String(sec).padStart(4, '0');
+}
+</script>
+</body>
+</html>

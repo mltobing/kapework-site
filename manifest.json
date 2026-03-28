@@ -34,5 +34,14 @@
     "tags": ["art","creative","kids"],
     "blurb": "Creative toys and art apps: Color & Sign.",
     "cover_emoji": "🎨"
+  },
+  {
+    "slug": "tools",
+    "name": "Tools",
+    "url": "apps/tools/",
+    "released_at": "2026-03-28",
+    "tags": ["tools","utility","builder"],
+    "blurb": "Utilities for builders: ClipDigest.",
+    "cover_emoji": "🛠️"
   }
 ]

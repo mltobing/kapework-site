@@ -375,6 +375,15 @@ textarea:focus { outline: none; border-color: var(--cyan); }
       </button>
     </a>
 
+    <a class="cat-card" href="https://tools.kapework.com/">
+      <div class="cat-icon">🛠️</div>
+      <div class="cat-name">Tools</div>
+      <div class="cat-sub">Utilities for builders</div>
+      <button type="button" class="card-like" data-slug="tools" onclick="event.preventDefault();event.stopPropagation();">
+        <span class="lheart">♡</span><span class="lnum"></span>
+      </button>
+    </a>
+
   </div>
 
   <footer class="site-footer">Kapework &mdash; small games, big ideas</footer>
@@ -451,6 +460,7 @@ const CATEGORIES = [
   { slug: "numbercrunch",  name: "Number Crunch",     emoji: "🔢" },
   { slug: "braingym",      name: "Brain Gym",         emoji: "🧩" },
   { slug: "create",        name: "Create",            emoji: "🎨" },
+  { slug: "tools",         name: "Tools",             emoji: "🛠️" },
 ];
 
 /* ─── DOM refs ──────────────────────────────────────────────── */
