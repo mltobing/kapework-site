@@ -469,6 +469,17 @@ button { font: inherit; cursor: pointer; }
 KapeworkAnalytics.init('clipdigest');
 KapeworkShell.init({ appSlug: 'clipdigest', mountId: 'kw-shell-mount' });
 
+/* ─── Lazy script loader ─────────────────────────────────────────────────────── */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="' + src + '"]')) return resolve();
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load ' + src));
+    document.head.appendChild(s);
+  });
+}
+
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
 const MAX_DURATION_S = 180;   // 3 minutes
 const MAX_FILE_BYTES = 250 * 1024 * 1024; // 250 MB
@@ -602,23 +613,19 @@ function friendlyError(err) {
   return 'Something went wrong during processing. Please try a different file.';
 }
 
-/* ─── Core pipeline (placeholder stubs — to be filled in Checkpoint 3) ──────── */
+/* ─── Core pipeline ─────────────────────────────────────────────────────────── */
 
 async function runPipeline(file, level) {
-  // Phase 1: load video metadata
   setProgress('Reading video', 5);
   await loadVideoMetadata(file);
 
-  // Phase 2: scan frames for change analysis
-  setProgress('Analysing change', 20);
-  const scanFrames = await scanVideoFrames(file, level);
+  setProgress('Analysing change', 15);
+  const scanData = await scanVideoFrames();
 
-  // Phase 3: select representative frames
-  setProgress('Selecting frames', 70);
-  selectedFrames = await selectRepresentativeFrames(scanFrames, level);
+  setProgress('Selecting frames', 68);
+  selectedFrames = selectRepresentativeFrames(scanData, level);
 
-  // Phase 4: capture full-res selected frames
-  setProgress('Capturing frames', 85);
+  setProgress('Capturing frames', 72);
   await captureFullResFrames(selectedFrames);
 
   setProgress('Done', 100);
@@ -629,7 +636,7 @@ function setProgress(phase, pct) {
   progressBar.style.width = pct + '%';
 }
 
-/* ── stub: load video metadata ── */
+/* ── load video metadata ── */
 async function loadVideoMetadata(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -646,58 +653,149 @@ async function loadVideoMetadata(file) {
   });
 }
 
-/* ── stub: scan frames ── */
-async function scanVideoFrames(file, level) {
-  // Full implementation in Checkpoint 3.
-  // Returns array of {time, score} for the phase-2 analysis step.
-  return [];
-}
+/* ── Phase 1: scan at ~2 fps, 64×64 grayscale, compute diff scores ── */
+async function scanVideoFrames() {
+  const SCAN_FPS   = 2;
+  const SCAN_W     = 64;
+  const SCAN_H     = 64;
+  const SCAN_STEP  = 1 / SCAN_FPS;
 
-/* ── stub: select representative frames ── */
-async function selectRepresentativeFrames(scanFrames, level) {
-  // Full implementation in Checkpoint 3.
-  // Returns array of {time, dataUrl: null}.
-  const cfg = LEVEL_CONFIG[level];
-  const count = cfg.minFrames;
-  const step  = videoDuration / (count + 1);
-  const frames = [];
-  for (let i = 1; i <= count; i++) {
-    frames.push({ time: +(step * i).toFixed(2), dataUrl: null });
+  const sc = document.createElement('canvas');
+  sc.width = SCAN_W; sc.height = SCAN_H;
+  const sctx = sc.getContext('2d');
+
+  const times = [];
+  for (let t = 0; t <= videoDuration; t = +(t + SCAN_STEP).toFixed(3)) times.push(t);
+
+  const results = [];
+  let prevGray = null;
+
+  for (let i = 0; i < times.length; i++) {
+    const t = times[i];
+    await seekTo(decodeVideo, t);
+    sctx.drawImage(decodeVideo, 0, 0, SCAN_W, SCAN_H);
+    const px = sctx.getImageData(0, 0, SCAN_W, SCAN_H).data;
+
+    // Convert to grayscale array
+    const gray = new Uint8Array(SCAN_W * SCAN_H);
+    for (let p = 0; p < gray.length; p++) {
+      const o = p * 4;
+      gray[p] = (px[o] * 77 + px[o+1] * 150 + px[o+2] * 29) >> 8;
+    }
+
+    let score = 0;
+    if (prevGray) {
+      let sum = 0;
+      for (let p = 0; p < gray.length; p++) sum += Math.abs(gray[p] - prevGray[p]);
+      score = sum / gray.length; // 0–255
+    }
+
+    results.push({ time: t, score });
+    prevGray = gray;
+
+    // Yield every 10 frames so the browser stays responsive
+    if (i % 10 === 0) {
+      const pct = 15 + Math.round((i / times.length) * 50);
+      setProgress('Analysing change', pct);
+      await tick();
+    }
   }
-  return frames;
+
+  return results;
 }
 
-/* ── stub: capture full-res frames ── */
+function seekTo(video, time) {
+  return new Promise((resolve, reject) => {
+    const onSeeked = () => { resolve(); video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onErr); };
+    const onErr    = () => { reject(new Error('seek failed')); video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onErr); };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    video.addEventListener('error', onErr, { once: true });
+    video.currentTime = time;
+  });
+}
+
+function tick() { return new Promise(r => setTimeout(r, 0)); }
+
+/* ── Phase 2: adaptive representative frame selection ── */
+function selectRepresentativeFrames(scanData, level) {
+  const cfg = LEVEL_CONFIG[level];
+  const { minFrames, maxFrames } = cfg;
+
+  // Min/max spacing between selected frames (seconds), tuned per level
+  const minSpacing = level === 'lean' ? 6 : level === 'balanced' ? 3 : 1.5;
+  const maxSpacing = level === 'lean' ? 20 : level === 'balanced' ? 10 : 6;
+
+  // Always include first and last frames
+  const forced = new Set([0, scanData.length - 1]);
+
+  // Rank all scan points by score descending (excluding forced)
+  const ranked = scanData
+    .map((d, i) => ({ i, time: d.time, score: d.score }))
+    .filter(d => !forced.has(d.i))
+    .sort((a, b) => b.score - a.score);
+
+  // Greedy selection: add highest-score frames that respect minSpacing
+  const selectedTimes = [scanData[0].time, scanData[scanData.length - 1].time];
+
+  for (const candidate of ranked) {
+    if (selectedTimes.length >= maxFrames) break;
+    const tooClose = selectedTimes.some(t => Math.abs(t - candidate.time) < minSpacing);
+    if (!tooClose) selectedTimes.push(candidate.time);
+  }
+
+  // Fill coverage gaps: find intervals > maxSpacing and insert midpoints
+  selectedTimes.sort((a, b) => a - b);
+  let safety = 0;
+  while (safety++ < 200) {
+    let inserted = false;
+    for (let i = 0; i < selectedTimes.length - 1; i++) {
+      const gap = selectedTimes[i + 1] - selectedTimes[i];
+      if (gap > maxSpacing && selectedTimes.length < maxFrames) {
+        selectedTimes.splice(i + 1, 0, +(selectedTimes[i] + gap / 2).toFixed(2));
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) break;
+  }
+
+  // Clamp to [minFrames, maxFrames] — if under min, add evenly spaced
+  if (selectedTimes.length < minFrames) {
+    const extra = minFrames - selectedTimes.length;
+    const step  = videoDuration / (extra + 1);
+    for (let i = 1; i <= extra; i++) {
+      const t = +(step * i).toFixed(2);
+      if (!selectedTimes.some(s => Math.abs(s - t) < minSpacing)) selectedTimes.push(t);
+    }
+    selectedTimes.sort((a, b) => a - b);
+  }
+
+  // Clamp to maxFrames
+  const final = selectedTimes.slice(0, maxFrames);
+  return final.map(t => ({ time: t, dataUrl: null }));
+}
+
+/* ── Phase 3: capture full-res JPEG for each selected frame ── */
 async function captureFullResFrames(frames) {
-  // Full implementation in Checkpoint 3.
-  // Fills frame.dataUrl by seeking decodeVideo and drawing to decodeCanvas.
-  for (const f of frames) {
-    f.dataUrl = await captureFrame(f.time);
-    setProgress('Capturing frames', 85 + Math.round((frames.indexOf(f) / frames.length) * 10));
+  for (let i = 0; i < frames.length; i++) {
+    frames[i].dataUrl = await captureFrame(frames[i].time);
+    setProgress('Capturing frames', 72 + Math.round((i / frames.length) * 24));
+    if (i % 5 === 0) await tick();
   }
 }
 
 function captureFrame(time) {
   return new Promise((resolve, reject) => {
-    const video  = decodeVideo;
-    const canvas = decodeCanvas;
     const onSeeked = () => {
-      canvas.width  = video.videoWidth  || 640;
-      canvas.height = video.videoHeight || 360;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-      video.removeEventListener('seeked', onSeeked);
-      video.removeEventListener('error', onError);
+      decodeCanvas.width  = decodeVideo.videoWidth  || 640;
+      decodeCanvas.height = decodeVideo.videoHeight || 360;
+      decodeCanvas.getContext('2d').drawImage(decodeVideo, 0, 0, decodeCanvas.width, decodeCanvas.height);
+      resolve(decodeCanvas.toDataURL('image/jpeg', 0.85));
     };
-    const onError = () => {
-      reject(new Error('Frame capture error at ' + time));
-      video.removeEventListener('seeked', onSeeked);
-      video.removeEventListener('error', onError);
-    };
-    video.addEventListener('seeked', onSeeked, { once: true });
-    video.addEventListener('error', onError, { once: true });
-    video.currentTime = time;
+    const onErr = () => reject(new Error('Frame capture failed at ' + time));
+    decodeVideo.addEventListener('seeked', onSeeked, { once: true });
+    decodeVideo.addEventListener('error',  onErr,    { once: true });
+    decodeVideo.currentTime = time;
   });
 }
 
@@ -748,9 +846,95 @@ btnPdf.addEventListener('click', async () => {
 });
 
 async function exportPdf() {
-  // Full implementation in Checkpoint 3 using pdf-lib (lazy loaded).
-  // Placeholder: alert for now.
-  alert('PDF export coming in the next build.');
+  await loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js');
+  const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+
+  const doc  = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fontR = await doc.embedFont(StandardFonts.Helvetica);
+
+  // Page geometry (A4 portrait)
+  const PW = 595, PH = 842;
+  const MARGIN = 36;
+  const COLS = 3;
+  const CELL_W = (PW - MARGIN * 2 - (COLS - 1) * 8) / COLS;
+  const TS_H  = 16; // timestamp label height
+  const TS_GAP = 4;
+  const CELL_GAP = 8;
+  const HEADER_H = 72;
+
+  const cfg = LEVEL_CONFIG[selectedLevel];
+  const baseName = (selectedFile.name || 'clip').replace(/\.[^.]+$/, '');
+
+  // Embed all images up front
+  const embedded = [];
+  for (const f of selectedFrames) {
+    try {
+      const bytes = dataUrlToBytes(f.dataUrl);
+      const img   = await doc.embedJpg(bytes);
+      embedded.push({ img, time: f.time, dims: img.scale(1) });
+    } catch (_) {
+      embedded.push(null);
+    }
+  }
+
+  // Determine image height from first valid frame's aspect ratio
+  const first = embedded.find(Boolean);
+  const aspect = first ? first.dims.width / first.dims.height : 16 / 9;
+  const IMG_H  = Math.min(Math.round(CELL_W / aspect), 180);
+  const CELL_H  = IMG_H + TS_GAP + TS_H;
+  const ROW_H   = CELL_H + CELL_GAP;
+  const ROWS_PER_PAGE = Math.floor((PH - MARGIN - HEADER_H - MARGIN) / ROW_H);
+
+  let page = null;
+  let row = 0, col = 0;
+
+  function newPage(isFirst) {
+    page = doc.addPage([PW, PH]);
+    col = 0; row = 0;
+    // Header
+    page.drawText('ClipDigest', { x: MARGIN, y: PH - MARGIN - 16, size: 15, font, color: rgb(0,0,0) });
+    page.drawText(baseName, { x: MARGIN, y: PH - MARGIN - 34, size: 9, font: fontR, color: rgb(0.35,0.35,0.35), maxWidth: PW - MARGIN * 2 });
+    const meta = formatTime(videoDuration) + ' · ' + selectedFrames.length + ' frames · ' + cfg.label;
+    page.drawText(meta, { x: MARGIN, y: PH - MARGIN - 48, size: 8, font: fontR, color: rgb(0.5,0.5,0.5) });
+    // Divider
+    page.drawLine({ start: { x: MARGIN, y: PH - MARGIN - 58 }, end: { x: PW - MARGIN, y: PH - MARGIN - 58 }, thickness: 0.5, color: rgb(0.85,0.85,0.85) });
+  }
+
+  newPage(true);
+
+  for (let i = 0; i < embedded.length; i++) {
+    if (col === 0 && row === ROWS_PER_PAGE) { newPage(false); }
+
+    const x = MARGIN + col * (CELL_W + CELL_GAP);
+    const y = PH - MARGIN - HEADER_H - row * ROW_H - IMG_H;
+
+    const entry = embedded[i];
+    if (entry) {
+      const scaled = entry.img.scaleToFit(CELL_W, IMG_H);
+      const offX = (CELL_W - scaled.width) / 2;
+      page.drawImage(entry.img, { x: x + offX, y, width: scaled.width, height: scaled.height });
+      page.drawText(formatTimestamp(entry.time), {
+        x: x, y: y - TS_GAP - TS_H + 4,
+        size: 8, font: fontR, color: rgb(0.4,0.4,0.4),
+        maxWidth: CELL_W
+      });
+    }
+
+    col++;
+    if (col >= COLS) { col = 0; row++; }
+  }
+
+  const bytes = await doc.save();
+  downloadBlob(new Blob([bytes], { type: 'application/pdf' }), baseName + '_digest.pdf');
+}
+
+function dataUrlToBytes(dataUrl) {
+  const b64 = dataUrl.split(',')[1];
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /* ─── ZIP export (stub — full impl in Checkpoint 3) ─────────────────────────── */
@@ -771,8 +955,30 @@ btnZip.addEventListener('click', async () => {
 });
 
 async function exportZip() {
-  // Full implementation in Checkpoint 3 using JSZip (lazy loaded).
-  alert('ZIP export coming in the next build.');
+  await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+  const zip = new window.JSZip();
+  const baseName = (selectedFile.name || 'clip').replace(/\.[^.]+$/, '');
+
+  selectedFrames.forEach((f, i) => {
+    if (!f.dataUrl) return;
+    const seq = String(i + 1).padStart(3, '0');
+    const ts  = formatTimestamp(f.time).replace(':', '-').replace('.', '-');
+    const filename = 'frame_' + seq + '__' + ts + '.jpg';
+    zip.file(filename, dataUrlToBytes(f.dataUrl));
+  });
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  downloadBlob(blob, baseName + '_frames.zip');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 /* ─── Restart ───────────────────────────────────────────────────────────────── */
