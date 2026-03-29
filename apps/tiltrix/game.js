@@ -95,7 +95,7 @@
   let score, lines, gameOver;
   // Round state
   let round, roundLines, tiltCharges, anchorColor, fallMs;
-  let roundPending, roundTimer;
+  let roundPending, roundTimer, roundAdvanceListener;
   // Animation / flow flags
   let animating      = false;
   let tiltWindowOpen = false;
@@ -350,6 +350,11 @@
   // ─── Round management ─────────────────────────────────────────────────────────
   function startRound(n) {
     clearTimeout(roundTimer);
+    // Remove any pending tap-to-advance listener to avoid double-firing
+    if (roundAdvanceListener) {
+      roundOverlay.removeEventListener('pointerdown', roundAdvanceListener);
+      roundAdvanceListener = null;
+    }
     roundPending = false;
     roundOverlay.classList.add('hidden');
     round      = n;
@@ -368,16 +373,17 @@
     const nextAnchor = ANCHOR_SEQ[(nextRound - 1) % ANCHOR_SEQ.length];
     const anchorName = ANCHOR_NAMES[nextAnchor];
 
-    roNum.textContent       = `Round ${round} complete`;
-    roScore.textContent     = `Score ${score.toLocaleString()} · Lines ${lines}`;
-    roNextNum.textContent   = nextRound;
+    roNum.textContent         = `Round ${round} complete`;
+    roScore.textContent       = `Score ${score.toLocaleString()} · Lines ${lines}`;
+    roNextNum.textContent     = nextRound;
     roSwatch.style.background = nextAnchor;
     roAnchorText.textContent  = `${anchorName} blocks stay rooted`;
     roCharges.textContent     = CHARGES_PER_ROUND;
 
     roundOverlay.classList.remove('hidden');
     roundTimer = setTimeout(() => startRound(nextRound), 2800);
-    roundOverlay.addEventListener('pointerdown', () => startRound(nextRound), {once:true});
+    roundAdvanceListener = () => startRound(nextRound);
+    roundOverlay.addEventListener('pointerdown', roundAdvanceListener, {once:true});
   }
 
   function updateRoundHUD() {
@@ -603,6 +609,10 @@
     roundPending   = false;
     clearTimeout(tiltWindowTimer); tiltWindowTimer = null;
     clearTimeout(roundTimer);      roundTimer = null;
+    if (roundAdvanceListener) {
+      roundOverlay.removeEventListener('pointerdown', roundAdvanceListener);
+      roundAdvanceListener = null;
+    }
     lockFlashEnd = 0; clearFlashEnd = 0; clearFlashRows = null;
     clearGlow = null; particles = [];
     turnCount = 0;
