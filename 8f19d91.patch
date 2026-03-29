@@ -1,0 +1,367 @@
+From 0158a20b54aa4c2c62f03d27c5546b99a8492726 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 29 Mar 2026 14:58:32 +0000
+Subject: [PATCH] Add Kapework analytics hooks and first-interaction tracking
+ to games
+
+### Motivation
+- Add consistent analytics instrumentation across multiple browser games to capture run lifecycle, first user interactions, and primary actions for product telemetry.
+
+### Description
+- Introduce shared helper functions `analytics()`, `trackFirstInteraction()`, `trackRunStart()`, `trackRunEnd()`, and `trackPrimaryAction()` to `tapsum/game.js`, `tiltgarden.html` (embedded script), and `tiltrix/game.js` and wire them to `window.KapeworkAnalytics` safely.
+- Call `trackRunStart()` when a run/session/game starts and include a `source` parameter such as `initial_load`, `start_button`, or `play_again` by updating `startRun`, `startSession`, and `startGame` signatures and invocation sites.
+- Call `trackRunEnd()` at run/session/game completion with summary payloads (e.g. `score`, `boards_cleared`, `exact_hits`, `best_chain`, `lives_left`, `outcome` for `tapsum`; `placed`/`lines` for `tiltgarden`; `score`/`lines`/`round` for `tiltrix`).
+- Instrument first user interactions across input paths by calling `trackFirstInteraction()` on the first meaningful input actions such as `tap`, `move`, `rotate`, `drop`, `settle`, `lean`, and `tilt`.
+- Add calls to `trackPrimaryAction()` for obvious primary actions like `play_again` and `share` in button handlers.
+- Move the `tiltrix` game script include to the bottom of the HTML to match other pages and ensure `KapeworkAnalytics.init()`/shell initialization runs before the game script.
+
+### Testing
+- Ran linters and a local build with `npm run lint` and `npm run build`, both completed successfully.
+- Verified through a local smoke run that instrumented functions guard against missing `window.KapeworkAnalytics` (no runtime errors occurred when analytics was absent).
+- Existing automated CI (if present) should run unchanged test suites; no new unit tests were added in this PR.
+---
+ apps/tapsum/game.js     | 43 +++++++++++++++++++++++++++++++++++---
+ apps/tiltgarden.html    | 39 +++++++++++++++++++++++++++++-----
+ apps/tiltrix/game.js    | 46 ++++++++++++++++++++++++++++++++++++-----
+ apps/tiltrix/index.html |  2 +-
+ 4 files changed, 116 insertions(+), 14 deletions(-)
+
+diff --git a/apps/tapsum/game.js b/apps/tapsum/game.js
+index e5c4f64..b756b96 100644
+--- a/apps/tapsum/game.js
++++ b/apps/tapsum/game.js
+@@ -36,6 +36,27 @@ function freshState() {
+ 
+ let state = freshState();
+ let timerInterval = null;
++function analytics() { return window.KapeworkAnalytics || null; }
++function trackFirstInteraction(props) {
++  const a = analytics();
++  if (!a) return;
++  try { a.firstInteraction(props || null); } catch {}
++}
++function trackRunStart(props) {
++  const a = analytics();
++  if (!a) return;
++  try { a.runStart(props || null); } catch {}
++}
++function trackRunEnd(props) {
++  const a = analytics();
++  if (!a) return;
++  try { a.runEnd(props || null); } catch {}
++}
++function trackPrimaryAction(action, props) {
++  const a = analytics();
++  if (!a) return;
++  try { a.primaryAction(action, props || null); } catch {}
++}
+ 
+ // ---------------------------------------------------------------------------
+ // Scoring
+@@ -159,7 +180,7 @@ function onSkip() {
+ // Run management
+ // ---------------------------------------------------------------------------
+ 
+-function startRun() {
++function startRun(source = 'initial_start') {
+   state          = freshState();
+   state.phase    = 'playing';
+   state.boardNum = 1;
+@@ -169,6 +190,7 @@ function startRun() {
+   UI.renderProgress(1);
+   UI.renderScore(0);
+   UI.renderChain(0);
++  trackRunStart({ source });
+   loadBoard();
+ }
+ 
+@@ -187,6 +209,16 @@ function endRun() {
+   }
+   saveTodayBest(state.score);
+ 
++  trackRunEnd({
++    score: state.score,
++    boards_cleared: Math.max(0, state.boardNum - 1),
++    exact_hits: state.exactHits,
++    best_chain: state.bestChain,
++    lives_left: state.lives,
++    outcome: allBoardsDone ? 'complete' : 'failed',
++    was_best_score: isNewBest
++  });
++
+   UI.showPhase('result');
+   UI.renderResult(state, finalBest, getTodayBest(), isNewBest, allBoardsDone);
+ }
+@@ -197,6 +229,7 @@ function endRun() {
+ 
+ function onTap(i) {
+   if (state.won || state.phase !== 'playing') return;
++  trackFirstInteraction({ input: 'tap' });
+ 
+   const c = state.cells[i];
+   c.selected = !c.selected;
+@@ -279,10 +312,14 @@ document.getElementById('clear').addEventListener('click', () => {
+ });
+ 
+ document.getElementById('skip').addEventListener('click', onSkip);
+-document.getElementById('start').addEventListener('click', startRun);
+-document.getElementById('replay').addEventListener('click', startRun);
++document.getElementById('start').addEventListener('click', () => startRun('start_button'));
++document.getElementById('replay').addEventListener('click', () => {
++  trackPrimaryAction('play_again');
++  startRun('play_again');
++});
+ 
+ document.getElementById('share-btn').addEventListener('click', async () => {
++  trackPrimaryAction('share');
+   const text = UI.buildShareText(state);
+   try {
+     if (navigator.share)             { await navigator.share({ title: 'TapSum', text }); return; }
+diff --git a/apps/tiltgarden.html b/apps/tiltgarden.html
+index ee58888..16bc8d8 100644
+--- a/apps/tiltgarden.html
++++ b/apps/tiltgarden.html
+@@ -269,6 +269,27 @@ body{
+   const stats = loadStats();
+ 
+   function track(name, data) { console.log('[tiltgarden]', name, data); }
++  function analytics() { return window.KapeworkAnalytics || null; }
++  function trackFirstInteraction(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.firstInteraction(props || null); } catch {}
++  }
++  function trackRunStart(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.runStart(props || null); } catch {}
++  }
++  function trackRunEnd(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.runEnd(props || null); } catch {}
++  }
++  function trackPrimaryAction(action, props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.primaryAction(action, props || null); } catch {}
++  }
+ 
+   // ─── Canvas / DOM refs ─────────────────────────────────────────────────────
+   const canvas     = document.getElementById('board');
+@@ -360,7 +381,7 @@ body{
+   function tryMove(dx) {
+     if (sessionOver||leanWindowOpen||animating) return;
+     const t={...piece,x:piece.x+dx};
+-    if (!collides(t,board)) piece.x+=dx;
++    if (!collides(t,board)) { piece.x+=dx; trackFirstInteraction({ input:'move' }); }
+   }
+   function tryRotate() {
+     if (sessionOver||leanWindowOpen||animating) return;
+@@ -368,11 +389,12 @@ body{
+     const kicks=[0,1,-1,2,-2];
+     for (const k of kicks) {
+       const t={...piece,rot:nr,shape:ns,x:piece.x+k};
+-      if (!collides(t,board)) { Object.assign(piece,t); return; }
++      if (!collides(t,board)) { Object.assign(piece,t); trackFirstInteraction({ input:'rotate' }); return; }
+     }
+   }
+   function settle() {
+     if (sessionOver||leanWindowOpen||animating) return;
++    trackFirstInteraction({ input:'settle' });
+     while (!collides({...piece,y:piece.y+1},board)) piece.y++;
+     lockCurrentPiece();
+   }
+@@ -457,6 +479,7 @@ body{
+     animating=true;
+     if (wasWindow) closeLeanWindow();
+     if (navigator.vibrate) navigator.vibrate([10,4,8]);
++    trackFirstInteraction({ input:'lean' });
+     track('lean',{dir,fromWindow:wasWindow,placed,cleared});
+ 
+     // Compute animation moves BEFORE applying physics
+@@ -520,6 +543,7 @@ body{
+     stats.totalPlaced+=placed; stats.totalCleared+=cleared; stats.totalSessions+=1;
+     saveStats(stats); updateStatsBar();
+     endOverlay.classList.remove('hidden');
++    trackRunEnd({ placed, lines: cleared });
+     track('session_end',{placed,cleared,totalSessions:stats.totalSessions});
+   }
+ 
+@@ -530,7 +554,7 @@ body{
+   }
+ 
+   // ─── Start ─────────────────────────────────────────────────────────────────
+-  function startSession() {
++  function startSession(source) {
+     board=emptyBoard(); bag=newBag();
+     placed=0; cleared=0; sessionOver=false; animating=false;
+     leanWindowOpen=false; gravityPaused=false;
+@@ -540,6 +564,7 @@ body{
+     nextPiece=makePiece(fromBag()); spawnNext();
+     endOverlay.classList.add('hidden');
+     lastFall=performance.now();
++    trackRunStart({ source: source || 'initial_load' });
+     track('session_start',{totalSessions:stats.totalSessions});
+   }
+ 
+@@ -830,7 +855,11 @@ body{
+   document.addEventListener('pointerup',stopRepeat);
+   document.getElementById('btn-rotate').addEventListener('click',tryRotate);
+   document.getElementById('btn-settle').addEventListener('click',settle);
+-  document.getElementById('btn-tend').addEventListener('click',()=>{ track('restart',{}); startSession(); });
++  document.getElementById('btn-tend').addEventListener('click',()=>{
++    trackPrimaryAction('play_again');
++    track('restart',{});
++    startSession('play_again');
++  });
+ 
+   // ─── Game loop ─────────────────────────────────────────────────────────────
+   function loop(ts) {
+@@ -867,7 +896,7 @@ body{
+   })();
+ 
+   updateStatsBar();
+-  startSession();
++  setTimeout(() => startSession('initial_load'), 0);
+   requestAnimationFrame(loop);
+ 
+ })();
+diff --git a/apps/tiltrix/game.js b/apps/tiltrix/game.js
+index 921d2f8..bba8c97 100644
+--- a/apps/tiltrix/game.js
++++ b/apps/tiltrix/game.js
+@@ -45,6 +45,27 @@
+   function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch {} }
+   const stats = loadStats();
+   function track(name, data) { console.log('[tiltrix]', name, data); }
++  function analytics() { return window.KapeworkAnalytics || null; }
++  function trackFirstInteraction(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.firstInteraction(props || null); } catch {}
++  }
++  function trackRunStart(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.runStart(props || null); } catch {}
++  }
++  function trackRunEnd(props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.runEnd(props || null); } catch {}
++  }
++  function trackPrimaryAction(action, props) {
++    const a = analytics();
++    if (!a) return;
++    try { a.primaryAction(action, props || null); } catch {}
++  }
+ 
+   // ─── DOM refs ────────────────────────────────────────────────────────────────
+   const canvas      = document.getElementById('board');
+@@ -158,7 +179,10 @@
+   function tryMove(dx) {
+     if (gameOver || tiltWindowOpen || animating || roundPending) return;
+     const t = { ...piece, x:piece.x+dx };
+-    if (!collides(t, board)) piece.x += dx;
++    if (!collides(t, board)) {
++      piece.x += dx;
++      trackFirstInteraction({ input: 'move' });
++    }
+   }
+   function tryRotate() {
+     if (gameOver || tiltWindowOpen || animating || roundPending) return;
+@@ -166,11 +190,16 @@
+     const kicks = [0,1,-1,2,-2];
+     for (const k of kicks) {
+       const t = { ...piece, rot:newRot, shape:newShape, x:piece.x+k };
+-      if (!collides(t, board)) { Object.assign(piece, t); return; }
++      if (!collides(t, board)) {
++        Object.assign(piece, t);
++        trackFirstInteraction({ input: 'rotate' });
++        return;
++      }
+     }
+   }
+   function hardDrop() {
+     if (gameOver || tiltWindowOpen || animating || roundPending) return;
++    trackFirstInteraction({ input: 'drop' });
+     while (!collides({...piece, y:piece.y+1}, board)) piece.y++;
+     lockCurrentPiece();
+   }
+@@ -257,6 +286,7 @@
+       closeTiltWindow();
+     }
+     if (navigator.vibrate) navigator.vibrate(18);
++    trackFirstInteraction({ input: 'tilt' });
+     track('board_tilt', { dir, fromWindow:wasWindow, charges:tiltCharges, score, lines, round });
+ 
+     boardWrap.classList.add(dir < 0 ? 'tilt-left' : 'tilt-right');
+@@ -591,6 +621,7 @@
+     updateStatsBar();
+     goBest.textContent = isNew ? '✦ New best score!' : `Best ${stats.bestScore.toLocaleString()}`;
+     goOverlay.classList.remove('hidden');
++    trackRunEnd({ score, lines, round, was_best_score: isNew });
+     track('game_over', {score, lines, round, runs:stats.totalRuns});
+   }
+ 
+@@ -601,7 +632,7 @@
+   }
+ 
+   // ─── Start / restart ──────────────────────────────────────────────────────────
+-  function startGame() {
++  function startGame(source) {
+     board      = emptyBoard();
+     bag        = newBag();
+     score      = 0; lines = 0; gameOver = false; animating = false;
+@@ -620,6 +651,7 @@
+     roundOverlay.classList.add('hidden');
+     nextPiece = makePiece(fromBag());
+     startRound(1);
++    trackRunStart({ source: source || 'initial_load' });
+     track('game_start', {runs:stats.totalRuns});
+     initHint();
+   }
+@@ -709,7 +741,11 @@
+   document.addEventListener('pointerup', stopRepeat);
+   document.getElementById('btn-rotate').addEventListener('click', tryRotate);
+   document.getElementById('btn-drop').addEventListener('click', hardDrop);
+-  document.getElementById('btn-replay').addEventListener('click', () => { track('restart',{}); startGame(); });
++  document.getElementById('btn-replay').addEventListener('click', () => {
++    trackPrimaryAction('play_again');
++    track('restart',{});
++    startGame('play_again');
++  });
+ 
+   // ─── Menu ─────────────────────────────────────────────────────────────────────
+   document.getElementById('btn-menu').addEventListener('click', e => {
+@@ -729,7 +765,7 @@
+ 
+   // ─── Init ─────────────────────────────────────────────────────────────────────
+   updateStatsBar();
+-  startGame();
++  startGame('initial_load');
+   requestAnimationFrame(loop);
+ 
+ })();
+diff --git a/apps/tiltrix/index.html b/apps/tiltrix/index.html
+index b61eef0..77b6f2e 100644
+--- a/apps/tiltrix/index.html
++++ b/apps/tiltrix/index.html
+@@ -105,7 +105,6 @@
+   </div>
+ 
+ </div>
+-<script src="/apps/tiltrix/game.js"></script>
+ <script src="/shared/config.js"></script>
+ <script src="/shared/analytics.js"></script>
+ <script src="/shared/subdomain-nav.js"></script>
+@@ -118,5 +117,6 @@
+     KapeworkShell.openFeedback();
+   });
+ </script>
++<script src="/apps/tiltrix/game.js"></script>
+ </body>
+ </html>
+-- 
+2.43.0

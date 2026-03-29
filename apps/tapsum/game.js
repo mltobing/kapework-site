@@ -36,6 +36,27 @@ function freshState() {
 
 let state = freshState();
 let timerInterval = null;
+function analytics() { return window.KapeworkAnalytics || null; }
+function trackFirstInteraction(props) {
+  const a = analytics();
+  if (!a) return;
+  try { a.firstInteraction(props || null); } catch {}
+}
+function trackRunStart(props) {
+  const a = analytics();
+  if (!a) return;
+  try { a.runStart(props || null); } catch {}
+}
+function trackRunEnd(props) {
+  const a = analytics();
+  if (!a) return;
+  try { a.runEnd(props || null); } catch {}
+}
+function trackPrimaryAction(action, props) {
+  const a = analytics();
+  if (!a) return;
+  try { a.primaryAction(action, props || null); } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // Scoring
@@ -159,7 +180,7 @@ function onSkip() {
 // Run management
 // ---------------------------------------------------------------------------
 
-function startRun() {
+function startRun(source = 'initial_start') {
   state          = freshState();
   state.phase    = 'playing';
   state.boardNum = 1;
@@ -169,6 +190,7 @@ function startRun() {
   UI.renderProgress(1);
   UI.renderScore(0);
   UI.renderChain(0);
+  trackRunStart({ source });
   loadBoard();
 }
 
@@ -187,6 +209,16 @@ function endRun() {
   }
   saveTodayBest(state.score);
 
+  trackRunEnd({
+    score: state.score,
+    boards_cleared: Math.max(0, state.boardNum - 1),
+    exact_hits: state.exactHits,
+    best_chain: state.bestChain,
+    lives_left: state.lives,
+    outcome: allBoardsDone ? 'complete' : 'failed',
+    was_best_score: isNewBest
+  });
+
   UI.showPhase('result');
   UI.renderResult(state, finalBest, getTodayBest(), isNewBest, allBoardsDone);
 }
@@ -197,6 +229,7 @@ function endRun() {
 
 function onTap(i) {
   if (state.won || state.phase !== 'playing') return;
+  trackFirstInteraction({ input: 'tap' });
 
   const c = state.cells[i];
   c.selected = !c.selected;
@@ -279,10 +312,14 @@ document.getElementById('clear').addEventListener('click', () => {
 });
 
 document.getElementById('skip').addEventListener('click', onSkip);
-document.getElementById('start').addEventListener('click', startRun);
-document.getElementById('replay').addEventListener('click', startRun);
+document.getElementById('start').addEventListener('click', () => startRun('start_button'));
+document.getElementById('replay').addEventListener('click', () => {
+  trackPrimaryAction('play_again');
+  startRun('play_again');
+});
 
 document.getElementById('share-btn').addEventListener('click', async () => {
+  trackPrimaryAction('share');
   const text = UI.buildShareText(state);
   try {
     if (navigator.share)             { await navigator.share({ title: 'TapSum', text }); return; }
