@@ -267,13 +267,16 @@ describe('getPuzzleNumber / getDateFromPuzzleNumber', () => {
 });
 
 describe('every puzzle in VALID_PUZZLES is solvable', () => {
-    // Sample a few to keep test fast
-    const sampleIndices = [0, 50, 100, 150, 200, 250, 300, 350, 399];
-    test.each(sampleIndices)('puzzle at index %i is solvable', (idx) => {
-        const nums = game.VALID_PUZZLES[idx];
-        expect(nums).toHaveLength(4);
-        const result = game.evaluateAllExpressions(...nums);
-        expect(result.solutionCount).toBeGreaterThan(0);
+    test('all puzzles are solvable via full solver', () => {
+        const unsolvable = [];
+        for (let i = 0; i < game.VALID_PUZZLES.length; i++) {
+            const nums = game.VALID_PUZZLES[i];
+            expect(nums).toHaveLength(4);
+            if (game.solve24Full(nums) === null) {
+                unsolvable.push({ index: i, nums });
+            }
+        }
+        expect(unsolvable).toEqual([]);
     });
 });
 
