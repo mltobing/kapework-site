@@ -45,6 +45,27 @@
   function saveStats(s) { try { localStorage.setItem(STATS_KEY, JSON.stringify(s)); } catch {} }
   const stats = loadStats();
   function track(name, data) { console.log('[tiltrix]', name, data); }
+  function analytics() { return window.KapeworkAnalytics || null; }
+  function trackFirstInteraction(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.firstInteraction(props || null); } catch {}
+  }
+  function trackRunStart(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runStart(props || null); } catch {}
+  }
+  function trackRunEnd(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runEnd(props || null); } catch {}
+  }
+  function trackPrimaryAction(action, props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.primaryAction(action, props || null); } catch {}
+  }
 
   // ─── DOM refs ────────────────────────────────────────────────────────────────
   const canvas      = document.getElementById('board');
@@ -158,7 +179,10 @@
   function tryMove(dx) {
     if (gameOver || tiltWindowOpen || animating || roundPending) return;
     const t = { ...piece, x:piece.x+dx };
-    if (!collides(t, board)) piece.x += dx;
+    if (!collides(t, board)) {
+      piece.x += dx;
+      trackFirstInteraction({ input: 'move' });
+    }
   }
   function tryRotate() {
     if (gameOver || tiltWindowOpen || animating || roundPending) return;
@@ -166,11 +190,16 @@
     const kicks = [0,1,-1,2,-2];
     for (const k of kicks) {
       const t = { ...piece, rot:newRot, shape:newShape, x:piece.x+k };
-      if (!collides(t, board)) { Object.assign(piece, t); return; }
+      if (!collides(t, board)) {
+        Object.assign(piece, t);
+        trackFirstInteraction({ input: 'rotate' });
+        return;
+      }
     }
   }
   function hardDrop() {
     if (gameOver || tiltWindowOpen || animating || roundPending) return;
+    trackFirstInteraction({ input: 'drop' });
     while (!collides({...piece, y:piece.y+1}, board)) piece.y++;
     lockCurrentPiece();
   }
@@ -257,6 +286,7 @@
       closeTiltWindow();
     }
     if (navigator.vibrate) navigator.vibrate(18);
+    trackFirstInteraction({ input: 'tilt' });
     track('board_tilt', { dir, fromWindow:wasWindow, charges:tiltCharges, score, lines, round });
 
     boardWrap.classList.add(dir < 0 ? 'tilt-left' : 'tilt-right');
@@ -591,6 +621,7 @@
     updateStatsBar();
     goBest.textContent = isNew ? '✦ New best score!' : `Best ${stats.bestScore.toLocaleString()}`;
     goOverlay.classList.remove('hidden');
+    trackRunEnd({ score, lines, round, was_best_score: isNew });
     track('game_over', {score, lines, round, runs:stats.totalRuns});
   }
 
@@ -601,7 +632,7 @@
   }
 
   // ─── Start / restart ──────────────────────────────────────────────────────────
-  function startGame() {
+  function startGame(source) {
     board      = emptyBoard();
     bag        = newBag();
     score      = 0; lines = 0; gameOver = false; animating = false;
@@ -620,6 +651,7 @@
     roundOverlay.classList.add('hidden');
     nextPiece = makePiece(fromBag());
     startRound(1);
+    trackRunStart({ source: source || 'initial_load' });
     track('game_start', {runs:stats.totalRuns});
     initHint();
   }
@@ -709,7 +741,11 @@
   document.addEventListener('pointerup', stopRepeat);
   document.getElementById('btn-rotate').addEventListener('click', tryRotate);
   document.getElementById('btn-drop').addEventListener('click', hardDrop);
-  document.getElementById('btn-replay').addEventListener('click', () => { track('restart',{}); startGame(); });
+  document.getElementById('btn-replay').addEventListener('click', () => {
+    trackPrimaryAction('play_again');
+    track('restart',{});
+    startGame('play_again');
+  });
 
   // ─── Menu ─────────────────────────────────────────────────────────────────────
   document.getElementById('btn-menu').addEventListener('click', e => {
@@ -729,7 +765,7 @@
 
   // ─── Init ─────────────────────────────────────────────────────────────────────
   updateStatsBar();
-  startGame();
+  startGame('initial_load');
   requestAnimationFrame(loop);
 
 })();
