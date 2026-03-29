@@ -1,0 +1,21 @@
+{
+	"siteId": "137d5fdc-9af7-435b-a181-4099318dda8e",
+	"geolocation": {
+		"data": {
+			"city": "New York",
+			"country": {
+				"code": "US",
+				"name": "United States"
+			},
+			"subdivision": {
+				"code": "NY",
+				"name": "New York"
+			},
+			"timezone": "America/New_York",
+			"latitude": 40.781,
+			"longitude": -73.9501,
+			"postalCode": "10128"
+		},
+		"timestamp": 1774211347471
+	}
+}

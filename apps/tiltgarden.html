@@ -269,6 +269,27 @@ body{
   const stats = loadStats();
 
   function track(name, data) { console.log('[tiltgarden]', name, data); }
+  function analytics() { return window.KapeworkAnalytics || null; }
+  function trackFirstInteraction(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.firstInteraction(props || null); } catch {}
+  }
+  function trackRunStart(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runStart(props || null); } catch {}
+  }
+  function trackRunEnd(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runEnd(props || null); } catch {}
+  }
+  function trackPrimaryAction(action, props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.primaryAction(action, props || null); } catch {}
+  }
 
   // ─── Canvas / DOM refs ─────────────────────────────────────────────────────
   const canvas     = document.getElementById('board');
@@ -360,7 +381,7 @@ body{
   function tryMove(dx) {
     if (sessionOver||leanWindowOpen||animating) return;
     const t={...piece,x:piece.x+dx};
-    if (!collides(t,board)) piece.x+=dx;
+    if (!collides(t,board)) { piece.x+=dx; trackFirstInteraction({ input:'move' }); }
   }
   function tryRotate() {
     if (sessionOver||leanWindowOpen||animating) return;
@@ -368,11 +389,12 @@ body{
     const kicks=[0,1,-1,2,-2];
     for (const k of kicks) {
       const t={...piece,rot:nr,shape:ns,x:piece.x+k};
-      if (!collides(t,board)) { Object.assign(piece,t); return; }
+      if (!collides(t,board)) { Object.assign(piece,t); trackFirstInteraction({ input:'rotate' }); return; }
     }
   }
   function settle() {
     if (sessionOver||leanWindowOpen||animating) return;
+    trackFirstInteraction({ input:'settle' });
     while (!collides({...piece,y:piece.y+1},board)) piece.y++;
     lockCurrentPiece();
   }
@@ -457,6 +479,7 @@ body{
     animating=true;
     if (wasWindow) closeLeanWindow();
     if (navigator.vibrate) navigator.vibrate([10,4,8]);
+    trackFirstInteraction({ input:'lean' });
     track('lean',{dir,fromWindow:wasWindow,placed,cleared});
 
     // Compute animation moves BEFORE applying physics
@@ -520,6 +543,7 @@ body{
     stats.totalPlaced+=placed; stats.totalCleared+=cleared; stats.totalSessions+=1;
     saveStats(stats); updateStatsBar();
     endOverlay.classList.remove('hidden');
+    trackRunEnd({ placed, lines: cleared });
     track('session_end',{placed,cleared,totalSessions:stats.totalSessions});
   }
 
@@ -530,7 +554,7 @@ body{
   }
 
   // ─── Start ─────────────────────────────────────────────────────────────────
-  function startSession() {
+  function startSession(source) {
     board=emptyBoard(); bag=newBag();
     placed=0; cleared=0; sessionOver=false; animating=false;
     leanWindowOpen=false; gravityPaused=false;
@@ -540,6 +564,7 @@ body{
     nextPiece=makePiece(fromBag()); spawnNext();
     endOverlay.classList.add('hidden');
     lastFall=performance.now();
+    trackRunStart({ source: source || 'initial_load' });
     track('session_start',{totalSessions:stats.totalSessions});
   }
 
@@ -830,7 +855,11 @@ body{
   document.addEventListener('pointerup',stopRepeat);
   document.getElementById('btn-rotate').addEventListener('click',tryRotate);
   document.getElementById('btn-settle').addEventListener('click',settle);
-  document.getElementById('btn-tend').addEventListener('click',()=>{ track('restart',{}); startSession(); });
+  document.getElementById('btn-tend').addEventListener('click',()=>{
+    trackPrimaryAction('play_again');
+    track('restart',{});
+    startSession('play_again');
+  });
 
   // ─── Game loop ─────────────────────────────────────────────────────────────
   function loop(ts) {
@@ -867,7 +896,7 @@ body{
   })();
 
   updateStatsBar();
-  startSession();
+  setTimeout(() => startSession('initial_load'), 0);
   requestAnimationFrame(loop);
 
 })();
