@@ -25,6 +25,28 @@ const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+function analytics() { return window.KapeworkAnalytics || null; }
+function trackFirstInteraction(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.firstInteraction(props || null); } catch {}
+}
+function trackRunStart(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runStart(props || null); } catch {}
+}
+function trackRunEnd(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runEnd(props || null); } catch {}
+}
+function trackPrimaryAction(action, props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.primaryAction(action, props || null); } catch {}
+}
+
 // ============================================================
 // NAMED CONSTANTS (replaces magic numbers)
 // ============================================================
@@ -274,6 +296,8 @@ function clearHintTimer() {
 
 function useHint() {
     if (playState.completed || playState.hinted) return;
+    trackFirstInteraction({ input: 'hint', puzzle_num: currentPuzzle.puzzleNum });
+    trackPrimaryAction('hint', { puzzle_num: currentPuzzle.puzzleNum });
     const remaining = playState.cards.filter(c => !c.used).map(c => c.value);
     let hintText;
     if (remaining.length === 4) {
@@ -912,6 +936,7 @@ function generateHistoryImage() {
 }
 
 function shareHistoryGrid() {
+    trackPrimaryAction('share_history', { window_days: HISTORY_SHARE_DAYS });
     const canvas = generateHistoryImage();
     const today = getTodayPuzzleNumber();
     let solved = 0, perfect = 0, fastPerfect = 0;
@@ -961,6 +986,7 @@ function shareHistoryGrid() {
 // CHALLENGE A FRIEND
 // ============================================================
 function shareChallenge() {
+    trackPrimaryAction('share_challenge', { puzzle_num: currentPuzzle.puzzleNum });
     const puzzleNum = currentPuzzle.puzzleNum;
     const history = gameState.history[puzzleNum];
     const moves = history?.moves || playState.moves;
@@ -1262,7 +1288,7 @@ function clearWinState() {
     display.style.cursor = '';
 }
 
-function initPuzzle(puzzleNum, isArchive = false) {
+function initPuzzle(puzzleNum, isArchive = false, source = 'navigate') {
     hideVictoryCard();
     hideOperators();
     clearHintTimer();
@@ -1353,6 +1379,11 @@ function initPuzzle(puzzleNum, isArchive = false) {
             addDifficultyChip(puzzleNum);
         }, ARCHIVE_WIN_MODAL_DELAY_MS);
     } else if (!alreadySolved) {
+        trackRunStart({
+            source,
+            puzzle_num: puzzleNum,
+            is_archive: Boolean(isArchive)
+        });
         startHintTimer();
     }
 }
@@ -1368,7 +1399,8 @@ function playAnother() {
     const next = getNearestEarlierUnsolvedPuzzle(currentPuzzle.puzzleNum);
     hideVictoryCard();
     if (next !== null) {
-        initPuzzle(next, next !== getTodayPuzzleNumber());
+        trackPrimaryAction('play_again', { from_puzzle_num: currentPuzzle.puzzleNum, to_puzzle_num: next });
+        initPuzzle(next, next !== getTodayPuzzleNumber(), 'play_another');
     } else {
         // All earlier puzzles solved — fall back to the history picker
         showArchive();
@@ -1520,6 +1552,7 @@ function formatNumberHTML(n) {
 function selectCard(index) {
     if (playState.completed) return;
     if (playState.cards[index].used) return;
+    trackFirstInteraction({ input: 'select_card', puzzle_num: currentPuzzle.puzzleNum });
 
     // Tutorial gate: only allow the correct card
     if (tutorialActive) {
@@ -1544,6 +1577,7 @@ function hideOperators() { document.getElementById('operatorsOverlay').classList
 
 function applyOperation(op) {
     if (playState.selected.length !== 2 || playState.completed) return;
+    trackFirstInteraction({ input: 'apply_operation', op, puzzle_num: currentPuzzle.puzzleNum });
 
     // Tutorial gate: only allow the correct operator
     if (tutorialActive) {
@@ -1722,6 +1756,18 @@ async function handleWin() {
     else if (isPerfect) { badge = 'Perfect'; badgeClass = 'perfect'; }
     if (playState.hinted) { badge += ' (with hint)'; }
 
+    trackRunEnd({
+        outcome: 'solved',
+        puzzle_num: currentPuzzle.puzzleNum,
+        is_archive: Boolean(currentPuzzle.isArchive),
+        moves: playState.moves,
+        solve_time_seconds: solveTime,
+        undos: playState.undoCount,
+        hinted: Boolean(playState.hinted),
+        is_perfect: Boolean(isPerfect),
+        is_fast: Boolean(isFast)
+    });
+
     setTimeout(() => {
         showVictoryCard({
             badge,
@@ -1823,6 +1869,7 @@ function generateShareText() {
 }
 
 function share() {
+    trackPrimaryAction('share', { puzzle_num: currentPuzzle.puzzleNum });
     const text = generateShareText();
     if (navigator.share) {
         navigator.share({ text }).catch(() => copyToClipboard(text));
@@ -2695,6 +2742,7 @@ function closeReplay() {
 function animatedUndo() {
     if (tutorialActive) return; // no undo during tutorial
     if (playState.cardStates.length === 0 || playState.completed) return;
+    trackFirstInteraction({ input: 'undo', puzzle_num: currentPuzzle.puzzleNum });
 
     // Get the merged card slot before undo
     const lastStep = playState.solutionSteps[playState.solutionSteps.length - 1];
