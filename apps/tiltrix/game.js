@@ -81,9 +81,9 @@
   // ─── Dynamic board sizing ────────────────────────────────────────────────────
   (function () {
     const fromW = Math.floor((Math.min(window.innerWidth, 400) - 24) / COLS);
-    const fromH = Math.floor((window.innerHeight - 200) / ROWS);
-    CELL      = Math.max(28, Math.min(48, Math.min(fromW, fromH)));
-    NEXT_CELL = Math.max(10, Math.round(CELL * 0.52));
+    const fromH = Math.floor((window.innerHeight - 270) / ROWS); // header + round HUD + controls + padding
+    CELL      = Math.max(26, Math.min(44, Math.min(fromW, fromH)));
+    NEXT_CELL = Math.max(10, Math.round(CELL * 0.38));
     canvas.width  = COLS * CELL;
     canvas.height = ROWS * CELL;
     const ns = NEXT_CELL * 4 + 4;
