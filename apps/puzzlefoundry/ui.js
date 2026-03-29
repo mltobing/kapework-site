@@ -54,9 +54,13 @@ export function init() {
     // Replay the exact same puzzle instance
     if (currentPuzzle) renderPlayScreen(currentPuzzle);
     showScreen('play');
+    if (window.KapeworkAnalytics) KapeworkAnalytics.primaryAction('play_again');
   });
   document.getElementById('btn-remix').addEventListener('click', remixSeed);
-  document.getElementById('btn-try-another').addEventListener('click', () => showScreen('pack'));
+  document.getElementById('btn-try-another').addEventListener('click', () => {
+    showScreen('pack');
+    if (window.KapeworkAnalytics) KapeworkAnalytics.primaryAction('new_puzzle');
+  });
   document.getElementById('btn-result-refresh').addEventListener('click', () => {
     refreshPack();
   });
@@ -150,6 +154,7 @@ function openSeed(seed) {
 
   if (window.KapeworkAnalytics) {
     KapeworkAnalytics.track('puzzle_foundry_seed_opened', { seed_id: seed.id });
+    KapeworkAnalytics.firstInteraction({ seed_id: seed.id });
   }
 }
 
@@ -184,6 +189,7 @@ function startPlay() {
       twist:      puzzle.twistId,
       difficulty: selectedDifficulty,
     });
+    KapeworkAnalytics.runStart({ seed_id: selectedSeed.id, family: puzzle.family, difficulty: selectedDifficulty });
   }
 }
 
@@ -216,6 +222,7 @@ function onPuzzleComplete({ solved, puzzle, ...extras }) {
       family:  puzzle.family,
       twist:   puzzle.twistId,
     });
+    KapeworkAnalytics.runEnd({ outcome: solved ? 'win' : 'loss', seed_id: selectedSeed?.id, family: puzzle.family });
   }
 }
 
@@ -265,6 +272,7 @@ function remixSeed() {
 
   if (window.KapeworkAnalytics) {
     KapeworkAnalytics.track('puzzle_foundry_remixed', { seed_id: selectedSeed.id });
+    KapeworkAnalytics.primaryAction('retry', { seed_id: selectedSeed.id });
   }
 
   const puzzle = instantiatePuzzle(selectedSeed.twist, selectedDifficulty);

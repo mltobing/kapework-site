@@ -9,6 +9,15 @@
  * Full usage (also fires app_open + custom events):
  *   KapeworkAnalytics.init('app-slug');
  *   KapeworkAnalytics.track('event_name', { extra: 'props' });
+ *
+ * Standard event helpers (each app wires these in at the right moment):
+ *   KapeworkAnalytics.firstInteraction(props?)   — once per session
+ *   KapeworkAnalytics.runStart(props?)           — when a run/game/generation begins
+ *   KapeworkAnalytics.runEnd(props?)             — when it ends; adds duration_ms automatically
+ *   KapeworkAnalytics.primaryAction(action, props?) — share, download, play_again, etc.
+ *
+ * Explicit-slug form (useful in ES-module apps):
+ *   KapeworkAnalytics.trackEvent('event_name', 'app-slug', props?)
  */
 (function () {
   'use strict';
@@ -17,7 +26,7 @@
   function getMeasurementId() {
     var cfg = window.KapeworkConfig;
     if (cfg && cfg.gaMeasurementId) return cfg.gaMeasurementId;
-    return ''; // no fallback to window.GA_MEASUREMENT_ID — config.js is the source
+    return ''; // no fallback — config.js is the source
   }
 
   // ── device_id (anonymous, persistent across sessions) ──────────────────────
@@ -34,6 +43,13 @@
 
   // ── session_id (per page-load, not persisted) ──────────────────────────────
   var SESSION_ID = 'ses_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+  // ── Once-per-load guards ───────────────────────────────────────────────────
+  var _appOpenFired        = false;
+  var _firstInteractionFired = false;
+
+  // ── Run lifecycle ──────────────────────────────────────────────────────────
+  var _runStartTime = null;
 
   // ── GA4 injection (idempotent — safe to call multiple times) ───────────────
   var _gtag = null;
@@ -57,20 +73,25 @@
     _gtag = gtag;
   }
 
-  // ── trackEvent ─────────────────────────────────────────────────────────────
-  function trackEvent(eventName, props) {
+  // ── Core trackEvent ────────────────────────────────────────────────────────
+  // Signature: trackEvent(eventName, appSlug, props?)
+  //   appSlug — pass null/undefined to fall back to window._kw_app_slug
+  //   props   — merged into payload; reserved keys (event_name, app_slug,
+  //             device_id, session_id, url) are ignored to prevent collisions
+  function trackEvent(eventName, appSlug, props) {
     if (!eventName) return;
+
+    var slug = appSlug || window._kw_app_slug || 'unknown';
 
     var payload = {
       event_name: eventName,
-      app_slug:   window._kw_app_slug || 'unknown',
+      app_slug:   slug,
       device_id:  getDeviceId(),
       session_id: SESSION_ID,
       url:        location.href,
       ts:         new Date().toISOString()
     };
 
-    // Merge extra props (exclude reserved keys to avoid collisions)
     if (props) {
       for (var k in props) {
         if (Object.prototype.hasOwnProperty.call(props, k) &&
@@ -96,13 +117,71 @@
     } catch (e) {}
   }
 
+  // ── Standard event: app_open ───────────────────────────────────────────────
+  // Fires once per page load. Called automatically by init().
+  // props: { referrer? }
+  function fireAppOpen(appSlug) {
+    if (_appOpenFired) return;
+    _appOpenFired = true;
+    trackEvent('app_open', appSlug, { referrer: document.referrer || null });
+  }
+
+  // ── Standard event: first_interaction ─────────────────────────────────────
+  // Fires once per session on the first meaningful user action.
+  // Guard prevents duplicate firing even if called from multiple code paths.
+  // props: any summary context the app wants to include
+  function firstInteraction(props) {
+    if (_firstInteractionFired) return;
+    _firstInteractionFired = true;
+    trackEvent('first_interaction', null, props || null);
+  }
+
+  // ── Standard event: run_start ──────────────────────────────────────────────
+  // Marks the start of a run. Resets the run timer so runEnd() gets duration.
+  // props: identifying context (puzzle_num, board_id, level, etc.)
+  function runStart(props) {
+    _runStartTime = Date.now();
+    trackEvent('run_start', null, props || null);
+  }
+
+  // ── Standard event: run_end ────────────────────────────────────────────────
+  // Fires when the run ends. Automatically adds duration_ms if runStart was called.
+  // props: outcome + summary metrics the app already tracks
+  function runEnd(props) {
+    var extra = {};
+    if (props) {
+      for (var k in props) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) extra[k] = props[k];
+      }
+    }
+    if (_runStartTime !== null) {
+      extra.duration_ms = Date.now() - _runStartTime;
+      _runStartTime = null;
+    }
+    var merged = Object.keys(extra).length > 0 ? extra : null;
+    trackEvent('run_end', null, merged);
+  }
+
+  // ── Standard event: primary_action ────────────────────────────────────────
+  // Fires on a high-intent post-run action (share, download, play_again, etc.).
+  // action: string — e.g. 'share', 'download', 'play_again', 'new_puzzle'
+  // props: any extra context
+  function primaryAction(action, props) {
+    var extra = { action: action };
+    if (props) {
+      for (var k in props) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) extra[k] = props[k];
+      }
+    }
+    trackEvent('primary_action', null, extra);
+  }
+
   // ── init ───────────────────────────────────────────────────────────────────
-  // Call this for apps that need app_open tracking and custom events.
-  // injectGA is idempotent — calling init() after the auto-init below is safe.
+  // Call once per app. Sets the app slug and fires app_open (guarded).
   function init(appSlug) {
     window._kw_app_slug = appSlug;
     injectGA(getMeasurementId()); // no-op if already injected at load time
-    trackEvent('app_open');
+    fireAppOpen(appSlug);
   }
 
   // ── Auto-init: inject GA as soon as this script loads ─────────────────────
@@ -113,9 +192,25 @@
 
   // ── Public API ─────────────────────────────────────────────────────────────
   window.KapeworkAnalytics = {
-    init:        init,
-    track:       trackEvent,
+    // Setup
+    init: init,
+
+    // Core — explicit-slug form
+    trackEvent: trackEvent,
+
+    // Backward-compatible shorthand (uses stored window._kw_app_slug)
+    track: function (eventName, props) {
+      trackEvent(eventName, null, props);
+    },
+
+    // Standard event helpers
+    firstInteraction: firstInteraction,
+    runStart:         runStart,
+    runEnd:           runEnd,
+    primaryAction:    primaryAction,
+
+    // Metadata
     getDeviceId: getDeviceId,
-    sessionId:   SESSION_ID
+    sessionId:   SESSION_ID,
   };
 }());

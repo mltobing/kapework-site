@@ -569,6 +569,7 @@ function handleFileSelected(file) {
   uploadZone.querySelector('.upload-label').textContent = file.name;
   uploadZone.querySelector('.upload-icon').textContent = '✅';
   KapeworkAnalytics.track('clipdigest_upload_started', { file_size: file.size });
+  KapeworkAnalytics.firstInteraction({ file_size: file.size });
 }
 
 /* ─── Error helpers ─────────────────────────────────────────────────────────── */
@@ -587,6 +588,7 @@ btnGenerate.addEventListener('click', async () => {
   hideError();
   showView('view-processing');
   KapeworkAnalytics.track('clipdigest_analysis_started', { level: selectedLevel });
+  KapeworkAnalytics.runStart({ level: selectedLevel });
   try {
     await runPipeline(selectedFile, selectedLevel);
     showResults();
@@ -595,6 +597,7 @@ btnGenerate.addEventListener('click', async () => {
       frame_count: selectedFrames.length,
       duration: videoDuration,
     });
+    KapeworkAnalytics.runEnd({ outcome: 'complete', level: selectedLevel, frame_count: selectedFrames.length });
   } catch (err) {
     console.error('[clipdigest] pipeline error', err);
     showView('view-upload');
@@ -835,6 +838,7 @@ btnPdf.addEventListener('click', async () => {
   try {
     await exportPdf();
     KapeworkAnalytics.track('clipdigest_pdf_downloaded', { frame_count: selectedFrames.length });
+    KapeworkAnalytics.primaryAction('download', { format: 'pdf', frame_count: selectedFrames.length });
   } catch (err) {
     console.error('[clipdigest] PDF error', err);
     resultsError.textContent = 'PDF export failed. Please try again.';
@@ -944,6 +948,7 @@ btnZip.addEventListener('click', async () => {
   try {
     await exportZip();
     KapeworkAnalytics.track('clipdigest_zip_downloaded', { frame_count: selectedFrames.length });
+    KapeworkAnalytics.primaryAction('download', { format: 'zip', frame_count: selectedFrames.length });
   } catch (err) {
     console.error('[clipdigest] ZIP error', err);
     resultsError.textContent = 'ZIP export failed. Please try again.';

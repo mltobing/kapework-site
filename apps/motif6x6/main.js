@@ -29,6 +29,7 @@
     statusEl.textContent = '';
     statusEl.style.color = '';
     track('game_start');
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
   }
 
   /* ── Cell tap ───────────────────────────────────────────── */
@@ -77,6 +78,7 @@
             loadPuzzle(p, true);
             subtitleEl.textContent = 'Practice board';
             track('practice_start');
+            if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
           },
           onShare: function (btn) {
             var text = PG36Share.buildText({
@@ -88,6 +90,7 @@
             });
             PG36Share.share(text, btn);
             track('share_result', { tier: result.tier });
+            if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: result.tier });
           }
         });
       }, 1400);
@@ -153,6 +156,7 @@
       new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     track('game_start');
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
   }
 
   init();

@@ -40,7 +40,10 @@
     var ok = G.pushColor(colorId);
     if (!ok) return;
 
-    if (isFirstInput) track('first_interaction', { puzzle_num: _puzzle.puzzleNum });
+    if (isFirstInput) {
+      track('first_interaction', { puzzle_num: _puzzle.puzzleNum });
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction({ puzzle_num: _puzzle.puzzleNum });
+    }
     sync();
   }
 
@@ -83,6 +86,7 @@
 
   function onShare() {
     track('share_click', { puzzle_num: _puzzle.puzzleNum });
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { puzzle_num: _puzzle.puzzleNum });
     SH.share(
       _puzzle.puzzleNum,
       G.getMedal(),
@@ -107,6 +111,12 @@
       guesses:    guessCount,
       puzzle_num: _puzzle.puzzleNum,
       rule:       _puzzle.rule.id,
+    });
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({
+      outcome:    won ? 'win' : 'loss',
+      medal:      medal,
+      guesses:    guessCount,
+      puzzle_num: _puzzle.puzzleNum,
     });
     if (medal && medal !== 'fail') {
       track('medal_earned', { medal: medal });
@@ -157,6 +167,7 @@
         puzzle_num: _puzzle.puzzleNum,
         rule:       _puzzle.rule.id,
       });
+      window.KapeworkAnalytics.runStart({ puzzle_num: _puzzle.puzzleNum, rule: _puzzle.rule.id });
     }
 
     // Shared shell (⋮ menu with How to play + feedback)
