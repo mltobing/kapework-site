@@ -158,6 +158,7 @@ resultPlayAnother.addEventListener("click", function () {
     loadPuzzle(practice);
     subtitleEl.textContent = "Practice board";
     track('practice_start');
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
   }
 });
 
@@ -181,6 +182,7 @@ resultShare.addEventListener("click", function () {
     }).catch(function () {});
   }
   track('share_result', { tier: tier });
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: tier });
 });
 
 resultHardMode.addEventListener("click", function () {
@@ -218,6 +220,7 @@ function loadPuzzle(p) {
   statusEl.style.color = "";
 
   track('game_start');
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
 }
 
 /* ── Build board ─────────────────────────────────────────── */
@@ -331,6 +334,7 @@ function onCellTap(e) {
   if (!firstInteraction) {
     firstInteraction = true;
     track('first_interaction');
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction();
   }
 
   grid[r][c] = (grid[r][c] + 1) % 5;
@@ -380,6 +384,7 @@ function onCheck() {
 
     updateCheckBtn();
     track('solve_success', { tier: tier, checks_failed: failedChecks, time_ms: elapsed });
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks });
 
     // Streak only counts for the daily, not practice
     var streak = isPracticeMode ? 1 : recordAndGetStreak();

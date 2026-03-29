@@ -67,6 +67,7 @@ var PG36Game = (function () {
     if (!firstInteraction) {
       firstInteraction = true;
       _track('first_interaction');
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction();
     }
 
     grid[r][c] = (grid[r][c] + 1) % N;
@@ -112,6 +113,7 @@ var PG36Game = (function () {
         time_ms:      elapsed,
         clue_count:   puzzle.clues ? puzzle.clues.length : 0
       });
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks });
 
       if (!isPractice) PG36Storage.clearProgress();
 

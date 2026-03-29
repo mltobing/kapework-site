@@ -48,6 +48,7 @@ function onTileSelect(idx) {
 
   if (wasEmpty && G.getPath().length === 1) {
     track('first_interaction');
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction();
   }
 
   syncUI();
@@ -94,6 +95,12 @@ function finishGame() {
   ST.saveDailyState(_dateKey, G.getState());
 
   track('run_complete', { medal: medal, best_length: G.getBestLength(), shots: shots.length });
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({
+    outcome:     'complete',
+    medal:       medal,
+    shots:       shots.length,
+    best_length: G.getBestLength(),
+  });
   if (medal !== 'none') track('medal_earned', { medal: medal });
 
   UI.renderStreak(streak);
@@ -116,6 +123,7 @@ function finishGame() {
 // ── Share ─────────────────────────────────────────────────────────────────────
 function onShare() {
   track('share_click');
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share');
   SH.share(G.getShots(), G.getMedal(), _board.puzzleNumber, function() {
     UI.showToast('Copied to clipboard!', 'ok');
   });
@@ -162,6 +170,7 @@ async function boot() {
   if (window.KapeworkAnalytics) {
     window.KapeworkAnalytics.init('longshot');
     track('game_start', { board_id: _board.id, puzzle_num: _board.puzzleNumber });
+    window.KapeworkAnalytics.runStart({ puzzle_num: _board.puzzleNumber, board_id: _board.id });
   }
 
   if (window.KapeworkShell) {
