@@ -35,7 +35,7 @@ const SINGLE_FILE: Record<string, string> = {
   // longshot: now a folder app at /apps/longshot/ — no entry needed here
   // rainbowrules: now a folder app at /apps/rainbowrules/ — no entry needed here
   tapsum:       "/apps/tapsum.html",
-  tiltrix:      "/apps/tiltrix.html",
+  // tiltrix: now a folder app at /apps/tiltrix/ — no entry needed here
   tiltgarden:   "/apps/tiltgarden.html",
 };
 

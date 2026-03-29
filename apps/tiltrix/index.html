@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a1628">
+<title>Tiltrix · Kapework</title>
+<link rel="stylesheet" href="/shared/kapework-shell.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <a class="back-btn" href="https://braingym.kapework.com/" aria-label="Back to Brain Gym">← Brain Gym</a>
+
+  <!-- ── Header ── -->
+  <div class="game-header">
+    <div class="title-wrap">
+      <h1 class="game-title">Tiltrix</h1>
+      <p class="game-sub">Place pieces. Tip the board to reshape the stack.</p>
+    </div>
+    <div class="hud">
+      <div class="next-wrap">
+        <span class="next-lbl">Next</span>
+        <canvas id="next-canvas" aria-hidden="true"></canvas>
+      </div>
+      <div class="hud-box">
+        <span class="hud-val" id="score">0</span>
+        <span class="hud-lbl">score</span>
+      </div>
+      <div class="menu-wrap">
+        <button class="menu-btn" id="btn-menu" aria-label="Stats">⋮</button>
+        <div class="menu-dropdown" id="menu-dropdown">
+          <div class="menu-stat">Best score <b id="stat-best">0</b></div>
+          <div class="menu-stat">Lines cleared <b id="stat-lines">0</b></div>
+          <div class="menu-stat">Runs <b id="stat-runs">0</b></div>
+          <button class="menu-feedback-btn" id="btn-feedback">💬 Send feedback</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Round HUD ── -->
+  <div id="round-hud" class="round-hud">
+    <span id="round-label" class="round-label">Round 1</span>
+    <div class="round-prog-wrap">
+      <div id="round-prog" class="round-prog-fill" style="width:0%"></div>
+    </div>
+    <div class="charges-wrap" id="charges-wrap"></div>
+    <div class="anchor-wrap">
+      <div id="anchor-swatch" class="anchor-swatch"></div>
+      <span class="anchor-lbl">rooted</span>
+    </div>
+  </div>
+
+  <!-- ── Board ── -->
+  <div class="board-area">
+    <div id="board-wrap" class="board-wrap">
+      <canvas id="board" aria-label="Tiltrix game board"></canvas>
+    </div>
+
+    <!-- Round-complete overlay -->
+    <div id="round-overlay" class="round-overlay hidden">
+      <div class="round-inner">
+        <div id="ro-num" class="ro-num">Round 1 complete</div>
+        <div id="ro-score" class="ro-score"></div>
+        <div class="ro-next-label">Round <span id="ro-next-num">2</span></div>
+        <div class="ro-anchor-preview">
+          <div id="ro-swatch" class="ro-swatch"></div>
+          <span id="ro-anchor-text" class="ro-anchor-text">Amber blocks stay rooted</span>
+        </div>
+        <div class="ro-charges-label"><span id="ro-charges">3</span> tilt charges refreshed</div>
+      </div>
+    </div>
+
+    <!-- Game-over overlay -->
+    <div id="go-overlay" class="go-overlay hidden">
+      <div class="go-inner">
+        <div class="go-title">Game Over</div>
+        <div class="go-detail" id="go-detail"></div>
+        <div class="go-best"  id="go-best"></div>
+        <button class="go-btn" id="btn-replay">Play Again</button>
+      </div>
+    </div>
+
+    <!-- First-run hint -->
+    <div id="hint-overlay" class="hint-overlay hidden">
+      <div class="hint-inner">
+        <div class="hint-line hint-accent">Swipe ← → to tilt — <span id="hint-charges">3</span> charges per round</div>
+        <div class="hint-line" id="hint-anchor-line">Amber blocks stay rooted when you tilt</div>
+        <div class="hint-line">Clear 2+ rows with one tilt → regain a charge</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Controls ── -->
+  <div class="controls">
+    <button id="btn-left"   class="ctrl-btn" aria-label="Move left">◀</button>
+    <button id="btn-rotate" class="ctrl-btn" aria-label="Rotate">↺</button>
+    <button id="btn-right"  class="ctrl-btn" aria-label="Move right">▶</button>
+    <button id="btn-drop"   class="ctrl-drop ctrl-btn" aria-label="Drop">▼</button>
+  </div>
+
+</div>
+<script src="game.js"></script>
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('tiltrix');
+  KapeworkShell.init({ appSlug: 'tiltrix' });
+  document.getElementById('btn-feedback').addEventListener('click', function () {
+    document.getElementById('menu-dropdown').classList.remove('open');
+    KapeworkShell.openFeedback();
+  });
+</script>
+</body>
+</html>
