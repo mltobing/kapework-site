@@ -239,21 +239,31 @@ a { color: inherit; text-decoration: none; }
 @keyframes row-shake  { 0%,100%{transform:translateX(0)} 18%{transform:translateX(-6px)} 36%{transform:translateX(6px)} 54%{transform:translateX(-4px)} 72%{transform:translateX(4px)} }
 @keyframes win-bounce { 0%{transform:translateY(0)} 30%{transform:translateY(-12px)} 60%{transform:translateY(-5px)} 80%{transform:translateY(-9px)} 100%{transform:translateY(0)} }
 
-/* ── Math fun ────────────────────────────────────────────────────────────── */
-.mathfun-wrap {
-  flex-shrink: 0; height: 30px;
-  display: flex; align-items: center; justify-content: center;
+/* ── Feedback strip ──────────────────────────────────────────────────────── */
+.feedback-strip {
+  flex-shrink: 0; height: 54px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; padding: 0 8px;
 }
-.mathfun-pill {
-  font-size: 0.73rem; font-weight: 700;
-  padding: 4px 14px; border-radius: 999px;
-  background: var(--surface2); color: var(--muted);
-  border: 1px solid var(--border);
-  white-space: nowrap; opacity: 0; transition: opacity 0.25s;
+.feedback-explain {
+  font-size: 0.74rem; font-weight: 600;
+  color: var(--muted);
+  opacity: 0; transition: opacity 0.3s ease;
+  white-space: nowrap; max-width: calc(100% - 20px);
+  overflow: hidden; text-overflow: ellipsis; text-align: center;
+}
+.feedback-explain.visible { opacity: 1; }
+.feedback-explain.prime   { color: var(--cyan); }
+.feedback-clue {
+  font-size: 0.72rem; font-weight: 700;
+  padding: 3px 12px; border-radius: 999px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border-hi);
+  white-space: nowrap; opacity: 0; transition: opacity 0.3s ease;
   max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
 }
-.mathfun-pill.visible { opacity: 1; }
-.mathfun-pill.prime   { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+.feedback-clue.visible { opacity: 1; }
 
 /* ── Keyboard ────────────────────────────────────────────────────────────── */
 .keyboard {
@@ -284,7 +294,8 @@ a { color: inherit; text-decoration: none; }
   .key { height: 44px; }
   .keyboard { gap: 5px; padding-bottom: env(safe-area-inset-bottom, 8px); }
   .subtitle { padding: 3px 4px 2px; }
-  .mathfun-wrap, .hint-bar { height: 24px; }
+  .feedback-strip { height: 46px; gap: 4px; }
+  .hint-bar { height: 24px; }
 }
 
 /* ── Toast ───────────────────────────────────────────────────────────────── */
@@ -446,7 +457,7 @@ a { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .tile.filled, .tile.flip, .row.shake, .tile.win-bounce { animation: none; }
   .toast { animation: none; opacity: 1; }
-  .overlay, .sheet, .archive-bar, .hint-pill, .mathfun-pill { transition: none; }
+  .overlay, .sheet, .archive-bar, .hint-pill, .feedback-explain, .feedback-clue { transition: none; }
 }
   </style>
 </head>
@@ -494,9 +505,10 @@ a { color: inherit; text-decoration: none; }
     <div class="board" id="board" role="grid" aria-label="Prim4 guess grid"></div>
   </main>
 
-  <!-- Math fun -->
-  <div class="mathfun-wrap" aria-live="polite" aria-atomic="true">
-    <div class="mathfun-pill" id="mathfun-pill"></div>
+  <!-- Feedback strip: guess explanation + auto-clue -->
+  <div class="feedback-strip" aria-live="polite" aria-atomic="true">
+    <div class="feedback-explain" id="fb-explain"></div>
+    <div class="feedback-clue"   id="fb-clue"></div>
   </div>
 
   <!-- Keyboard -->
@@ -792,16 +804,16 @@ function evaluate(guess, answer) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MATH FUN
+   GUESS EXPLANATION — one elegant line about the submitted number
    ═════════════════════════════════════════════════════════════════════════ */
-function mathFunMsg(gs) {
+function guessExplanation(gs) {
   const n = parseInt(gs, 10);
-  if (isPrime(n)) return { text: `Math fun: Prime ✓ — ${n} is prime!`, prime: true };
-  if (n % 2 === 0)  return { text: "Math fun: Not prime — it's even.", prime: false };
-  if (n % 5 === 0)  return { text: "Math fun: Not prime — ends in 5.", prime: false };
+  if (isPrime(n)) return { text: `${n} is prime.`, prime: true };
+  if (n % 2 === 0) return { text: `${n} is composite — it's even.`, prime: false };
+  if (n % 5 === 0) return { text: `${n} is composite — it ends in 5.`, prime: false };
   const dsum = [...gs].reduce((a, d) => a + +d, 0);
-  if (dsum % 3 === 0) return { text: `Math fun: Not prime — digit sum ${dsum} is divisible by 3.`, prime: false };
-  return { text: 'Math fun: Composite number.', prime: false };
+  if (dsum % 3 === 0) return { text: `${n} is composite — digits sum to ${dsum}, divisible by 3.`, prime: false };
+  return { text: `${n} is composite.`, prime: false };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -826,6 +838,56 @@ function computeHint(answer, puzzleNum) {
   ];
 
   return '💡 ' + pool[puzzleNum % pool.length];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTO-CLUE LADDER — one clue per guess, systematic and progressive
+   guessNum is 1-indexed (1 = first guess just submitted)
+   ═════════════════════════════════════════════════════════════════════════ */
+function autoClue(guessNum, answer, guess) {
+  const aDigits = [...String(answer)].map(Number);
+  const aSum    = aDigits.reduce((a, b) => a + b, 0);
+  const aOdds   = aDigits.filter(d => d % 2 !== 0).length;
+  const aUnique = new Set(aDigits).size;
+  const gVal    = parseInt(guess, 10);
+
+  switch (guessNum) {
+    case 1:
+      return answer > gVal
+        ? `The answer is higher than ${gVal}.`
+        : `The answer is lower than ${gVal}.`;
+    case 2:
+      return `The answer's digit sum is ${aSum}.`;
+    case 3:
+      if (aOdds === 4) return `All four digits of the answer are odd.`;
+      if (aOdds === 0) return `All four digits of the answer are even.`;
+      return `Exactly ${aOdds} of the answer's digits are odd.`;
+    case 4:
+      return aUnique < 4
+        ? `The answer contains a repeated digit.`
+        : `All four digits of the answer are distinct.`;
+    case 5:
+      return answer > gVal
+        ? `The answer is higher than ${gVal}.`
+        : `The answer is lower than ${gVal}.`;
+    default:
+      return null; // no clue on final guess
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CANDIDATE COUNT — primes still consistent with all revealed feedback
+   ═════════════════════════════════════════════════════════════════════════ */
+function countCandidates(guesses, answer) {
+  const ansStr  = String(answer);
+  const results = guesses.map(g => evaluate(g, ansStr));
+  return PRIMES.filter(p => {
+    const ps = String(p);
+    return guesses.every((g, i) => {
+      const r = evaluate(g, ps);
+      return r.every((v, j) => v === results[i][j]);
+    });
+  }).length;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -860,7 +922,8 @@ function updateKeys(guess, result) {
    DOM REFS
    ═════════════════════════════════════════════════════════════════════════ */
 const boardEl      = document.getElementById('board');
-const mathfunEl    = document.getElementById('mathfun-pill');
+const fbExplainEl  = document.getElementById('fb-explain');
+const fbClueEl     = document.getElementById('fb-clue');
 const hintPillEl   = document.getElementById('hint-pill');
 const btnHint      = document.getElementById('btn-hint');
 const toastZone    = document.getElementById('toast-zone');
@@ -872,9 +935,9 @@ const noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fitTiles() {
   const vh = window.innerHeight;
-  // Reserve: header≈52 + archivebar≈30 + subtitle≈36 + hintbar≈28 + mathfun≈30 +
-  //          keyboard≈168 + padding/gaps≈36 = 380
-  const reserved = vh < 640 ? 340 : 380;
+  // Reserve: header≈52 + archivebar≈30 + subtitle≈36 + hintbar≈28 + feedbackstrip≈54 +
+  //          keyboard≈168 + padding/gaps≈36 = 404
+  const reserved = vh < 640 ? 362 : 404;
   const size = Math.max(40, Math.min(62, Math.floor((vh - reserved - 5 * 6) / 6)));
   document.documentElement.style.setProperty('--tile-size', size + 'px');
 }
@@ -952,15 +1015,36 @@ function renderKeyboard() {
   });
 }
 
-function showMathFun(gs) {
-  const { text, prime } = mathFunMsg(gs);
-  mathfunEl.textContent = text;
-  mathfunEl.classList.toggle('prime', prime);
-  mathfunEl.classList.add('visible');
+function showFeedbackExplain(gs) {
+  const { text, prime } = guessExplanation(gs);
+  fbExplainEl.textContent = text;
+  fbExplainEl.classList.toggle('prime', prime);
+  fbExplainEl.classList.add('visible');
 }
 
-function clearMathFun() {
-  mathfunEl.classList.remove('visible', 'prime');
+function showFeedbackClue(clueText, count) {
+  if (!clueText) return;
+  const suffix = (count !== null && count > 1 && count <= 180) ? ` · ${count} primes left` : '';
+  fbClueEl.textContent = clueText + suffix;
+  fbClueEl.classList.add('visible');
+}
+
+function clearFeedback() {
+  fbExplainEl.classList.remove('visible', 'prime');
+  fbClueEl.classList.remove('visible');
+}
+
+// Restore feedback strip when loading a saved game state
+function restoreFeedback(state, answer) {
+  const guesses = state.guesses;
+  if (guesses.length === 0) { clearFeedback(); return; }
+  const lastGuess = guesses[guesses.length - 1];
+  showFeedbackExplain(lastGuess);
+  if (state.status === 'playing' && guesses.length <= 5) {
+    const clue  = autoClue(guesses.length, answer, lastGuess);
+    const count = clue ? countCandidates(guesses, answer) : null;
+    showFeedbackClue(clue, count);
+  }
 }
 
 /* ── Toast ─────────────────────────────────────────────────────────────── */
@@ -1001,7 +1085,7 @@ async function startReplay() {
   closeOverlay('overlay-result');
   buildBoard();
   renderKeyboard();
-  clearMathFun();
+  clearFeedback();
   const ansStr  = String(activeAnswer);
   const guesses = activeState.guesses;
   busy = true;
@@ -1011,7 +1095,7 @@ async function startReplay() {
     if (r < guesses.length - 1) await new Promise(res => setTimeout(res, 180));
   }
   busy = false;
-  if (guesses.length > 0) showMathFun(guesses[guesses.length - 1]);
+  if (guesses.length > 0) showFeedbackExplain(guesses[guesses.length - 1]);
   setTimeout(() => openResult(), 600);
 }
 
@@ -1354,15 +1438,11 @@ function openDate(ds, withReplay = false) {
   updateHintButton();
 
   if (withReplay && activeState.status === 'won' && activeState.guesses.length > 0) {
-    clearMathFun();
+    clearFeedback();
     startReplay();
   } else {
     renderPastGuesses(activeState, String(activeAnswer));
-    if (activeState.guesses.length > 0) {
-      showMathFun(activeState.guesses[activeState.guesses.length - 1]);
-    } else {
-      clearMathFun();
-    }
+    restoreFeedback(activeState, activeAnswer);
     if (activeState.status !== 'playing') {
       setTimeout(() => openResult(), 700);
     }
@@ -1452,23 +1532,33 @@ async function submitGuess() {
   }
 
   busy = true;
-  const r      = activeState.guesses.length;
-  const ansStr = String(activeAnswer);
-  const result = evaluate(input, ansStr);
+  const r              = activeState.guesses.length;
+  const guessSubmitted = input;
+  const guessNum       = r + 1; // 1-indexed
+  const ansStr         = String(activeAnswer);
+  const result         = evaluate(guessSubmitted, ansStr);
 
-  await revealRow(r, input, result, false);
+  await revealRow(r, guessSubmitted, result, false);
 
-  updateKeys(input, result);
+  updateKeys(guessSubmitted, result);
   renderKeyboard();
-  showMathFun(input);
 
-  activeState.guesses.push(input);
+  const won = result.every(x => x === 'correct');
+
+  // Staggered feedback: explain then clue, both after tiles have settled
+  setTimeout(() => showFeedbackExplain(guessSubmitted), 80);
+  if (!won && guessNum <= 5) {
+    const allGuesses = [...activeState.guesses, guessSubmitted];
+    const clue  = autoClue(guessNum, activeAnswer, guessSubmitted);
+    const count = countCandidates(allGuesses, activeAnswer);
+    setTimeout(() => showFeedbackClue(clue, count), 280);
+  }
+
+  activeState.guesses.push(guessSubmitted);
   input = '';
 
   // Update hint button availability now that guess count changed
   updateHintButton();
-
-  const won = result.every(x => x === 'correct');
 
   if (won) {
     activeState.status = 'won';
@@ -1548,10 +1638,8 @@ function init() {
   updateHintButton();
   updateHeaderStreak();
 
-  // Restore math fun for last guess
-  if (activeState.guesses.length > 0) {
-    showMathFun(activeState.guesses[activeState.guesses.length - 1]);
-  }
+  // Restore feedback strip for last guess
+  restoreFeedback(activeState, activeAnswer);
 
   // Restore hint pill if previously used
   if (activeState.hintUsed) showHintPill();
