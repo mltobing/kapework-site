@@ -637,11 +637,11 @@ async function runPipeline(file, level) {
   setProgress('Reading video', 5);
   await loadVideoMetadata(file);
 
-  setProgress('Analysing change', 15);
-  const scanData = await scanVideoFrames();
+  setProgress('Scanning video', 15);
+  const { results: scanData, grays: grayData } = await scanVideoFrames();
 
   setProgress('Selecting frames', 68);
-  selectedFrames = selectRepresentativeFrames(scanData, level);
+  selectedFrames = selectRepresentativeFrames(scanData, grayData, level);
 
   setProgress('Capturing frames', 72);
   await captureFullResFrames(selectedFrames);
@@ -682,9 +682,9 @@ async function scanVideoFrames() {
   // ≤2 min → 2 fps (unchanged for short clips)
   // 2–5 min → 1 fps
   // >5 min  → 0.5 fps  (≈300 scan points for a 10-min clip)
-  const SCAN_FPS = videoDuration <= 120 ? 2 : videoDuration <= 300 ? 1 : 0.5;
-  const SCAN_W   = 64;
-  const SCAN_H   = 64;
+  const SCAN_FPS  = videoDuration <= 120 ? 2 : videoDuration <= 300 ? 1 : 0.5;
+  const SCAN_W    = 64;
+  const SCAN_H    = 64;
   const SCAN_STEP = 1 / SCAN_FPS;
 
   const sc = document.createElement('canvas');
@@ -695,6 +695,10 @@ async function scanVideoFrames() {
   for (let t = 0; t <= videoDuration; t = +(t + SCAN_STEP).toFixed(3)) times.push(t);
 
   const results = [];
+  // Retain gray arrays keyed by time (rounded to 3dp) so the selection step
+  // can run near-duplicate suppression without a second seek pass.
+  // Memory cost: ~300 frames × 4 096 bytes ≈ 1.2 MB — negligible.
+  const grays = new Map();
   let prevGray = null;
 
   for (let i = 0; i < times.length; i++) {
@@ -718,25 +722,37 @@ async function scanVideoFrames() {
     }
 
     results.push({ time: t, score });
+    grays.set(+(t.toFixed(3)), gray);
     prevGray = gray;
 
-    // Yield every 10 frames so the browser stays responsive
+    // Yield every 10 frames to keep the browser responsive
     if (i % 10 === 0) {
       const pct = 15 + Math.round((i / times.length) * 50);
-      setProgress('Analysing change', pct);
+      setProgress('Scanning video', pct);
       await tick();
     }
   }
 
-  return results;
+  return { results, grays };
 }
 
 function seekTo(video, time) {
   return new Promise((resolve, reject) => {
-    const onSeeked = () => { resolve(); video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onErr); };
-    const onErr    = () => { reject(new Error('seek failed')); video.removeEventListener('seeked', onSeeked); video.removeEventListener('error', onErr); };
+    // 5-second timeout: if the browser stalls on a seek (common on Safari with large
+    // files), soft-resolve so the pipeline continues with whatever frame is loaded.
+    const SEEK_TIMEOUT_MS = 5000;
+    let settled = false;
+    const cleanup = () => {
+      settled = true;
+      clearTimeout(timer);
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error',  onErr);
+    };
+    const onSeeked = () => { if (!settled) { cleanup(); resolve(); } };
+    const onErr    = () => { if (!settled) { cleanup(); reject(new Error('seek failed')); } };
+    const timer    = setTimeout(() => { if (!settled) { cleanup(); resolve(); } }, SEEK_TIMEOUT_MS);
     video.addEventListener('seeked', onSeeked, { once: true });
-    video.addEventListener('error', onErr, { once: true });
+    video.addEventListener('error',  onErr,    { once: true });
     video.currentTime = time;
   });
 }
@@ -744,27 +760,38 @@ function seekTo(video, time) {
 function tick() { return new Promise(r => setTimeout(r, 0)); }
 
 /* ── Phase 2: adaptive representative frame selection ── */
-function selectRepresentativeFrames(scanData, level) {
+function selectRepresentativeFrames(scanData, grayData, level) {
   const { minFrames, maxFrames } = computeFrameBudget(level, videoOrientation);
 
-  // Duration-aware spacing: for longer videos the algorithm must spread frames
-  // more aggressively to ensure full-timeline coverage without clustering.
-  // Floor/ceiling keep short clips behaving the same as before.
-  const levelFloors  = { lean: 6,  balanced: 3,  detailed: 1.5 };
-  const levelCeils   = { lean: 20, balanced: 10, detailed: 6   };
-  const minSpacing = Math.max(levelFloors[level], videoDuration / maxFrames * 0.7);
-  const maxSpacing = Math.max(levelCeils[level],  videoDuration / minFrames * 1.3);
+  // ── Static-clip detection ─────────────────────────────────────────────────
+  // Compute the median visual-change score across all scan points.
+  // A low median means the clip is mostly static or changes very slowly.
+  // We widen spacing for static clips so the output isn't full of redundant frames.
+  const sortedScores = scanData.map(d => d.score).sort((a, b) => a - b);
+  const medianScore  = sortedScores[Math.floor(sortedScores.length / 2)];
+  const isStaticClip = medianScore < 6; // 6/255 ≈ very low activity
 
-  // Always include first and last frames
+  // ── Duration-aware spacing ────────────────────────────────────────────────
+  // Derive minSpacing / maxSpacing from the frame budget and video length so
+  // that longer videos spread their selections across the full timeline.
+  // Floor/ceiling preserve old behaviour for short clips.
+  const levelFloors = { lean: 6,  balanced: 3,  detailed: 1.5 };
+  const levelCeils  = { lean: 20, balanced: 10, detailed: 6   };
+  let minSpacing = Math.max(levelFloors[level], videoDuration / maxFrames * 0.7);
+  let maxSpacing = Math.max(levelCeils[level],  videoDuration / minFrames * 1.3);
+
+  // For static / slow-moving clips, push frames further apart to avoid a PDF
+  // full of nearly-identical screenshots.
+  if (isStaticClip) { minSpacing *= 1.5; maxSpacing *= 1.5; }
+
+  // ── Step 1: greedy high-change selection ─────────────────────────────────
   const forced = new Set([0, scanData.length - 1]);
 
-  // Rank all scan points by score descending (excluding forced)
   const ranked = scanData
     .map((d, i) => ({ i, time: d.time, score: d.score }))
     .filter(d => !forced.has(d.i))
     .sort((a, b) => b.score - a.score);
 
-  // Greedy selection: add highest-score frames that respect minSpacing
   const selectedTimes = [scanData[0].time, scanData[scanData.length - 1].time];
 
   for (const candidate of ranked) {
@@ -773,10 +800,10 @@ function selectRepresentativeFrames(scanData, level) {
     if (!tooClose) selectedTimes.push(candidate.time);
   }
 
-  // Fill coverage gaps: find intervals > maxSpacing and insert midpoints
+  // ── Step 2: gap-fill for full-timeline coverage ───────────────────────────
   selectedTimes.sort((a, b) => a - b);
   let safety = 0;
-  while (safety++ < 200) {
+  while (safety++ < 300) {
     let inserted = false;
     for (let i = 0; i < selectedTimes.length - 1; i++) {
       const gap = selectedTimes[i + 1] - selectedTimes[i];
@@ -789,7 +816,7 @@ function selectRepresentativeFrames(scanData, level) {
     if (!inserted) break;
   }
 
-  // Clamp to [minFrames, maxFrames] — if under min, add evenly spaced
+  // ── Step 3: top-up to minFrames with evenly-spaced extras ────────────────
   if (selectedTimes.length < minFrames) {
     const extra = minFrames - selectedTimes.length;
     const step  = videoDuration / (extra + 1);
@@ -800,9 +827,49 @@ function selectRepresentativeFrames(scanData, level) {
     selectedTimes.sort((a, b) => a - b);
   }
 
-  // Clamp to maxFrames
-  const final = selectedTimes.slice(0, maxFrames);
-  return final.map(t => ({ time: t, dataUrl: null }));
+  // ── Step 4: near-duplicate suppression ───────────────────────────────────
+  // Compare retained 64×64 gray scan frames. If two consecutive selections are
+  // visually near-identical (avg pixel diff < threshold), remove the lower-scored
+  // one — unless it's the very first or last frame.
+  // Only runs when we have enough frames to afford shrinking below maxFrames.
+  const DEDUP_THRESHOLD = 8; // avg absolute pixel diff on 0–255 scale
+  const scoreFor = new Map(scanData.map(d => [+(d.time.toFixed(3)), d.score]));
+
+  function grayFor(time) {
+    return grayData.get(+(time.toFixed(3))) || null;
+  }
+  function avgDiff(timeA, timeB) {
+    const gA = grayFor(timeA), gB = grayFor(timeB);
+    if (!gA || !gB) return 255; // no data → assume different, keep both
+    let sum = 0;
+    for (let p = 0; p < gA.length; p++) sum += Math.abs(gA[p] - gB[p]);
+    return sum / gA.length;
+  }
+
+  let deduped = [...selectedTimes];
+  let evicted = true;
+  while (evicted && deduped.length > minFrames) {
+    evicted = false;
+    for (let i = 0; i < deduped.length - 1; i++) {
+      if (avgDiff(deduped[i], deduped[i + 1]) < DEDUP_THRESHOLD) {
+        const isFirst = i === 0;
+        const isLast  = i + 1 === deduped.length - 1;
+        if (isFirst) {
+          deduped.splice(i + 1, 1);
+        } else if (isLast) {
+          deduped.splice(i, 1);
+        } else {
+          const sA = scoreFor.get(+(deduped[i    ].toFixed(3))) || 0;
+          const sB = scoreFor.get(+(deduped[i + 1].toFixed(3))) || 0;
+          deduped.splice(sA >= sB ? i + 1 : i, 1);
+        }
+        evicted = true;
+        break; // restart after each eviction
+      }
+    }
+  }
+
+  return deduped.slice(0, maxFrames).map(t => ({ time: t, dataUrl: null }));
 }
 
 /* ── Phase 3: capture full-res JPEG for each selected frame ── */
@@ -814,19 +881,13 @@ async function captureFullResFrames(frames) {
   }
 }
 
-function captureFrame(time) {
-  return new Promise((resolve, reject) => {
-    const onSeeked = () => {
-      decodeCanvas.width  = decodeVideo.videoWidth  || 640;
-      decodeCanvas.height = decodeVideo.videoHeight || 360;
-      decodeCanvas.getContext('2d').drawImage(decodeVideo, 0, 0, decodeCanvas.width, decodeCanvas.height);
-      resolve(decodeCanvas.toDataURL('image/jpeg', 0.85));
-    };
-    const onErr = () => reject(new Error('Frame capture failed at ' + time));
-    decodeVideo.addEventListener('seeked', onSeeked, { once: true });
-    decodeVideo.addEventListener('error',  onErr,    { once: true });
-    decodeVideo.currentTime = time;
-  });
+async function captureFrame(time) {
+  // Reuses seekTo so the same 5-second timeout guard covers capture seeks too.
+  await seekTo(decodeVideo, time);
+  decodeCanvas.width  = decodeVideo.videoWidth  || 640;
+  decodeCanvas.height = decodeVideo.videoHeight || 360;
+  decodeCanvas.getContext('2d').drawImage(decodeVideo, 0, 0, decodeCanvas.width, decodeCanvas.height);
+  return decodeCanvas.toDataURL('image/jpeg', 0.85);
 }
 
 /* ─── Results ───────────────────────────────────────────────────────────────── */
