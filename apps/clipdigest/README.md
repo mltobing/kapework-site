@@ -33,8 +33,8 @@ Frame budgets are orientation-aware. Landscape layouts are stricter because each
 | Level | Frames selected | Target pages |
 |---|---|---|
 | Lean | 9–27 | 1–3 |
-| Balanced | 18–45 | 2–5 |
-| Detailed | 27–63 | 3–7 |
+| Balanced | 27–63 | 3–7 |
+| Detailed | 45–90 | 5–10 |
 
 **Landscape (4 frames/page):**
 
@@ -59,7 +59,7 @@ Total scan frames are bounded at ~300 regardless of clip length.
 `minSpacing` and `maxSpacing` are derived from `videoDuration ÷ frameBudget` rather than hardcoded per-level constants. This spreads selections across the full timeline for long clips while preserving the original short-clip behaviour.
 
 **Static-clip detection:**
-If the median visual-change score across all scan points is below 6/255, the clip is classified as static. Spacing is widened by 1.5× to avoid a PDF full of near-identical screenshots (e.g. long tutorial sessions, idle screen recordings).
+If the median visual-change score across all scan points is below 6/255, the clip is classified as static. Spacing is widened by 1.25× to avoid a PDF full of near-identical screenshots (e.g. long tutorial sessions, idle screen recordings) without suppressing frame count too aggressively.
 
 **Near-duplicate suppression:**
 After initial frame selection, consecutive selected frames with average pixel difference < 8/255 are deduplicated — the lower-scored frame is removed. The first and last frames are always protected. Deduplication stops before falling below `minFrames`.
