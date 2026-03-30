@@ -366,8 +366,8 @@ button { font: inherit; cursor: pointer; }
     <div class="app-header">
       <div class="app-logo">🎞️</div>
       <h1 class="app-title">ClipDigest</h1>
-      <p class="app-sub">Turn a short video into a clean storyboard PDF</p>
-      <p class="app-hint">Great for app demos, playtests, and mobile screen recordings</p>
+      <p class="app-sub">Turn a video clip into a clean storyboard PDF</p>
+      <p class="app-hint">Great for app demos, playtests, and screen recordings up to 10 minutes</p>
     </div>
 
     <div class="upload-zone" id="upload-zone" role="button" aria-label="Upload video file">
@@ -375,7 +375,7 @@ button { font: inherit; cursor: pointer; }
       <div class="upload-icon">📹</div>
       <div class="upload-label">Drop a video or tap to choose</div>
       <div class="upload-hint">mp4 · mov · webm</div>
-      <div class="upload-types">Up to 3 min · 250 MB</div>
+      <div class="upload-types">Up to 10 min · 500 MB</div>
     </div>
 
     <div class="settings-card">
@@ -481,20 +481,35 @@ function loadScript(src) {
 }
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
-const MAX_DURATION_S = 180;   // 3 minutes
-const MAX_FILE_BYTES = 250 * 1024 * 1024; // 250 MB
+const MAX_DURATION_S = 600;   // 10 minutes
+const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 
-const LEVEL_CONFIG = {
-  lean:     { minFrames: 12, maxFrames: 20, label: 'Lean' },
-  balanced: { minFrames: 20, maxFrames: 36, label: 'Balanced' },
-  detailed: { minFrames: 36, maxFrames: 60, label: 'Detailed' },
+// Frame budgets are orientation-aware.
+// Portrait (9/page, 3×3): more frames are fine because each is small.
+// Landscape (4/page, 2×2): stricter cap because each frame fills more space.
+const FRAME_BUDGETS = {
+  portrait: {
+    lean:     { minFrames:  9, maxFrames: 27, label: 'Lean' },
+    balanced: { minFrames: 18, maxFrames: 45, label: 'Balanced' },
+    detailed: { minFrames: 27, maxFrames: 63, label: 'Detailed' },
+  },
+  landscape: {
+    lean:     { minFrames:  4, maxFrames: 12, label: 'Lean' },
+    balanced: { minFrames:  8, maxFrames: 16, label: 'Balanced' },
+    detailed: { minFrames: 12, maxFrames: 24, label: 'Detailed' },
+  },
 };
 
+function computeFrameBudget(level, orientation) {
+  return FRAME_BUDGETS[orientation] ? FRAME_BUDGETS[orientation][level] : FRAME_BUDGETS.portrait[level];
+}
+
 /* ─── State ─────────────────────────────────────────────────────────────────── */
-let selectedFile   = null;
-let selectedLevel  = 'balanced';
-let selectedFrames = [];   // [{time, dataUrl}]
-let videoDuration  = 0;
+let selectedFile      = null;
+let selectedLevel     = 'balanced';
+let selectedFrames    = [];   // [{time, dataUrl}]
+let videoDuration     = 0;
+let videoOrientation  = 'portrait'; // 'portrait' | 'landscape'
 
 /* ─── DOM refs ──────────────────────────────────────────────────────────────── */
 const fileInput      = document.getElementById('file-input');
@@ -561,7 +576,7 @@ function handleFileSelected(file) {
     return;
   }
   if (file.size > MAX_FILE_BYTES) {
-    showError('File is too large. Maximum size is 250 MB.');
+    showError('File is too large. Maximum size is 500 MB.');
     return;
   }
   selectedFile = file;
@@ -610,7 +625,7 @@ function friendlyError(err) {
   if (msg.includes('decode') || msg.includes('load'))
     return 'Could not read the video. The file may be corrupted or use an unsupported codec.';
   if (msg.includes('duration') || msg.includes('too long'))
-    return 'Video is too long. Maximum duration is 3 minutes.';
+    return 'Video is too long. Maximum supported duration is 10 minutes.';
   if (msg.includes('memory') || msg.includes('quota'))
     return 'Your device ran out of memory while processing. Try a shorter clip or a lower detail level.';
   return 'Something went wrong during processing. Please try a different file.';
@@ -650,18 +665,27 @@ async function loadVideoMetadata(file) {
         return reject(new Error('Could not decode video duration.'));
       if (videoDuration > MAX_DURATION_S)
         return reject(new Error('Video is too long.'));
+      // Detect orientation from intrinsic display dimensions.
+      // Modern browsers report post-rotation dimensions (correct for phone recordings).
+      const vw = decodeVideo.videoWidth  || 0;
+      const vh = decodeVideo.videoHeight || 0;
+      videoOrientation = (vh > vw) ? 'portrait' : 'landscape';
       resolve();
     };
     decodeVideo.onerror = () => reject(new Error('Video decode error.'));
   });
 }
 
-/* ── Phase 1: scan at ~2 fps, 64×64 grayscale, compute diff scores ── */
+/* ── Phase 1: scan at adaptive fps, 64×64 grayscale, compute diff scores ── */
 async function scanVideoFrames() {
-  const SCAN_FPS   = 2;
-  const SCAN_W     = 64;
-  const SCAN_H     = 64;
-  const SCAN_STEP  = 1 / SCAN_FPS;
+  // Adaptive scan FPS keeps total scan frames bounded for long videos.
+  // ≤2 min → 2 fps (unchanged for short clips)
+  // 2–5 min → 1 fps
+  // >5 min  → 0.5 fps  (≈300 scan points for a 10-min clip)
+  const SCAN_FPS = videoDuration <= 120 ? 2 : videoDuration <= 300 ? 1 : 0.5;
+  const SCAN_W   = 64;
+  const SCAN_H   = 64;
+  const SCAN_STEP = 1 / SCAN_FPS;
 
   const sc = document.createElement('canvas');
   sc.width = SCAN_W; sc.height = SCAN_H;
@@ -721,12 +745,15 @@ function tick() { return new Promise(r => setTimeout(r, 0)); }
 
 /* ── Phase 2: adaptive representative frame selection ── */
 function selectRepresentativeFrames(scanData, level) {
-  const cfg = LEVEL_CONFIG[level];
-  const { minFrames, maxFrames } = cfg;
+  const { minFrames, maxFrames } = computeFrameBudget(level, videoOrientation);
 
-  // Min/max spacing between selected frames (seconds), tuned per level
-  const minSpacing = level === 'lean' ? 6 : level === 'balanced' ? 3 : 1.5;
-  const maxSpacing = level === 'lean' ? 20 : level === 'balanced' ? 10 : 6;
+  // Duration-aware spacing: for longer videos the algorithm must spread frames
+  // more aggressively to ensure full-timeline coverage without clustering.
+  // Floor/ceiling keep short clips behaving the same as before.
+  const levelFloors  = { lean: 6,  balanced: 3,  detailed: 1.5 };
+  const levelCeils   = { lean: 20, balanced: 10, detailed: 6   };
+  const minSpacing = Math.max(levelFloors[level], videoDuration / maxFrames * 0.7);
+  const maxSpacing = Math.max(levelCeils[level],  videoDuration / minFrames * 1.3);
 
   // Always include first and last frames
   const forced = new Set([0, scanData.length - 1]);
@@ -804,11 +831,11 @@ function captureFrame(time) {
 
 /* ─── Results ───────────────────────────────────────────────────────────────── */
 function showResults() {
-  const cfg = LEVEL_CONFIG[selectedLevel];
+  const budget = computeFrameBudget(selectedLevel, videoOrientation);
   resultsFilename.textContent = selectedFile.name;
   statDuration.textContent = formatTime(videoDuration);
   statFrames.textContent   = selectedFrames.length;
-  statLevel.textContent    = cfg.label;
+  statLevel.textContent    = budget.label;
 
   // Preview strip — first 4 frames
   previewStrip.innerHTML = '';
@@ -853,21 +880,25 @@ async function exportPdf() {
   await loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js');
   const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
 
-  const doc  = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  const doc   = await PDFDocument.create();
+  const font  = await doc.embedFont(StandardFonts.HelveticaBold);
   const fontR = await doc.embedFont(StandardFonts.Helvetica);
 
-  // Page geometry (A4 portrait)
-  const PW = 595, PH = 842;
-  const MARGIN = 36;
-  const COLS = 3;
-  const CELL_W = (PW - MARGIN * 2 - (COLS - 1) * 8) / COLS;
-  const TS_H  = 16; // timestamp label height
-  const TS_GAP = 4;
+  // Orientation-aware page geometry:
+  //   Portrait video  → A4 portrait  (595×842), 3 cols → 3×3 = 9 frames/page
+  //   Landscape video → A4 landscape (842×595), 2 cols → 2×2 = 4 frames/page
+  const isLandscape = videoOrientation === 'landscape';
+  const PW = isLandscape ? 842 : 595;
+  const PH = isLandscape ? 595 : 842;
+  const MARGIN   = 36;
+  const COLS     = isLandscape ? 2 : 3;
   const CELL_GAP = 8;
+  const CELL_W   = (PW - MARGIN * 2 - (COLS - 1) * CELL_GAP) / COLS;
+  const TS_H     = 16; // timestamp label height
+  const TS_GAP   = 4;
   const HEADER_H = 72;
 
-  const cfg = LEVEL_CONFIG[selectedLevel];
+  const budget   = computeFrameBudget(selectedLevel, videoOrientation);
   const baseName = (selectedFile.name || 'clip').replace(/\.[^.]+$/, '');
 
   // Embed all images up front
@@ -882,33 +913,34 @@ async function exportPdf() {
     }
   }
 
-  // Determine image height from first valid frame's aspect ratio
-  const first = embedded.find(Boolean);
-  const aspect = first ? first.dims.width / first.dims.height : 16 / 9;
+  // Determine image height from the first valid frame's aspect ratio.
+  // Fallback aspect ratio is orientation-appropriate.
+  const first  = embedded.find(Boolean);
+  const aspect = first ? first.dims.width / first.dims.height : (isLandscape ? 16 / 9 : 9 / 16);
   const IMG_H  = Math.min(Math.round(CELL_W / aspect), 180);
-  const CELL_H  = IMG_H + TS_GAP + TS_H;
-  const ROW_H   = CELL_H + CELL_GAP;
+  const CELL_H = IMG_H + TS_GAP + TS_H;
+  const ROW_H  = CELL_H + CELL_GAP;
   const ROWS_PER_PAGE = Math.floor((PH - MARGIN - HEADER_H - MARGIN) / ROW_H);
 
   let page = null;
   let row = 0, col = 0;
 
-  function newPage(isFirst) {
+  function newPage() {
     page = doc.addPage([PW, PH]);
     col = 0; row = 0;
     // Header
     page.drawText('ClipDigest', { x: MARGIN, y: PH - MARGIN - 16, size: 15, font, color: rgb(0,0,0) });
     page.drawText(baseName, { x: MARGIN, y: PH - MARGIN - 34, size: 9, font: fontR, color: rgb(0.35,0.35,0.35), maxWidth: PW - MARGIN * 2 });
-    const meta = formatTime(videoDuration) + ' · ' + selectedFrames.length + ' frames · ' + cfg.label;
+    const meta = formatTime(videoDuration) + ' · ' + selectedFrames.length + ' frames · ' + budget.label;
     page.drawText(meta, { x: MARGIN, y: PH - MARGIN - 48, size: 8, font: fontR, color: rgb(0.5,0.5,0.5) });
     // Divider
     page.drawLine({ start: { x: MARGIN, y: PH - MARGIN - 58 }, end: { x: PW - MARGIN, y: PH - MARGIN - 58 }, thickness: 0.5, color: rgb(0.85,0.85,0.85) });
   }
 
-  newPage(true);
+  newPage();
 
   for (let i = 0; i < embedded.length; i++) {
-    if (col === 0 && row === ROWS_PER_PAGE) { newPage(false); }
+    if (col === 0 && row === ROWS_PER_PAGE) { newPage(); }
 
     const x = MARGIN + col * (CELL_W + CELL_GAP);
     const y = PH - MARGIN - HEADER_H - row * ROW_H - IMG_H;
@@ -988,10 +1020,11 @@ function downloadBlob(blob, filename) {
 
 /* ─── Restart ───────────────────────────────────────────────────────────────── */
 btnRestart.addEventListener('click', () => {
-  selectedFile   = null;
-  selectedFrames = [];
-  videoDuration  = 0;
-  fileInput.value = '';
+  selectedFile     = null;
+  selectedFrames   = [];
+  videoDuration    = 0;
+  videoOrientation = 'portrait';
+  fileInput.value  = '';
   uploadZone.querySelector('.upload-label').textContent = 'Drop a video or tap to choose';
   uploadZone.querySelector('.upload-icon').textContent = '📹';
   btnGenerate.disabled = true;
