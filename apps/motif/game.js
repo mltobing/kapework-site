@@ -30,12 +30,13 @@ var failedChecks = 0;
 var firstInteraction = false;
 var startTime = null;   // timestamp of loadPuzzle
 var isPracticeMode = false;
+var APP_SLUG = window.KAPEWORK_APP_SLUG || "motif";
 
 /* ── Analytics helper ────────────────────────────────────── */
 
 function track(eventName, props) {
   if (window.KapeworkAnalytics) {
-    window.KapeworkAnalytics.track(eventName, props);
+    window.KapeworkAnalytics.trackEvent(eventName, APP_SLUG, props);
   }
 }
 
@@ -158,7 +159,6 @@ resultPlayAnother.addEventListener("click", function () {
     loadPuzzle(practice);
     subtitleEl.textContent = "Practice board";
     track('practice_start');
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
   }
 });
 
@@ -182,7 +182,7 @@ resultShare.addEventListener("click", function () {
     }).catch(function () {});
   }
   track('share_result', { tier: tier });
-  if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: tier });
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: tier }, APP_SLUG);
 });
 
 resultHardMode.addEventListener("click", function () {
@@ -220,7 +220,7 @@ function loadPuzzle(p) {
   statusEl.style.color = "";
 
   track('game_start');
-  if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
+  if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart(null, APP_SLUG);
 }
 
 /* ── Build board ─────────────────────────────────────────── */
@@ -334,7 +334,7 @@ function onCellTap(e) {
   if (!firstInteraction) {
     firstInteraction = true;
     track('first_interaction');
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction();
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction(null, APP_SLUG);
   }
 
   grid[r][c] = (grid[r][c] + 1) % 5;
@@ -384,7 +384,7 @@ function onCheck() {
 
     updateCheckBtn();
     track('solve_success', { tier: tier, checks_failed: failedChecks, time_ms: elapsed });
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks });
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks }, APP_SLUG);
 
     // Streak only counts for the daily, not practice
     var streak = isPracticeMode ? 1 : recordAndGetStreak();
