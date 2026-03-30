@@ -24,27 +24,28 @@ const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
 // Supabase client (auth-aware)
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const APP_SLUG = 'make36';
 
 function analytics() { return window.KapeworkAnalytics || null; }
 function trackFirstInteraction(props) {
     const a = analytics();
     if (!a) return;
-    try { a.firstInteraction(props || null); } catch {}
+    try { a.firstInteraction(props || null, APP_SLUG); } catch {}
 }
 function trackRunStart(props) {
     const a = analytics();
     if (!a) return;
-    try { a.runStart(props || null); } catch {}
+    try { a.runStart(props || null, APP_SLUG); } catch {}
 }
 function trackRunEnd(props) {
     const a = analytics();
     if (!a) return;
-    try { a.runEnd(props || null); } catch {}
+    try { a.runEnd(props || null, APP_SLUG); } catch {}
 }
 function trackPrimaryAction(action, props) {
     const a = analytics();
     if (!a) return;
-    try { a.primaryAction(action, props || null); } catch {}
+    try { a.primaryAction(action, props || null, APP_SLUG); } catch {}
 }
 
 // ============================================================
