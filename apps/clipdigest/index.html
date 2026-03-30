@@ -490,8 +490,8 @@ const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 const FRAME_BUDGETS = {
   portrait: {
     lean:     { minFrames:  9, maxFrames: 27, label: 'Lean' },
-    balanced: { minFrames: 18, maxFrames: 45, label: 'Balanced' },
-    detailed: { minFrames: 27, maxFrames: 63, label: 'Detailed' },
+    balanced: { minFrames: 27, maxFrames: 63, label: 'Balanced' },
+    detailed: { minFrames: 45, maxFrames: 90, label: 'Detailed' },
   },
   landscape: {
     lean:     { minFrames:  4, maxFrames: 12, label: 'Lean' },
@@ -784,9 +784,10 @@ function selectRepresentativeFrames(scanData, grayData, level) {
   let minSpacing = Math.max(levelFloors[level], videoDuration / maxFrames * 0.7);
   let maxSpacing = Math.max(levelCeils[level],  videoDuration / minFrames * 1.3);
 
-  // For static / slow-moving clips, push frames further apart to avoid a PDF
-  // full of nearly-identical screenshots.
-  if (isStaticClip) { minSpacing *= 1.5; maxSpacing *= 1.5; }
+  // For static / slow-moving clips, push frames moderately further apart to
+  // avoid a PDF full of nearly-identical screenshots. 1.25× is enough to
+  // noticeably widen spacing without crushing the frame count too aggressively.
+  if (isStaticClip) { minSpacing *= 1.25; maxSpacing *= 1.25; }
 
   // ── Step 1: greedy high-change selection ─────────────────────────────────
   const forced = new Set([0, scanData.length - 1]);
