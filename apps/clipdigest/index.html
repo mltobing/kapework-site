@@ -510,6 +510,7 @@ let selectedLevel     = 'balanced';
 let selectedFrames    = [];   // [{time, dataUrl}]
 let videoDuration     = 0;
 let videoOrientation  = 'portrait'; // 'portrait' | 'landscape'
+let wasStaticClip     = false;      // set by selectRepresentativeFrames; used in analytics
 
 /* ─── DOM refs ──────────────────────────────────────────────────────────────── */
 const fileInput      = document.getElementById('file-input');
@@ -602,7 +603,7 @@ btnGenerate.addEventListener('click', async () => {
   if (!selectedFile) return;
   hideError();
   showView('view-processing');
-  KapeworkAnalytics.track('clipdigest_analysis_started', { level: selectedLevel });
+  KapeworkAnalytics.track('clipdigest_analysis_started', { level: selectedLevel, file_size: selectedFile.size });
   KapeworkAnalytics.runStart({ level: selectedLevel });
   try {
     await runPipeline(selectedFile, selectedLevel);
@@ -611,8 +612,10 @@ btnGenerate.addEventListener('click', async () => {
       level: selectedLevel,
       frame_count: selectedFrames.length,
       duration: videoDuration,
+      orientation: videoOrientation,
+      is_static: wasStaticClip,
     });
-    KapeworkAnalytics.runEnd({ outcome: 'complete', level: selectedLevel, frame_count: selectedFrames.length });
+    KapeworkAnalytics.runEnd({ outcome: 'complete', level: selectedLevel, frame_count: selectedFrames.length, orientation: videoOrientation });
   } catch (err) {
     console.error('[clipdigest] pipeline error', err);
     showView('view-upload');
@@ -770,6 +773,7 @@ function selectRepresentativeFrames(scanData, grayData, level) {
   const sortedScores = scanData.map(d => d.score).sort((a, b) => a - b);
   const medianScore  = sortedScores[Math.floor(sortedScores.length / 2)];
   const isStaticClip = medianScore < 6; // 6/255 ≈ very low activity
+  wasStaticClip = isStaticClip;         // expose to analytics
 
   // ── Duration-aware spacing ────────────────────────────────────────────────
   // Derive minSpacing / maxSpacing from the frame budget and video length so
@@ -919,14 +923,14 @@ function showResults() {
   showView('view-results');
 }
 
-/* ─── PDF export (stub — full impl in Checkpoint 3) ─────────────────────────── */
+/* ─── PDF export ─────────────────────────────────────────────────────────────── */
 btnPdf.addEventListener('click', async () => {
   btnPdf.disabled = true;
   btnPdf.textContent = 'Building PDF…';
   try {
     await exportPdf();
-    KapeworkAnalytics.track('clipdigest_pdf_downloaded', { frame_count: selectedFrames.length });
-    KapeworkAnalytics.primaryAction('download', { format: 'pdf', frame_count: selectedFrames.length });
+    KapeworkAnalytics.track('clipdigest_pdf_downloaded', { frame_count: selectedFrames.length, orientation: videoOrientation });
+    KapeworkAnalytics.primaryAction('download', { format: 'pdf', frame_count: selectedFrames.length, orientation: videoOrientation });
   } catch (err) {
     console.error('[clipdigest] PDF error', err);
     resultsError.textContent = 'PDF export failed. Please try again.';
@@ -1034,14 +1038,14 @@ function dataUrlToBytes(dataUrl) {
   return out;
 }
 
-/* ─── ZIP export (stub — full impl in Checkpoint 3) ─────────────────────────── */
+/* ─── ZIP export ─────────────────────────────────────────────────────────────── */
 btnZip.addEventListener('click', async () => {
   btnZip.disabled = true;
   btnZip.textContent = 'Building ZIP…';
   try {
     await exportZip();
-    KapeworkAnalytics.track('clipdigest_zip_downloaded', { frame_count: selectedFrames.length });
-    KapeworkAnalytics.primaryAction('download', { format: 'zip', frame_count: selectedFrames.length });
+    KapeworkAnalytics.track('clipdigest_zip_downloaded', { frame_count: selectedFrames.length, orientation: videoOrientation });
+    KapeworkAnalytics.primaryAction('download', { format: 'zip', frame_count: selectedFrames.length, orientation: videoOrientation });
   } catch (err) {
     console.error('[clipdigest] ZIP error', err);
     resultsError.textContent = 'ZIP export failed. Please try again.';
@@ -1085,6 +1089,7 @@ btnRestart.addEventListener('click', () => {
   selectedFrames   = [];
   videoDuration    = 0;
   videoOrientation = 'portrait';
+  wasStaticClip    = false;
   fileInput.value  = '';
   uploadZone.querySelector('.upload-label').textContent = 'Drop a video or tap to choose';
   uploadZone.querySelector('.upload-icon').textContent = '📹';
