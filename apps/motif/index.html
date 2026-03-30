@@ -104,17 +104,18 @@
 <script src="/shared/analytics.js"></script>
 <!-- Shared shell (⋮ menu + feedback modal) -->
 <script src="/shared/kapework-shell.js"></script>
+<script>
+  window.KAPEWORK_APP_SLUG = 'motif';
+  KapeworkAnalytics.init(window.KAPEWORK_APP_SLUG);
+</script>
 
 <script src="engine.js"></script>
 <script src="game.js"></script>
 
 <script>
-  // Init analytics
-  KapeworkAnalytics.init('motif');
-
   // Init shell — "How to play" routes to the existing help modal
   KapeworkShell.init({
-    appSlug: 'motif',
+    appSlug: window.KAPEWORK_APP_SLUG,
     mountId: 'kw-shell-mount',
     menuItems: [
       {

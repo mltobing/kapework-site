@@ -16,6 +16,7 @@
  */
 
 var PG36Game = (function () {
+  var APP_SLUG = window.KAPEWORK_APP_SLUG || 'motif6x6';
 
   var N = 6;
   var MAX_CHECKS = 1;   // 6×6 expert mode: 1 check only
@@ -67,7 +68,7 @@ var PG36Game = (function () {
     if (!firstInteraction) {
       firstInteraction = true;
       _track('first_interaction');
-      if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction();
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction(null, APP_SLUG);
     }
 
     grid[r][c] = (grid[r][c] + 1) % N;
@@ -113,7 +114,7 @@ var PG36Game = (function () {
         time_ms:      elapsed,
         clue_count:   puzzle.clues ? puzzle.clues.length : 0
       });
-      if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks });
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.runEnd({ outcome: 'win', tier: tier, checks_failed: failedChecks }, APP_SLUG);
 
       if (!isPractice) PG36Storage.clearProgress();
 
@@ -164,7 +165,7 @@ var PG36Game = (function () {
   }
 
   function _track(name, props) {
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.track(name, props);
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.trackEvent(name, APP_SLUG, props);
   }
 
   /* ── Progress persistence ──────────────────────────────── */

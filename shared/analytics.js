@@ -82,6 +82,13 @@
     if (!eventName) return;
 
     var slug = appSlug || window._kw_app_slug || 'unknown';
+    if (slug === 'unknown') {
+      try {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[KapeworkAnalytics] Missing appSlug for event:', eventName);
+        }
+      } catch (e) {}
+    }
 
     var payload = {
       event_name: eventName,
@@ -130,24 +137,24 @@
   // Fires once per session on the first meaningful user action.
   // Guard prevents duplicate firing even if called from multiple code paths.
   // props: any summary context the app wants to include
-  function firstInteraction(props) {
+  function firstInteraction(props, appSlug) {
     if (_firstInteractionFired) return;
     _firstInteractionFired = true;
-    trackEvent('first_interaction', null, props || null);
+    trackEvent('first_interaction', appSlug || null, props || null);
   }
 
   // ── Standard event: run_start ──────────────────────────────────────────────
   // Marks the start of a run. Resets the run timer so runEnd() gets duration.
   // props: identifying context (puzzle_num, board_id, level, etc.)
-  function runStart(props) {
+  function runStart(props, appSlug) {
     _runStartTime = Date.now();
-    trackEvent('run_start', null, props || null);
+    trackEvent('run_start', appSlug || null, props || null);
   }
 
   // ── Standard event: run_end ────────────────────────────────────────────────
   // Fires when the run ends. Automatically adds duration_ms if runStart was called.
   // props: outcome + summary metrics the app already tracks
-  function runEnd(props) {
+  function runEnd(props, appSlug) {
     var extra = {};
     if (props) {
       for (var k in props) {
@@ -159,21 +166,21 @@
       _runStartTime = null;
     }
     var merged = Object.keys(extra).length > 0 ? extra : null;
-    trackEvent('run_end', null, merged);
+    trackEvent('run_end', appSlug || null, merged);
   }
 
   // ── Standard event: primary_action ────────────────────────────────────────
   // Fires on a high-intent post-run action (share, download, play_again, etc.).
   // action: string — e.g. 'share', 'download', 'play_again', 'new_puzzle'
   // props: any extra context
-  function primaryAction(action, props) {
+  function primaryAction(action, props, appSlug) {
     var extra = { action: action };
     if (props) {
       for (var k in props) {
         if (Object.prototype.hasOwnProperty.call(props, k)) extra[k] = props[k];
       }
     }
-    trackEvent('primary_action', null, extra);
+    trackEvent('primary_action', appSlug || null, extra);
   }
 
   // ── init ───────────────────────────────────────────────────────────────────

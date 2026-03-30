@@ -117,6 +117,10 @@
 <script src="/shared/analytics.js"></script>
 <!-- Shared shell (⋮ menu + feedback modal) -->
 <script src="/shared/kapework-shell.js"></script>
+<script>
+  window.KAPEWORK_APP_SLUG = 'motif6x6';
+  KapeworkAnalytics.init(window.KAPEWORK_APP_SLUG);
+</script>
 
 <!-- Motif Expert 6×6 modules -->
 <script src="seed-bank.js"></script>
@@ -131,12 +135,9 @@
 <script src="main.js"></script>
 
 <script>
-  // Init analytics
-  KapeworkAnalytics.init('motif6x6');
-
   // Init shell — help item routes to help modal
   KapeworkShell.init({
-    appSlug: 'motif6x6',
+    appSlug: window.KAPEWORK_APP_SLUG,
     mountId: 'kw-shell-mount',
     menuItems: [
       {

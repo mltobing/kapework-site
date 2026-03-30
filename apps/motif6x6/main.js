@@ -3,6 +3,7 @@
 "use strict";
 
 (function () {
+  var APP_SLUG = window.KAPEWORK_APP_SLUG || 'motif6x6';
 
   /* ── DOM refs ─────────────────────────────────────────── */
   var boardEl     = document.getElementById('board6');
@@ -17,7 +18,7 @@
 
   /* ── Analytics shortcut ─────────────────────────────────── */
   function track(name, props) {
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.track(name, props);
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.trackEvent(name, APP_SLUG, props);
   }
 
   /* ── Load a puzzle into the board ─────────────────────── */
@@ -29,7 +30,7 @@
     statusEl.textContent = '';
     statusEl.style.color = '';
     track('game_start');
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
+    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart(null, APP_SLUG);
   }
 
   /* ── Cell tap ───────────────────────────────────────────── */
@@ -78,7 +79,6 @@
             loadPuzzle(p, true);
             subtitleEl.textContent = 'Practice board';
             track('practice_start');
-            if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
           },
           onShare: function (btn) {
             var text = PG36Share.buildText({
@@ -90,7 +90,7 @@
             });
             PG36Share.share(text, btn);
             track('share_result', { tier: result.tier });
-            if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: result.tier });
+            if (window.KapeworkAnalytics) window.KapeworkAnalytics.primaryAction('share', { tier: result.tier }, APP_SLUG);
           }
         });
       }, 1400);
@@ -155,8 +155,10 @@
     subtitleEl.textContent = 'Expert symbol logic \u00b7 ' +
       new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    track('game_start');
-    if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart();
+    if (restored) {
+      track('game_start');
+      if (window.KapeworkAnalytics) window.KapeworkAnalytics.runStart(null, APP_SLUG);
+    }
   }
 
   init();
