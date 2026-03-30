@@ -6,7 +6,7 @@ Built for solo app and game builders: upload a screen recording, get back a comp
 
 ## What it does
 
-1. **Upload** — mp4, mov, or webm up to 10 minutes / 500 MB
+1. **Upload** — mp4, mov, or webm up to 12 minutes / 500 MB
 2. **Scan** — adaptive scan at 0.5–2 fps, downsampled to 64×64 grayscale, computing a visual-difference score between adjacent frames
 3. **Select** — picks representative frames using duration-aware budgets, static-clip detection, and near-duplicate suppression
 4. **Export** — generates a PDF storyboard (pdf-lib) with orientation-aware layout, and optionally a ZIP of JPEG frames (JSZip)

@@ -367,7 +367,7 @@ button { font: inherit; cursor: pointer; }
       <div class="app-logo">🎞️</div>
       <h1 class="app-title">ClipDigest</h1>
       <p class="app-sub">Turn a video clip into a clean storyboard PDF</p>
-      <p class="app-hint">Great for app demos, playtests, and screen recordings up to 10 minutes</p>
+      <p class="app-hint">Great for app demos, playtests, and screen recordings up to 12 minutes</p>
     </div>
 
     <div class="upload-zone" id="upload-zone" role="button" aria-label="Upload video file">
@@ -375,7 +375,7 @@ button { font: inherit; cursor: pointer; }
       <div class="upload-icon">📹</div>
       <div class="upload-label">Drop a video or tap to choose</div>
       <div class="upload-hint">mp4 · mov · webm</div>
-      <div class="upload-types">Up to 10 min · 500 MB</div>
+      <div class="upload-types">Up to 12 min · 500 MB</div>
     </div>
 
     <div class="settings-card">
@@ -481,7 +481,7 @@ function loadScript(src) {
 }
 
 /* ─── Constants ─────────────────────────────────────────────────────────────── */
-const MAX_DURATION_S = 600;   // 10 minutes
+const MAX_DURATION_S = 720;   // 12 minutes
 const MAX_FILE_BYTES = 500 * 1024 * 1024; // 500 MB
 
 // Frame budgets are orientation-aware.
@@ -628,7 +628,7 @@ function friendlyError(err) {
   if (msg.includes('decode') || msg.includes('load'))
     return 'Could not read the video. The file may be corrupted or use an unsupported codec.';
   if (msg.includes('duration') || msg.includes('too long'))
-    return 'Video is too long. Maximum supported duration is 10 minutes.';
+    return 'Video is too long. Maximum supported duration is 12 minutes.';
   if (msg.includes('memory') || msg.includes('quota'))
     return 'Your device ran out of memory while processing. Try a shorter clip or a lower detail level.';
   return 'Something went wrong during processing. Please try a different file.';
@@ -684,7 +684,7 @@ async function scanVideoFrames() {
   // Adaptive scan FPS keeps total scan frames bounded for long videos.
   // ≤2 min → 2 fps (unchanged for short clips)
   // 2–5 min → 1 fps
-  // >5 min  → 0.5 fps  (≈300 scan points for a 10-min clip)
+  // >5 min  → 0.5 fps  (≈360 scan points for a 12-min clip)
   const SCAN_FPS  = videoDuration <= 120 ? 2 : videoDuration <= 300 ? 1 : 0.5;
   const SCAN_W    = 64;
   const SCAN_H    = 64;
