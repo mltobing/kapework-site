@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <title>NameForge · Kapework</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <style>
+/* ── Reset & tokens ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:        #0a1628;
+  --surface:   #121e33;
+  --surface2:  #1a2a44;
+  --cyan:      #00e5cc;
+  --cyan-dim:  rgba(0,229,204,0.12);
+  --cyan-glow: rgba(0,229,204,0.20);
+  --text:      #e8edf5;
+  --muted:     rgba(232,237,245,0.50);
+  --muted-dim: rgba(232,237,245,0.28);
+  --border:    rgba(232,237,245,0.08);
+  --border-h:  rgba(232,237,245,0.15);
+  --danger:    #f87171;
+  --success:   #4ade80;
+  --amber:     #fbbf24;
+}
+
+html, body { min-height: 100dvh; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex; flex-direction: column; align-items: center;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; }
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
+.page {
+  width: 100%; max-width: 560px;
+  padding: 12px 16px env(safe-area-inset-bottom, 24px);
+  display: flex; flex-direction: column; gap: 20px; flex: 1;
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+.top-bar {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+}
+.back-link {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.82rem; color: var(--muted); transition: color 0.15s;
+}
+.back-link:hover { color: var(--text); }
+
+/* ── App header ─────────────────────────────────────────────────────────── */
+.app-header { text-align: center; padding-top: 4px; }
+.app-logo   { font-size: 2.5rem; line-height: 1; }
+.app-title  { font-size: 1.7rem; font-weight: 900; letter-spacing: -0.5px; margin-top: 6px; }
+.app-sub    { font-size: 0.88rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.app-hint   { font-size: 0.76rem; color: var(--muted-dim); margin-top: 3px; }
+
+/* ── Card ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px 18px; display: flex; flex-direction: column; gap: 14px;
+}
+.card-label {
+  font-size: 0.70rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+.nf-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); padding: 11px 13px;
+  font-size: 0.92rem; line-height: 1.4; transition: border-color 0.15s;
+}
+.nf-input::placeholder { color: var(--muted); }
+.nf-input:focus        { outline: none; border-color: var(--cyan); }
+.nf-input.input-error  { border-color: var(--danger); animation: shake 0.3s; }
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+/* ── Chip groups ────────────────────────────────────────────────────────── */
+.chip-group { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.chip {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--muted);
+  font-size: 0.80rem; font-weight: 700; padding: 6px 13px;
+  transition: background 0.13s, color 0.13s, border-color 0.13s;
+  min-height: 34px; display: flex; align-items: center;
+}
+.chip:hover { color: var(--text); border-color: var(--border-h); }
+.chip.active {
+  background: var(--cyan-dim); border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* ── Media panel toggle ─────────────────────────────────────────────────── */
+.media-toggle-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--muted);
+  font-size: 0.85rem; font-weight: 700; padding: 9px 14px;
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  transition: border-color 0.15s, color 0.15s;
+}
+.media-toggle-btn:hover { color: var(--text); border-color: var(--border-h); }
+.media-toggle-arrow { transition: transform 0.2s; font-size: 0.7rem; }
+.media-toggle-btn[aria-expanded="true"] .media-toggle-arrow { transform: rotate(90deg); }
+
+.media-panel { display: none; flex-direction: column; gap: 14px; }
+.media-panel.open { display: flex; }
+
+/* ── Drop zone ──────────────────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed var(--border-h); border-radius: 14px;
+  background: var(--surface2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 22px 18px; text-align: center;
+  cursor: pointer; transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+  position: relative; min-height: 100px;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--cyan); background: var(--surface);
+  box-shadow: 0 0 18px var(--cyan-dim);
+}
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-icon  { font-size: 1.6rem; line-height: 1; pointer-events: none; }
+.drop-label { font-size: 0.85rem; font-weight: 700; pointer-events: none; }
+.drop-hint  { font-size: 0.72rem; color: var(--muted); pointer-events: none; }
+
+/* ── Media previews ─────────────────────────────────────────────────────── */
+.media-previews { display: flex; flex-direction: column; gap: 10px; }
+
+.media-thumb-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px; position: relative;
+}
+.media-thumb {
+  width: 100%; max-height: 160px; object-fit: cover;
+  border-radius: 8px; display: block;
+}
+.media-thumb--pdf { max-height: 120px; object-fit: contain; background: #fff; }
+
+.media-caption {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); padding: 8px 10px;
+  font-size: 0.82rem; transition: border-color 0.15s;
+}
+.media-caption::placeholder { color: var(--muted); }
+.media-caption:focus { outline: none; border-color: var(--cyan); }
+
+.media-pdf-info { display: flex; gap: 8px; align-items: baseline; }
+.media-pdf-name { font-size: 0.82rem; font-weight: 700; }
+.media-pdf-pages { font-size: 0.75rem; color: var(--muted); }
+
+.media-remove {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--muted);
+  width: 26px; height: 26px; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s;
+}
+.media-remove:hover { color: var(--danger); }
+
+/* Video progress */
+#nf-vid-progress { display: none; }
+.vid-prog-bar-wrap {
+  width: 100%; height: 4px; background: var(--surface2);
+  border-radius: 999px; overflow: hidden; margin-top: 4px;
+}
+.vid-prog-bar { height: 100%; background: var(--cyan); border-radius: 999px; width: 0%; transition: width 0.3s; }
+
+.nf-media-error {
+  display: none; color: var(--danger); font-size: 0.80rem;
+  background: rgba(248,113,113,0.07); border: 1px solid rgba(248,113,113,0.2);
+  border-radius: 8px; padding: 8px 12px;
+}
+
+/* ── Generate button ────────────────────────────────────────────────────── */
+.btn-primary {
+  background: var(--cyan); color: #0a1628; font-weight: 800;
+  font-size: 1rem; border: none; border-radius: 14px;
+  padding: 15px 24px; width: 100%;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-primary:hover:not(:disabled) { opacity: 0.9; }
+.btn-primary:active:not(:disabled) { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.35; cursor: default; }
+
+/* ── Progress ───────────────────────────────────────────────────────────── */
+#nf-progress {
+  display: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px 20px;
+  flex-direction: column; align-items: center; gap: 12px; text-align: center;
+}
+.prog-title { font-size: 0.95rem; font-weight: 800; }
+.prog-phase { font-size: 0.82rem; color: var(--muted); }
+.prog-bar-wrap { width: 100%; height: 5px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+.prog-bar { height: 100%; background: var(--cyan); border-radius: 999px; width: 0%; transition: width 0.35s ease; }
+
+/* ── Results area ───────────────────────────────────────────────────────── */
+#nf-results { display: none; }
+
+/* ── Reaction bar ───────────────────────────────────────────────────────── */
+.react-bar {
+  display: flex; flex-wrap: wrap; gap: 7px; padding: 14px 0 4px;
+}
+.react-bar.flash { animation: flash-anim 0.4s; }
+@keyframes flash-anim {
+  0%,100% { opacity: 1; } 40% { opacity: 0.3; }
+}
+
+.nf-react-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--muted);
+  font-size: 0.78rem; font-weight: 700; padding: 6px 12px;
+  min-height: 32px; transition: background 0.13s, color 0.13s, border-color 0.13s;
+}
+.nf-react-btn:hover  { color: var(--text); border-color: var(--border-h); }
+.nf-react-btn.active { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+
+.react-label { font-size: 0.70rem; color: var(--muted-dim); align-self: center; white-space: nowrap; }
+
+/* ── Cluster sections ───────────────────────────────────────────────────── */
+.nf-cluster { margin-bottom: 24px; }
+.nf-cluster-label {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted); margin-bottom: 10px;
+}
+
+.nf-name-grid { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Name card ──────────────────────────────────────────────────────────── */
+.nf-name-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 7px;
+  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+.nf-name-card:hover { border-color: var(--border-h); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.nf-name-card:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.nf-card-top {
+  display: flex; align-items: center; gap: 8px;
+}
+.nf-name-text { font-size: 1.15rem; font-weight: 900; flex: 1; }
+
+.nf-ai-pill {
+  font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em;
+  background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.3);
+  color: var(--amber); border-radius: 999px; padding: 2px 7px;
+}
+
+.nf-like-btn {
+  background: none; border: none; color: var(--muted); font-size: 1.1rem;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0;
+}
+.nf-like-btn:hover { color: var(--danger); background: rgba(248,113,113,0.08); }
+.nf-like-btn.liked { color: var(--danger); }
+
+.nf-card-tagline { font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+
+.nf-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+.nf-tags { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+.nf-tag {
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+  background: var(--surface2); border-radius: 999px; padding: 3px 9px;
+  color: var(--muted-dim);
+}
+
+.nf-copy-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--muted);
+  font-size: 0.75rem; font-weight: 700; padding: 5px 10px;
+  transition: color 0.13s, border-color 0.13s; white-space: nowrap; flex-shrink: 0;
+}
+.nf-copy-btn:hover { color: var(--text); border-color: var(--border-h); }
+
+/* ── Result actions row ─────────────────────────────────────────────────── */
+.result-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px;
+}
+
+.btn-secondary {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; color: var(--text); font-weight: 700;
+  font-size: 0.88rem; padding: 13px 16px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-secondary:hover   { border-color: var(--border-h); background: var(--surface); }
+.btn-secondary:disabled { opacity: 0.35; cursor: default; }
+
+.btn-ai-enhance {
+  width: 100%; background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 12px; color: var(--amber); font-weight: 700;
+  font-size: 0.88rem; padding: 13px 16px; display: none;
+  transition: background 0.15s;
+}
+.btn-ai-enhance:hover:not(:disabled) { background: rgba(251,191,36,0.14); }
+.btn-ai-enhance:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Ollama status pill ─────────────────────────────────────────────────── */
+.nf-ollama-pill {
+  display: none; align-items: center; gap: 5px;
+  font-size: 0.72rem; font-weight: 700;
+  border-radius: 999px; padding: 4px 11px; border: 1px solid;
+}
+.nf-ollama-pill--on {
+  color: var(--success); border-color: rgba(74,222,128,0.3);
+  background: rgba(74,222,128,0.07);
+}
+.nf-ollama-pill::before { content: '●'; font-size: 0.5rem; }
+
+.nf-ollama-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.nf-ollama-toggle-wrap {
+  display: none; align-items: center; gap: 8px;
+  font-size: 0.80rem; color: var(--muted);
+}
+/* Toggle switch */
+.toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.toggle-track::before {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  background: var(--muted); border-radius: 50%;
+  top: 2px; left: 2px; transition: transform 0.2s, background 0.2s;
+}
+.toggle-switch input:checked + .toggle-track { background: var(--cyan-dim); border-color: var(--cyan); }
+.toggle-switch input:checked + .toggle-track::before { transform: translateX(16px); background: var(--cyan); }
+
+.nf-ollama-setup {
+  font-size: 0.76rem; color: var(--muted-dim);
+  background: var(--surface2); border-radius: 10px; padding: 10px 13px;
+  line-height: 1.5; display: none;
+}
+
+/* ── Detail panel (slide-up) ────────────────────────────────────────────── */
+.detail-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(10,22,40,0.72); backdrop-filter: blur(3px);
+  z-index: 300; align-items: flex-end; justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+}
+.detail-backdrop.open { display: flex; }
+
+.detail-sheet {
+  background: var(--surface); border: 1px solid var(--border-h);
+  border-radius: 24px 24px 0 0; width: 100%; max-width: 560px;
+  padding: 22px 20px 32px; display: flex; flex-direction: column; gap: 14px;
+  max-height: 80vh; overflow-y: auto;
+}
+
+.detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.detail-name   { font-size: 1.5rem; font-weight: 900; }
+.detail-close  {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--muted); width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+  transition: color 0.15s; flex-shrink: 0;
+}
+.detail-close:hover { color: var(--text); }
+
+.detail-tagline   { font-size: 0.92rem; color: var(--muted); line-height: 1.5; }
+.detail-rationale { font-size: 0.85rem; color: var(--muted-dim); line-height: 1.5; font-style: italic; }
+
+.detail-section-label {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--muted-dim); margin-top: 4px;
+}
+
+.nf-tagline-list {
+  list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
+}
+.nf-tagline-variant {
+  background: var(--surface2); border-radius: 9px; padding: 10px 13px;
+  font-size: 0.85rem; color: var(--text); line-height: 1.4;
+}
+.nf-tagline-variant.nf-err { color: var(--danger); }
+
+.btn-detail-polish {
+  display: none; background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 10px; color: var(--amber); font-weight: 700;
+  font-size: 0.85rem; padding: 11px 16px; width: 100%;
+  transition: background 0.15s;
+}
+.btn-detail-polish:hover:not(:disabled) { background: rgba(251,191,36,0.14); }
+.btn-detail-polish:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.app-footer {
+  margin-top: auto; color: var(--muted-dim); font-size: 0.72rem;
+  text-align: center; padding-bottom: 8px;
+}
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <a class="back-link" href="https://tools.kapework.com/">
+      <span>←</span><span>Tools</span>
+    </a>
+    <div id="kw-shell-mount"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="app-header">
+    <div class="app-logo">⚒️</div>
+    <h1 class="app-title">NameForge</h1>
+    <p class="app-sub">Describe what you're building — or show it — and get names that fit</p>
+    <p class="app-hint">Works with text, screenshots, sketches, PDFs, and short clips</p>
+  </div>
+
+  <!-- Brief inputs -->
+  <div class="card">
+    <span class="card-label">What are you naming?</span>
+    <input
+      id="nf-product"
+      class="nf-input"
+      type="text"
+      placeholder="a mobile puzzle game, a screen recording tool for builders…"
+      autocomplete="off"
+      spellcheck="false"
+    />
+
+    <span class="card-label">Who is it for?</span>
+    <input
+      id="nf-audience"
+      class="nf-input"
+      type="text"
+      placeholder="indie builders, casual puzzle fans, parents and young readers…"
+      autocomplete="off"
+    />
+
+    <span class="card-label">Vibe <span style="font-weight:400;text-transform:none;letter-spacing:0">(pick any)</span></span>
+    <div class="chip-group">
+      <button class="chip nf-vibe-chip" data-vibe="clear">Clear</button>
+      <button class="chip nf-vibe-chip" data-vibe="clever">Clever</button>
+      <button class="chip nf-vibe-chip" data-vibe="minimal">Minimal</button>
+      <button class="chip nf-vibe-chip" data-vibe="playful">Playful</button>
+      <button class="chip nf-vibe-chip" data-vibe="premium">Premium</button>
+      <button class="chip nf-vibe-chip" data-vibe="warm">Warm</button>
+      <button class="chip nf-vibe-chip" data-vibe="surprising">Surprising</button>
+      <button class="chip nf-vibe-chip" data-vibe="serious">Serious</button>
+      <button class="chip nf-vibe-chip" data-vibe="educational">Educational</button>
+      <button class="chip nf-vibe-chip" data-vibe="cozy">Cozy</button>
+    </div>
+
+    <span class="card-label">Naming lane</span>
+    <div class="chip-group">
+      <button class="chip nf-lane-chip active" data-lane="clear">Clear</button>
+      <button class="chip nf-lane-chip" data-lane="clever">Clever</button>
+      <button class="chip nf-lane-chip" data-lane="brandable">Brandable</button>
+      <button class="chip nf-lane-chip" data-lane="playful">Playful</button>
+      <button class="chip nf-lane-chip" data-lane="premium">Premium</button>
+    </div>
+
+    <span class="card-label">Avoid words or vibes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></span>
+    <input
+      id="nf-avoid"
+      class="nf-input"
+      type="text"
+      placeholder="AI, childish, corporate, anything too long…"
+      autocomplete="off"
+    />
+  </div>
+
+  <!-- Media panel -->
+  <div class="card">
+    <button id="nf-media-toggle" class="media-toggle-btn" aria-expanded="false">
+      <span>📎</span>
+      <span style="flex:1;text-align:left">Add media — screenshots, PDFs, short clips</span>
+      <span class="media-toggle-arrow">▶</span>
+    </button>
+
+    <div id="nf-media-panel" class="media-panel">
+
+      <!-- Images -->
+      <span class="card-label">Images — screenshots, sketches, mockups (up to 3, 10 MB each)</span>
+      <div id="nf-img-zone" class="drop-zone">
+        <input id="nf-img-upload" type="file" accept="image/*" multiple>
+        <span class="drop-icon">🖼️</span>
+        <span class="drop-label">Drop images here or tap to browse</span>
+        <span class="drop-hint">jpg, png, gif, webp — up to 3 files</span>
+      </div>
+      <div id="nf-img-previews" class="media-previews"></div>
+
+      <!-- PDF -->
+      <span class="card-label">PDF — concept notes, one-pagers, ClipDigest exports (50 MB max)</span>
+      <div id="nf-pdf-zone" class="drop-zone">
+        <input id="nf-pdf-upload" type="file" accept="application/pdf">
+        <span class="drop-icon">📄</span>
+        <span class="drop-label">Drop a PDF here or tap to browse</span>
+        <span class="drop-hint">Up to 20 pages analyzed</span>
+      </div>
+      <div id="nf-pdf-previews" class="media-previews"></div>
+
+      <!-- Video -->
+      <span class="card-label">Short video — demo, screen recording, gameplay clip (500 MB max)</span>
+      <div id="nf-vid-zone" class="drop-zone">
+        <input id="nf-vid-upload" type="file" accept="video/*">
+        <span class="drop-icon">🎞️</span>
+        <span class="drop-label">Drop a video here or tap to browse</span>
+        <span class="drop-hint">mp4, mov, webm — under 5 min recommended</span>
+      </div>
+      <div id="nf-vid-progress">
+        <div class="vid-prog-bar-wrap"><div id="nf-vid-progress-bar" class="vid-prog-bar"></div></div>
+      </div>
+      <div id="nf-vid-previews" class="media-previews"></div>
+
+      <!-- Errors -->
+      <div id="nf-media-error" class="nf-media-error"></div>
+
+      <!-- Ollama status (lives in media panel so it's contextual) -->
+      <div class="nf-ollama-row">
+        <span id="nf-ollama-status" class="nf-ollama-pill"></span>
+        <label id="nf-ollama-toggle" class="nf-ollama-toggle-wrap">
+          <span>Local AI analysis</span>
+          <span class="toggle-switch">
+            <input type="checkbox" aria-label="Enable local AI analysis">
+            <span class="toggle-track"></span>
+          </span>
+        </label>
+      </div>
+      <div id="nf-ollama-setup" class="nf-ollama-setup">
+        Optional: run <strong>Ollama</strong> locally to let NameForge read your media and suggest sharper names.
+        Install from <strong>ollama.com</strong>, then start it with <code>OLLAMA_ORIGINS="*" ollama serve</code>.
+      </div>
+
+    </div><!-- /media-panel -->
+  </div><!-- /card -->
+
+  <!-- Generate -->
+  <button id="nf-generate" class="btn-primary">Generate Names</button>
+
+  <!-- Progress -->
+  <div id="nf-progress">
+    <div class="prog-title">Forging names…</div>
+    <div id="nf-progress-phase" class="prog-phase">Setting up…</div>
+    <div class="prog-bar-wrap">
+      <div id="nf-progress-bar" class="prog-bar"></div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="nf-results">
+
+    <!-- Reaction bar -->
+    <div id="nf-react-bar" class="react-bar">
+      <span class="react-label">React:</span>
+      <button class="nf-react-btn" data-reaction="more_like_this">More like this</button>
+      <button class="nf-react-btn" data-reaction="less_like_this">Less like this</button>
+      <button class="nf-react-btn" data-reaction="too_generic">Too generic</button>
+      <button class="nf-react-btn" data-reaction="too_cute">Too cute</button>
+      <button class="nf-react-btn" data-reaction="too_abstract">Too abstract</button>
+    </div>
+
+    <!-- Clusters rendered by ui.js -->
+    <div id="nf-clusters"></div>
+
+    <!-- Action row -->
+    <div class="result-actions">
+      <button id="nf-refine" class="btn-secondary">Refine</button>
+      <button id="nf-start-over" class="btn-secondary">Start over</button>
+    </div>
+    <button id="nf-ollama-enhance" class="btn-ai-enhance">Polish with local AI</button>
+
+  </div><!-- /results -->
+
+  <div class="app-footer">Kapework · NameForge · local-first, zero cost</div>
+</div><!-- /page -->
+
+<!-- Detail panel (slide-up sheet) -->
+<div id="nf-detail-panel" class="detail-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="detail-sheet">
+    <div class="detail-header">
+      <div id="nf-detail-name" class="detail-name"></div>
+      <button id="nf-detail-close" class="detail-close" aria-label="Close">✕</button>
+    </div>
+    <p id="nf-detail-tagline" class="detail-tagline"></p>
+    <p id="nf-detail-rationale" class="detail-rationale"></p>
+    <div class="detail-section-label">Tagline variants</div>
+    <ul id="nf-detail-taglines" class="nf-tagline-list"></ul>
+    <button id="nf-detail-polish" class="btn-detail-polish">Get tagline variants</button>
+  </div>
+</div>
+
+<!-- pdf.js (lazy — only needed if user uploads a PDF) -->
+<script>
+(function() {
+  var pdfLoaded = false;
+  function ensurePdfJs(cb) {
+    if (window.pdfjsLib) { cb(); return; }
+    if (pdfLoaded) { setTimeout(function(){ ensurePdfJs(cb); }, 80); return; }
+    pdfLoaded = true;
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function() {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      cb();
+    };
+    document.head.appendChild(s);
+  }
+  window._ensurePdfJs = ensurePdfJs;
+}());
+
+// Patch NameForgeMedia.handlePDF to lazy-load pdf.js before running
+document.addEventListener('DOMContentLoaded', function() {
+  var orig = null;
+  Object.defineProperty(window, 'NameForgeMedia', {
+    configurable: true,
+    set: function(val) {
+      orig = val;
+      var origHandlePDF = val.handlePDF;
+      val.handlePDF = function(file, maxPages) {
+        return new Promise(function(resolve, reject) {
+          window._ensurePdfJs(function() {
+            origHandlePDF(file, maxPages).then(resolve, reject);
+          });
+        });
+      };
+    },
+    get: function() { return orig; }
+  });
+});
+</script>
+
+<script src="engine.js"></script>
+<script src="media.js"></script>
+<script src="ollama.js"></script>
+<script src="ui.js"></script>
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/subdomain-nav.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+
+</body>
+</html>
