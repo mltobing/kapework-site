@@ -285,9 +285,55 @@ function roundGetValue(round)  {
 // ============================================================
 // 7. BOARD RENDERER
 // ============================================================
+
+// Convert a non-integer to a mixed-number fraction {whole, num, den, negative}.
+// Returns null when no clean fraction is found within the search range.
+const FLOAT_EPSILON = 0.0001;
+
+function toFraction(n) {
+    if (Number.isInteger(n)) return { whole: n, num: 0, den: 1 };
+    const sign = n < 0 ? -1 : 1;
+    const absN  = Math.abs(n);
+    const whole = Math.floor(absN);
+    const frac  = absN - whole;
+    for (let den = 2; den <= 1000; den++) {
+        const num = Math.round(frac * den);
+        if (Math.abs(num / den - frac) < FLOAT_EPSILON) {
+            const g = gcd(num, den);
+            const sNum = num / g, sDen = den / g;
+            if (sNum === 0) return { whole: sign * whole, num: 0, den: 1 };
+            return { whole: sign * whole, num: sNum, den: sDen, negative: sign < 0 };
+        }
+    }
+    return null;
+}
+
+// Returns a DOM node (text or span) representing n.
+// Fractions are rendered with stacked numerator/denominator so they
+// look like  1¼  rather than  1.25.
 function makeNumberNode(n) {
-    // For integers (the only case Hot Hand produces), a text node is enough.
-    return document.createTextNode(Number.isInteger(n) ? String(n) : n.toFixed(2));
+    if (Number.isInteger(n)) return document.createTextNode(String(n));
+    const rounded = Math.round(n * 100) / 100;
+    if (Number.isInteger(rounded)) return document.createTextNode(String(rounded));
+
+    const f = toFraction(n);
+    if (f && f.num > 0) {
+        const span = document.createElement('span');
+        span.className = 'fraction-display';
+        const sign = f.negative ? '\u2212' : '';
+        if (f.whole !== 0 || sign) {
+            const ws = document.createElement('span');
+            ws.className   = 'fraction-whole';
+            ws.textContent = `${sign}${Math.abs(f.whole)}`;
+            span.appendChild(ws);
+        }
+        const fp = document.createElement('span');
+        fp.className = 'fraction-part';
+        fp.innerHTML = `<span class="frac-num">${f.num}</span><span class="frac-den">${f.den}</span>`;
+        span.appendChild(fp);
+        return span;
+    }
+    return document.createTextNode(rounded.toFixed(2).replace(/\.?0+$/, ''));
 }
 
 function renderBoard(containerEl, round) {
