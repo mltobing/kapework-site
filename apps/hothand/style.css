@@ -1,0 +1,998 @@
+/* =============================================================
+   HOT HAND — standalone daily game
+   All game-specific selectors prefixed .hh-
+   Cards (.card, .selected, .first, .second) and operator buttons
+   (.op-btn, .operators-grid) are defined here for self-contained use.
+   ============================================================= */
+
+/* ---------------------------------------------------------------
+   RESET + BASE
+   --------------------------------------------------------------- */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+:root {
+    --cyan: #22d3ee;
+    --cyan-dark: #0891b2;
+    --cyan-glow: rgba(34, 211, 238, 0.3);
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --success: #10b981;
+    --error: #ef4444;
+    --warning: #f59e0b;
+    --gold: #fbbf24;
+    color-scheme: dark;
+}
+
+html {
+    height: 100%;
+    position: fixed;
+    width: 100%;
+}
+
+body {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* ---------------------------------------------------------------
+   LOBBY
+   --------------------------------------------------------------- */
+.hh-lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100dvh;
+    padding: 24px 20px;
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+}
+
+.hh-lobby-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+}
+
+.hh-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.hh-logo-icon {
+    font-size: 3.5rem;
+    line-height: 1;
+    animation: hh-logo-flicker 4s ease-in-out infinite;
+}
+
+@keyframes hh-logo-flicker {
+    0%, 90%, 100% { opacity: 1; }
+    95%  { opacity: 0.7; }
+}
+
+.hh-logo-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+}
+
+.hh-tagline {
+    font-size: 1rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    max-width: 280px;
+}
+
+/* Today's hand digit preview in lobby */
+.hh-hand-display {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 4px 0;
+}
+
+.hh-hand-digit {
+    width: 56px;
+    height: 56px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.hh-lobby-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 4px;
+}
+
+.hh-lobby-meta {
+    font-size: 0.8125rem;
+    color: var(--text-dim);
+    min-height: 1.2em;
+}
+
+.hh-lobby-meta .hh-meta-score {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.hh-lobby-meta .hh-meta-perfect {
+    color: var(--gold);
+    font-weight: 600;
+}
+
+/* ---------------------------------------------------------------
+   BUTTONS (shared)
+   --------------------------------------------------------------- */
+.hh-btn {
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    padding: 12px 20px;
+    cursor: pointer;
+    border: none;
+    transition: background 0.15s, transform 0.1s, opacity 0.15s;
+    touch-action: manipulation;
+    width: 100%;
+    line-height: 1;
+}
+
+.hh-btn:active { transform: scale(0.97); }
+
+.hh-btn-primary {
+    background: var(--cyan);
+    color: #0f172a;
+}
+
+.hh-btn-primary:hover { background: var(--cyan-dark); }
+
+.hh-btn-ghost {
+    background: none;
+    color: var(--text-muted);
+    border: 1.5px solid var(--border);
+}
+
+.hh-btn-ghost:hover { color: var(--text); border-color: #64748b; }
+
+.hh-btn-share {
+    background: var(--bg);
+    color: var(--cyan);
+    border: 1.5px solid var(--cyan);
+}
+
+.hh-btn-share:hover { background: rgba(34, 211, 238, 0.08); }
+
+/* ---------------------------------------------------------------
+   GAME SCREEN  (full viewport, flex column)
+   --------------------------------------------------------------- */
+.hh-game-screen {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+    height: 100dvh;
+    background: #0f172a;
+    overflow: hidden;
+    position: relative;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---------------------------------------------------------------
+   TOP BAR
+   --------------------------------------------------------------- */
+.hh-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 10px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #1e293b;
+}
+
+.hh-back-btn {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 1.5rem;
+    cursor: pointer; padding: 6px 8px;
+    border-radius: 8px; min-width: 44px;
+    text-align: center; line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+.hh-back-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+.hh-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fbbf24;
+    padding: 3px 8px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 6px;
+    line-height: 1;
+}
+
+.hh-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hh-topbar-progress {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.hh-stars {
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+/* ---------------------------------------------------------------
+   TARGET DISPLAY
+   --------------------------------------------------------------- */
+.hh-target-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 16px 4px;
+    flex-shrink: 0;
+    gap: 10px;
+    position: relative;
+}
+
+.hh-target-label {
+    font-size: 0.8125rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.hh-target-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--cyan);
+    line-height: 1;
+    min-width: 60px;
+    text-align: center;
+    transition: color 0.15s;
+    position: relative;
+}
+
+/* Per-target solve flash */
+.hh-target-number.hh-target-hit {
+    animation: hh-target-hit 0.35s ease-out;
+}
+
+@keyframes hh-target-hit {
+    0%   { color: var(--success); transform: scale(1.15); }
+    60%  { color: var(--success); transform: scale(1.05); }
+    100% { color: var(--cyan);    transform: scale(1); }
+}
+
+/* Sparkle burst — injected as sibling div, removed after animation */
+.hh-burst {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    pointer-events: none;
+    animation: hh-burst-out 0.45s ease-out forwards;
+    border-radius: 50%;
+    border: 2.5px solid var(--success);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+}
+
+@keyframes hh-burst-out {
+    0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 1; }
+    60%  { transform: translate(-50%, -50%) scale(1.4); opacity: 0.6; }
+    100% { transform: translate(-50%, -50%) scale(2);   opacity: 0; }
+}
+
+/* ---------------------------------------------------------------
+   TIMER BAR
+   --------------------------------------------------------------- */
+.hh-timer-bar-track {
+    width: 100%;
+    height: 4px;
+    background: #1e293b;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.hh-timer-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: var(--cyan);
+    transform-origin: left;
+    transition: transform 0.1s linear, background-color 0.3s;
+}
+
+.hh-timer-bar-fill.hh-timer-warn   { background: var(--gold); }
+.hh-timer-bar-fill.hh-timer-danger {
+    background: var(--error);
+    animation: hh-timer-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes hh-timer-pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hh-timer-bar-fill { transition: none; }
+    .hh-timer-bar-fill.hh-timer-danger { animation: none; }
+    .hh-target-number.hh-target-hit { animation: none; }
+    .hh-burst { animation: none; display: none; }
+}
+
+/* ---------------------------------------------------------------
+   GAME ARENA
+   --------------------------------------------------------------- */
+.hh-arena {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* ---------------------------------------------------------------
+   DIAMOND GRID — identical layout to Make24 base game.
+   Cards inside use .card class defined below.
+   --------------------------------------------------------------- */
+.hh-diamond-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 12px;
+    width: 320px;
+    height: 320px;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+}
+
+.hh-slot { display: flex; align-items: center; justify-content: center; }
+.hh-slot-top    { grid-column: 2; grid-row: 1; }
+.hh-slot-left   { grid-column: 1; grid-row: 2; }
+.hh-slot-right  { grid-column: 3; grid-row: 2; }
+.hh-slot-bottom { grid-column: 2; grid-row: 3; }
+
+/* ── Cards — self-contained, identical look to make24 ── */
+.card {
+    width: 96px;
+    height: 96px;
+    background: #1e293b;
+    border: 2px solid #334155;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 2.75rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    cursor: pointer;
+    transition: transform 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.card:active  { transform: scale(0.95); }
+.card.selected { border-color: #22d3ee; box-shadow: 0 0 24px rgba(34, 211, 238, 0.3); transform: scale(1.08); }
+.card.selected.first  { border-color: #22d3ee; }
+.card.selected.second { border-color: #f59e0b; box-shadow: 0 0 24px rgba(245, 158, 11, 0.3); }
+.card.used { opacity: 0; pointer-events: none; transform: scale(0.8); }
+
+/* Fraction display inside cards */
+.fraction-display { display: inline-flex; align-items: center; gap: 0.05em; line-height: 1; }
+.fraction-whole   { font-size: inherit; }
+.fraction-part    { display: inline-flex; flex-direction: column; align-items: center; font-size: 0.45em; line-height: 1.1; vertical-align: middle; }
+.frac-num         { border-bottom: 1.5px solid currentColor; padding: 0 0.15em 0.05em; }
+.frac-den         { padding: 0.05em 0.15em 0; }
+.card .fraction-display { font-size: 2rem; }
+
+/* ── Operators overlay ── */
+.hh-op-overlay {
+    position: absolute; inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 10;
+}
+.hh-op-overlay.hh-op-show { display: flex; }
+
+.operators-grid {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 12px; padding: 14px;
+    background: rgba(30, 41, 59, 0.9); border-radius: 20px;
+    border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.op-btn {
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 2px solid #22d3ee; background: rgba(30, 41, 59, 0.95);
+    color: #f1f5f9; font-size: 1.5rem; font-weight: 700;
+    cursor: pointer; transition: all 0.1s ease;
+    display: flex; align-items: center; justify-content: center;
+}
+.op-btn:hover  { background: rgba(34, 211, 238, 0.2); transform: scale(1.1); }
+.op-btn:active { transform: scale(0.95); }
+
+/* ── Undo row ── */
+.hh-undo-row {
+    position: relative; z-index: 2;
+    height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+.hh-undo-btn {
+    background: none; border: none;
+    color: var(--text-dim); font-size: 0.875rem; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; padding: 6px 14px; border-radius: 8px;
+    transition: color 0.15s, background 0.15s;
+}
+.hh-undo-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+/* ── Inline feedback ── */
+.hh-inline-fb {
+    position: relative; z-index: 2;
+    height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9375rem; font-weight: 600;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+}
+.hh-inline-fb.hh-fb-show { opacity: 1; }
+.hh-inline-fb.hh-fb-new  { color: var(--success); }
+.hh-inline-fb.hh-fb-dupe { color: var(--warning); }
+.hh-inline-fb.hh-fb-bad  { color: var(--error); }
+
+/* ── Inline operator display for solution replay ── */
+.hh-sol-op-display {
+    grid-column: 2; grid-row: 2;
+    font-family: 'Space Mono', monospace;
+    font-size: 2.5rem; font-weight: 700; color: var(--cyan);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+}
+.hh-sol-op-display.visible { opacity: 1; }
+
+/* ---------------------------------------------------------------
+   PROGRESS TRACK — shows solved/total above chips row
+   --------------------------------------------------------------- */
+.hh-progress-track {
+    width: 100%;
+    height: 3px;
+    background: #1e293b;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.hh-progress-fill {
+    height: 100%;
+    background: var(--success);
+    width: 0%;
+    transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---------------------------------------------------------------
+   CHIPS ROW — progress through targets
+   --------------------------------------------------------------- */
+.hh-chips-row {
+    display: flex;
+    gap: 5px;
+    padding: 10px 16px 12px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    justify-content: center;
+    flex-wrap: wrap;
+    border-top: 1px solid #1e293b;
+}
+.hh-chips-row::-webkit-scrollbar { display: none; }
+
+.hh-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    min-width: 30px;
+    flex-shrink: 0;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.hh-chip-pending {
+    background: none;
+    border: 1.5px solid #1e293b;
+    color: #334155;
+}
+
+/* Active — pulses cyan */
+.hh-chip-active {
+    background: rgba(34, 211, 238, 0.1);
+    border: 1.5px solid var(--cyan);
+    color: var(--cyan);
+    animation: hh-chip-glow 1.5s ease-in-out infinite alternate;
+}
+@keyframes hh-chip-glow {
+    from { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    to   { box-shadow: 0 0 6px 2px rgba(34, 211, 238, 0.3); }
+}
+
+/* Done — green with pop animation */
+.hh-chip-done {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1.5px solid #10b981;
+    color: #10b981;
+}
+
+/* Pop animation when a chip transitions to done */
+.hh-chip-done.hh-chip-pop {
+    animation: hh-chip-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes hh-chip-pop {
+    0%   { transform: scale(0.85); }
+    60%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* Missed — grey, shown on end screen */
+.hh-chip-missed {
+    background: none;
+    border: 1.5px solid #1e293b;
+    color: #475569;
+}
+
+/* Tappable missed chip (has a solution) */
+.hh-chip-tappable {
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.hh-chip-tappable:hover {
+    border-color: #64748b;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.04);
+}
+
+/* ---------------------------------------------------------------
+   RESULT SCREEN
+   --------------------------------------------------------------- */
+.hh-result {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px 24px 16px;
+    text-align: center;
+    overflow-y: auto;
+    animation: hh-fade-in 0.3s ease-out;
+}
+
+.hh-result-icon { font-size: 2.5rem; line-height: 1; }
+
+.hh-result-badge {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+.hh-result-badge-perfect { color: var(--gold); }
+.hh-result-badge-partial { color: var(--success); }
+.hh-result-badge-none    { color: var(--text-muted); }
+
+.hh-result-date {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+}
+
+.hh-result-stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin: 4px 0;
+}
+
+.hh-result-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.hh-result-stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.625rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.hh-result-stat-label {
+    font-size: 0.6875rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.hh-result-hint {
+    font-size: 0.75rem;
+    color: #475569;
+}
+
+.hh-result-book {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+    max-width: 340px;
+}
+
+/* Result chips */
+.hh-chip-found {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    min-width: 30px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1.5px solid #10b981;
+    color: #10b981;
+}
+
+.hh-result-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%; max-width: 300px;
+    margin-top: 8px;
+}
+
+.hh-result-actions .hh-btn {
+    flex: 1;
+    min-width: 110px;
+}
+
+/* Perfect run treatment */
+.hh-result.hh-result-perfect .hh-result-icon {
+    animation: hh-result-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes hh-result-pop {
+    from { transform: scale(0.3); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+}
+.hh-result.hh-result-perfect .hh-result-badge { font-size: 1.375rem; color: var(--gold); }
+.hh-result.hh-result-perfect .hh-result-stat-value { color: var(--gold); }
+.hh-result.hh-result-perfect .hh-chip-found {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+/* ---------------------------------------------------------------
+   INTRO CARD  (first-run, centred overlay)
+   --------------------------------------------------------------- */
+.hh-intro-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    max-width: 320px;
+    width: calc(100% - 40px);
+    text-align: center;
+    animation: hh-intro-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes hh-intro-in {
+    from { transform: scale(0.86); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+.hh-intro-icon  { font-size: 3rem; line-height: 1; margin-bottom: 14px; }
+.hh-intro-title { font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.hh-intro-body  { font-size: 0.9375rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px; }
+.hh-intro-tag   { font-size: 0.8125rem; color: var(--cyan); font-weight: 500; margin-bottom: 24px; }
+.hh-intro-start { width: auto; padding: 12px 40px; display: inline-block; }
+
+/* ---------------------------------------------------------------
+   SOLUTION MODAL  (layered inside game screen)
+   --------------------------------------------------------------- */
+.hh-solution-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 15, 28, 0.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    animation: hh-fade-in 0.18s ease-out;
+    padding: 24px 20px;
+}
+
+.hh-sol-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 18px;
+    padding: 24px 20px 20px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    animation: hh-intro-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hh-sol-heading { font-size: 1rem; font-weight: 700; color: var(--text-muted); }
+.hh-sol-n       { color: var(--cyan); font-size: 1.25rem; }
+.hh-sol-expr    {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.0625rem; font-weight: 700; color: var(--text);
+    line-height: 1.4; word-break: break-all;
+}
+.hh-sol-board {
+    width: min(280px, 70vw);
+    height: min(280px, 70vw);
+    position: relative; flex-shrink: 0;
+}
+.hh-sol-board .hh-diamond-grid { width: 100%; height: 100%; }
+.hh-sol-board .hh-op-overlay { display: none; }
+.hh-sol-actions { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.hh-sol-watch,
+.hh-sol-close { width: 100%; padding: 11px 20px; }
+
+/* ---------------------------------------------------------------
+   MODAL OVERLAY (calendar + intro)
+   --------------------------------------------------------------- */
+.hh-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 200;
+    animation: hh-fade-in 0.2s ease-out;
+    padding: 0;
+}
+
+/* Centred variant */
+.hh-modal-overlay.hh-modal-center {
+    align-items: center;
+    padding: 20px;
+}
+
+.hh-modal {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 20px 20px 0 0;
+    width: 100%;
+    max-width: 480px;
+    max-height: 80dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: hh-sheet-in 0.25s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+@keyframes hh-sheet-in {
+    from { transform: translateY(60px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+}
+
+.hh-modal-overlay.hh-modal-center .hh-modal {
+    border-radius: 20px;
+    max-height: 90dvh;
+    animation: hh-intro-in 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+.hh-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid #334155;
+    flex-shrink: 0;
+}
+
+.hh-modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.hh-modal-close {
+    background: none; border: none;
+    color: var(--text-muted); font-size: 1.125rem;
+    cursor: pointer; padding: 4px 6px; border-radius: 6px;
+    transition: color 0.15s;
+}
+.hh-modal-close:hover { color: var(--text); }
+
+/* ---------------------------------------------------------------
+   CALENDAR GRID
+   --------------------------------------------------------------- */
+.hh-cal-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+}
+
+.hh-cal-month-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 4px 0 2px;
+}
+
+.hh-cal-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.hh-cal-cell {
+    background: #0f172a;
+    border: 1.5px solid #1e293b;
+    border-radius: 10px;
+    padding: 10px 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    min-height: 64px;
+    justify-content: center;
+}
+
+.hh-cal-cell:hover {
+    border-color: var(--border);
+    background: #1a2540;
+}
+
+.hh-cal-cell.hh-cal-today {
+    border-color: var(--cyan);
+    background: rgba(34, 211, 238, 0.06);
+}
+
+.hh-cal-cell.hh-cal-played {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.04);
+}
+
+.hh-cal-cell.hh-cal-perfect {
+    border-color: rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.04);
+}
+
+.hh-cal-date {
+    font-size: 0.6875rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.hh-cal-today .hh-cal-date { color: var(--cyan); }
+
+.hh-cal-score {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
+.hh-cal-perfect .hh-cal-score { color: var(--gold); }
+
+.hh-cal-empty {
+    font-size: 0.6875rem;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+/* ---------------------------------------------------------------
+   CONFETTI
+   --------------------------------------------------------------- */
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    opacity: 0;
+}
+
+@keyframes confetti-fall {
+    0%   { transform: translateY(-10px) rotate(0deg);   opacity: 1; }
+    80%  { opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ---------------------------------------------------------------
+   TOAST
+   --------------------------------------------------------------- */
+.hh-toast {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #334155;
+    color: var(--text);
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 20px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 2000;
+    white-space: nowrap;
+}
+.hh-toast.hh-toast-show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ---------------------------------------------------------------
+   FADE-IN UTILITY
+   --------------------------------------------------------------- */
+@keyframes hh-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}

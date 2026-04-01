@@ -36,6 +36,15 @@
     "cover_emoji": "🎨"
   },
   {
+    "slug": "hothand",
+    "name": "Hot Hand",
+    "url": "apps/hothand/",
+    "released_at": "2026-04-01",
+    "tags": ["math", "daily", "speed"],
+    "blurb": "One hand. Complete as many targets as you can before time runs out.",
+    "cover_emoji": "🔥"
+  },
+  {
     "slug": "tools",
     "name": "Tools",
     "url": "apps/tools/",

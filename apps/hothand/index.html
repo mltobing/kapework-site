@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Hot Hand</title>
+  <meta name="description" content="Complete today's hand before time runs out. One hand. 24 targets. Beat the clock.">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hot Hand">
+  <meta property="og:title" content="Hot Hand">
+  <meta property="og:description" content="One hand. 24 targets. Beat the clock.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── LOBBY ──────────────────────────────── -->
+  <div id="hhLobby" class="hh-lobby">
+    <div class="hh-lobby-inner">
+
+      <div class="hh-logo">
+        <span class="hh-logo-icon">🔥</span>
+        <h1 class="hh-logo-title">Hot Hand</h1>
+      </div>
+
+      <p class="hh-tagline">Complete today&rsquo;s hand before time runs out.</p>
+
+      <div class="hh-hand-display" id="hhHandDisplay">
+        <!-- 4 digit tiles injected by app.js -->
+      </div>
+
+      <div class="hh-lobby-actions">
+        <button class="hh-btn hh-btn-primary" id="hhPlayBtn">Play Today&rsquo;s Hand</button>
+        <button class="hh-btn hh-btn-ghost"   id="hhArchiveBtn">Past Hands</button>
+      </div>
+
+      <div class="hh-lobby-meta" id="hhLobbyMeta"></div>
+
+    </div>
+  </div>
+
+  <!-- ── GAME SCREEN (content injected by app.js) ── -->
+  <div id="hhGame" class="hh-game-screen" style="display:none"></div>
+
+  <!-- ── CONFETTI ──────────────────────────── -->
+  <div id="confetti" style="position:fixed;inset:0;pointer-events:none;z-index:1000;overflow:hidden"></div>
+
+  <!-- ── SCRIPTS ───────────────────────────── -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="supabase-service.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
