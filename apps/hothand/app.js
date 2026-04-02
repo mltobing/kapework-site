@@ -46,9 +46,38 @@ const STORAGE_HISTORY  = 'hothand_history';   // { [puzzleNum]: { solved, total,
 const STORAGE_RUN      = 'hothand_run';        // in-progress run state
 const STORAGE_INTRO    = 'hothand_intro_seen'; // '1' once seen
 const DEVICE_ID_KEY    = 'hothand_device_id_' + window.location.hostname;
+const APP_SLUG         = 'hothand';
 
 const SLOT_CLASSES = ['hh-slot-top', 'hh-slot-left', 'hh-slot-right', 'hh-slot-bottom'];
 const OP_STR       = { '+': '+', '-': '\u2212', '*': '\u00D7', '/': '\u00F7' };
+
+function analytics() {
+    return window.KapeworkAnalytics || null;
+}
+
+function trackFirstInteraction(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.firstInteraction(props || null, APP_SLUG); } catch (_) {}
+}
+
+function trackRunStart(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runStart(props || null, APP_SLUG); } catch (_) {}
+}
+
+function trackRunEnd(props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.runEnd(props || null, APP_SLUG); } catch (_) {}
+}
+
+function trackPrimaryAction(action, props) {
+    const a = analytics();
+    if (!a) return;
+    try { a.primaryAction(action, props || null, APP_SLUG); } catch (_) {}
+}
 
 // ============================================================
 // 2. PUZZLE ENGINE
@@ -386,18 +415,21 @@ function wireArena(containerEl, getRound, setRound, onResolve) {
 
         if (undoEl) {
             e.preventDefault();
+            markFirstInteraction('undo');
             setRound(roundUndo(getRound()));
             renderBoard(containerEl, getRound());
             return;
         }
         if (cardEl) {
             e.preventDefault();
+            markFirstInteraction('select_card');
             setRound(roundSelectCard(getRound(), parseInt(cardEl.dataset.cardIdx, 10)));
             renderBoard(containerEl, getRound());
             return;
         }
         if (opBtn) {
             e.preventDefault();
+            markFirstInteraction('apply_operation', { operator: opBtn.dataset.op });
             const next = roundApplyOp(getRound(), opBtn.dataset.op);
             if (!next) return;
             setRound(next);
@@ -694,6 +726,7 @@ function showEndScreen(gameScreenEl, targetsList, solvedSet, solutionsByTarget, 
     });
 
     gameScreenEl.querySelector('#hhResultShare').addEventListener('click', () => {
+        trackPrimaryAction('share', { puzzle_num: puzzleNum, solved, total });
         const text = buildShareText(puzzleNum, solved, total);
         navigator.clipboard.writeText(text).catch(() => {});
         if (navigator.share) navigator.share({ text }).catch(() => {});
@@ -761,6 +794,17 @@ let _currentIdx        = 0;
 let _timerStart        = null;
 let _totalElapsedBefore = 0;
 let _isArchive         = false;
+let _runFirstInteractionTracked = false;
+
+function markFirstInteraction(input, extraProps) {
+    if (_runFirstInteractionTracked) return;
+    _runFirstInteractionTracked = true;
+    trackFirstInteraction(Object.assign({
+        input,
+        puzzle_num: _puzzleNum,
+        is_archive: _isArchive
+    }, extraProps || {}));
+}
 
 function renderChips(chipsRow, targetsList, solvedSet, currentIdx) {
     chipsRow.innerHTML = targetsList.map((n, i) => {
@@ -813,6 +857,14 @@ function startRun(puzzleNum, digits, targetsList, solutionsByTarget, difficultyC
     _solvedSet          = new Set(resumeState ? resumeState.solvedList : []);
     _currentIdx         = resumeState ? resumeState.currentIdx : 0;
     _totalElapsedBefore = resumeState ? resumeState.elapsedMs : 0;
+    _runFirstInteractionTracked = false;
+
+    trackRunStart({
+        puzzle_num: puzzleNum,
+        targets_total: targetsList.length,
+        is_archive: !!_isArchive,
+        is_resume: !!resumeState
+    });
 
     // Skip solved indices
     while (_currentIdx < targetsList.length && _solvedSet.has(targetsList[_currentIdx])) {
@@ -884,6 +936,14 @@ function startRun(puzzleNum, digits, targetsList, solutionsByTarget, difficultyC
         if (_removeKbHandler) { _removeKbHandler(); _removeKbHandler = null; }
         const elapsed = _totalElapsedBefore + (_timerStart ? Date.now() - _timerStart : 0);
         saveRunState(_puzzleNum, _targetsList, [..._solvedSet], _currentIdx, elapsed);
+        trackRunEnd({
+            puzzle_num: _puzzleNum,
+            outcome: 'abandon',
+            solved: _solvedSet.size,
+            total: totalTargets,
+            total_time_sec: Math.round(elapsed / 1000),
+            is_archive: !!_isArchive
+        });
         showLobby();
     });
 
@@ -933,11 +993,20 @@ function startRun(puzzleNum, digits, targetsList, solutionsByTarget, difficultyC
 
         const totalElapsed = _totalElapsedBefore + (_timerStart ? Date.now() - _timerStart : 0);
         const totalTimeSec = Math.round(totalElapsed / 1000);
+        const solvedCount  = _solvedSet.size;
 
         recordResult(_puzzleNum, _solvedSet.size, totalTargets, totalTimeSec);
         syncResult(_puzzleNum, [..._solvedSet], _targetsList, totalTimeSec);
+        trackRunEnd({
+            puzzle_num: _puzzleNum,
+            outcome: solvedCount === totalTargets ? 'win' : 'timeout',
+            solved: solvedCount,
+            total: totalTargets,
+            total_time_sec: totalTimeSec,
+            is_archive: !!_isArchive
+        });
 
-        if (_solvedSet.size === totalTargets) {
+        if (solvedCount === totalTargets) {
             launchConfetti();
             setTimeout(() => {
                 showEndScreen(gameEl, _targetsList, _solvedSet, _solutionsByTarget, _digits, _puzzleNum, totalTimeSec);
@@ -1102,6 +1171,7 @@ function wireKeyboard(containerEl, getRound, setRound, isFinished, getCurrentTar
         if (isNaN(num)) return;
         const idx = findCardIndex(num);
         if (idx !== -1) {
+            markFirstInteraction('select_card_keyboard');
             setRound(roundSelectCard(getRound(), idx));
             renderBoard(containerEl, getRound());
             if (getRound().selected.length === 2) {
@@ -1132,6 +1202,7 @@ function wireKeyboard(containerEl, getRound, setRound, isFinished, getCurrentTar
                 keyBuffer = '';
                 const idx = findCardIndex(num);
                 if (idx !== -1) {
+                    markFirstInteraction('select_card_keyboard');
                     setRound(roundSelectCard(getRound(), idx));
                     renderBoard(containerEl, getRound());
                     if (getRound().selected.length === 2) {
@@ -1150,6 +1221,7 @@ function wireKeyboard(containerEl, getRound, setRound, isFinished, getCurrentTar
         const opMap = { '+': '+', '-': '-', '*': '*', 'x': '*', 'X': '*', '/': '/' };
         if (opMap[key]) {
             e.preventDefault();
+            markFirstInteraction('apply_operation_keyboard', { operator: opMap[key] });
             if (keyBuffer) { if (keyTimeout) clearTimeout(keyTimeout); commitBuffer(); }
             const r = getRound();
             if (r.selected.length === 2) {
@@ -1174,6 +1246,7 @@ function wireKeyboard(containerEl, getRound, setRound, isFinished, getCurrentTar
 
         if (key === 'Backspace' || key === 'z' || key === 'Z') {
             e.preventDefault();
+            markFirstInteraction('undo_keyboard');
             clearBuffer();
             setRound(roundUndo(getRound()));
             renderBoard(containerEl, getRound());
@@ -1333,10 +1406,12 @@ function init() {
 
     // Wire lobby buttons
     document.getElementById('hhPlayBtn').addEventListener('click', () => {
+        trackPrimaryAction('play_today', { puzzle_num: today });
         launchGame(today, false);
     });
 
     document.getElementById('hhArchiveBtn').addEventListener('click', () => {
+        trackPrimaryAction('open_archive', { puzzle_num: today });
         openCalendar();
     });
 
@@ -1348,4 +1423,3 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
-
