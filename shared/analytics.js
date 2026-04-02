@@ -73,6 +73,51 @@
     _gtag = gtag;
   }
 
+  function postEvent(payload) {
+    // GA4 — fire-and-forget
+    if (_gtag) {
+      try { _gtag('event', payload.event_name, payload); } catch (e) {}
+    }
+
+    // Netlify function — fire-and-forget, never blocks the user
+    try {
+      fetch('/.netlify/functions/track-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function getCompletionMirror(eventName, props) {
+    var outcome = null;
+    var completionType = null;
+
+    if (eventName === 'solve_success') {
+      completionType = 'run_complete';
+      outcome = 'win';
+    } else if (eventName === 'solve_fail' || eventName === 'game_over') {
+      completionType = 'run_fail';
+      outcome = 'fail';
+    } else if (eventName === 'game_end' || eventName === 'session_end') {
+      completionType = 'run_complete';
+      outcome = 'complete';
+    }
+
+    if (!completionType) return null;
+
+    var mirroredProps = {};
+    if (props) {
+      for (var k in props) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) mirroredProps[k] = props[k];
+      }
+    }
+    if (!mirroredProps.outcome) mirroredProps.outcome = outcome;
+
+    return { completionType: completionType, props: mirroredProps };
+  }
+
   // ── Core trackEvent ────────────────────────────────────────────────────────
   // Signature: trackEvent(eventName, appSlug, props?)
   //   appSlug — pass null/undefined to fall back to window._kw_app_slug
@@ -108,20 +153,47 @@
       }
     }
 
-    // GA4 — fire-and-forget
-    if (_gtag) {
-      try { _gtag('event', eventName, payload); } catch (e) {}
-    }
+    postEvent(payload);
 
-    // Netlify function — fire-and-forget, never blocks the user
-    try {
-      fetch('/.netlify/functions/track-event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        keepalive: true
-      }).catch(function () {});
-    } catch (e) {}
+    // Mirror common app-specific terminal events into standard completion events.
+    // This keeps dashboards stable even when individual apps use custom names.
+    if (eventName !== 'run_end') {
+      if (eventName === 'run_complete' || eventName === 'run_fail') {
+        var terminalProps = {};
+        if (props) {
+          for (var tp in props) {
+            if (Object.prototype.hasOwnProperty.call(props, tp)) terminalProps[tp] = props[tp];
+          }
+        }
+        if (!terminalProps.outcome) terminalProps.outcome = (eventName === 'run_complete' ? 'win' : 'fail');
+        runEnd(terminalProps, slug);
+        return;
+      }
+
+      var mirror = getCompletionMirror(eventName, props);
+      if (mirror) {
+        var completionPayload = {
+          event_name: mirror.completionType,
+          app_slug: slug,
+          device_id: getDeviceId(),
+          session_id: SESSION_ID,
+          url: location.href,
+          ts: new Date().toISOString()
+        };
+
+        for (var cp in mirror.props) {
+          if (Object.prototype.hasOwnProperty.call(mirror.props, cp) &&
+              completionPayload[cp] === undefined) {
+            completionPayload[cp] = mirror.props[cp];
+          }
+        }
+
+        postEvent(completionPayload);
+
+        // Guarantee a normalized run_end event for all terminal states.
+        runEnd(mirror.props, slug);
+      }
+    }
   }
 
   // ── Standard event: app_open ───────────────────────────────────────────────
