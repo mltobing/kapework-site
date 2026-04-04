@@ -266,6 +266,14 @@ describe('getPuzzleNumber / getDateFromPuzzleNumber', () => {
     });
 });
 
+describe('record_solve payload', () => {
+    test('includes p_is_speakeasy=false for standard Make36 saves', () => {
+        const payload = game.buildRecordSolvePayload(true);
+        expect(payload).toHaveProperty('p_is_speakeasy', false);
+        expect(payload).toHaveProperty('p_solved', true);
+    });
+});
+
 describe('every puzzle in VALID_PUZZLES is solvable', () => {
     test('all puzzles are solvable via full solver', () => {
         const unsolvable = [];

@@ -2069,21 +2069,40 @@ function renderCalendar() {
 // Supabase tracking
 let lastPercentileData = null;
 
+function buildRecordSolvePayload(success) {
+    const solveTime = playState.startTime
+        ? Math.round((playState.endTime - playState.startTime) / 1000)
+        : 0;
+
+    return {
+        p_device_id: gameState.deviceId,
+        p_puzzle_num: currentPuzzle.puzzleNum,
+        p_solved: success,
+        p_moves: playState.moves,
+        p_solve_time: solveTime,
+        p_operators: playState.operatorHistory,
+        p_undos: playState.undoCount,
+        // record_solve currently expects this flag (used by make24 speakeasy/hothand).
+        // Make36 is always regular mode, so send false explicitly.
+        p_is_speakeasy: false
+    };
+}
+
+function logRpcFailure({ op, response, bodyText, payload }) {
+    console.error(`[make36] ${op} failed`, {
+        status: response?.status,
+        statusText: response?.statusText,
+        body: bodyText ? bodyText.slice(0, 500) : '',
+        puzzle_num: payload?.p_puzzle_num,
+        solved: payload?.p_solved,
+        device_id_suffix: payload?.p_device_id ? String(payload.p_device_id).slice(-6) : null
+    });
+}
+
 async function trackPlay(success) {
     if (currentPuzzle.isArchive) return null;
     try {
-        const solveTime = playState.startTime ?
-            Math.round((playState.endTime - playState.startTime) / 1000) : 0;
-
-        const payload = {
-            p_device_id: gameState.deviceId,
-            p_puzzle_num: currentPuzzle.puzzleNum,
-            p_solved: success,
-            p_moves: playState.moves,
-            p_solve_time: solveTime,
-            p_operators: playState.operatorHistory,
-            p_undos: playState.undoCount
-        };
+        const payload = buildRecordSolvePayload(success);
 
         const headers = await getAuthHeaders();
         const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_solve`, {
@@ -2094,6 +2113,8 @@ async function trackPlay(success) {
 
         if (!response.ok) {
             showSyncError('Could not save your result to the server.');
+            const bodyText = await response.text().catch(() => '');
+            logRpcFailure({ op: 'record_solve', response, bodyText, payload });
             return null;
         }
         const result = await response.json();
@@ -3518,5 +3539,6 @@ if (typeof module !== 'undefined' && module.exports) {
         EPOCH_DATE,
         PUZZLE_SEED_MULTIPLIER,
         solve24Full,
+        buildRecordSolvePayload,
     };
 }
