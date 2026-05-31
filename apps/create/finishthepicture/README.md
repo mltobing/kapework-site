@@ -33,6 +33,16 @@ no PII) are sent, and they fail silently when offline.
   as a fraction of canvas width). This is why the drawing survives resize /
   orientation changes and re-renders crisply at print resolution.
 - **DPR-aware sizing** keeps lines sharp on retina screens.
+- **Adaptive layout** maximises the photo on every device:
+  - **Phone:** the canvas goes near full-screen; a slim always-on bar
+    (colours + brush + eraser + Undo + Reveal) sits at the bottom, and a
+    **More** button opens a slide-up sheet with modes / cut / ghost /
+    print / worksheet / save / new.
+  - **Wide screens (laptop / tablet landscape):** the dock becomes a
+    right-hand **side rail**, so the canvas uses the full height.
+  - The canvas fills the available space but never upscales beyond the
+    photo's own resolution (so it stays crisp). A `ResizeObserver` on the
+    stage re-fits on any layout change without losing the drawing.
 
 ## Modes
 
@@ -57,7 +67,7 @@ the comparison is self-judged, per Kapework philosophy.
 ## Tools
 
 - 12-colour swatch palette (selected swatch enlarges)
-- Brush size slider (2–40px) with a live preview dot
+- Brush size slider (1–40px, defaults to a fine 4px for precise, pencil-like drawing) with a live preview dot
 - Eraser (`destination-out` on the draw layer only — never touches the photo)
 - Undo (pops the last stroke; instant) · Clear (confirms)
 - New photo (re-runs the import flow)
