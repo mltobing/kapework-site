@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#fbf3e2">
+  <title>Finish the Picture · Kapework</title>
+  <meta name="description" content="Import a photo, half stays real, you draw the other half — then peek at the original to compare. On-device, printable.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <style>
+/* ── Reset & tokens ──────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; margin: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+:root {
+  --paper:    #fdf6e9;   /* warm cream paper                       */
+  --paper-2:  #fbf0db;   /* slightly deeper cream (dock)          */
+  --ink:      #3a3026;   /* warm dark brown text                  */
+  --ink-soft: #8a7a64;   /* muted brown                           */
+  --line:     #e6d8bd;   /* hairline borders                      */
+  --coral:    #ff6f61;   /* primary accent                        */
+  --coral-d:  #e85b4e;
+  --teal:     #2bb9a8;
+  --amber:    #f2a93b;
+  --shadow:   rgba(58,48,38,0.22);
+}
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
+  background: var(--paper);
+}
+body {
+  font-family: 'Fredoka', system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  -webkit-user-select: none; user-select: none;
+  /* subtle dotted paper texture */
+  background-image: radial-gradient(rgba(58,48,38,0.05) 1.1px, transparent 1.2px);
+  background-size: 18px 18px;
+}
+
+/* ── App shell ───────────────────────────────────────────── */
+#app {
+  display: flex; flex-direction: column;
+  height: 100dvh; width: 100%;
+}
+
+/* ── Top bar ─────────────────────────────────────────────── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px;
+  padding-top: max(8px, env(safe-area-inset-top, 8px));
+  flex-shrink: 0; gap: 8px;
+}
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-emoji { font-size: 1.35rem; line-height: 1; }
+.brand-title {
+  font-family: 'Caveat', cursive;
+  font-size: 1.9rem; font-weight: 700; line-height: 1;
+  color: var(--ink); white-space: nowrap;
+}
+.top-actions { display: flex; align-items: center; gap: 6px; }
+.back-link {
+  color: var(--ink-soft); text-decoration: none;
+  font-weight: 600; font-size: 0.85rem; padding: 6px 8px; border-radius: 10px;
+}
+.back-link:hover { color: var(--ink); }
+
+/* shell ⋮ button is dark-themed by default — nudge it to fit cream */
+#kw-shell-mount .kw-more-btn { color: var(--ink-soft); }
+#kw-shell-mount .kw-more-btn:hover,
+#kw-shell-mount .kw-more-btn[aria-expanded="true"] {
+  color: var(--ink); background: rgba(58,48,38,0.07);
+}
+
+/* ── Stage ───────────────────────────────────────────────── */
+#stage {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px 10px;
+  position: relative;
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+#empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; text-align: center; max-width: 360px; padding: 24px;
+}
+.empty-art { font-size: 3.4rem; line-height: 1; }
+.empty-head {
+  font-family: 'Caveat', cursive; font-weight: 700;
+  font-size: 2.3rem; line-height: 1.05; color: var(--ink);
+}
+.empty-sub { color: var(--ink-soft); font-size: 0.98rem; line-height: 1.5; }
+.privacy-note {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.8rem; color: var(--ink-soft);
+  background: var(--paper-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px;
+}
+
+/* ── Chunky sticker buttons ──────────────────────────────── */
+.btn {
+  font-family: 'Fredoka', sans-serif; font-weight: 600;
+  border: none; cursor: pointer; border-radius: 16px;
+  padding: 13px 22px; font-size: 1rem; color: #fff;
+  background: var(--coral);
+  box-shadow: 0 4px 0 var(--coral-d);
+  transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.15s;
+}
+.btn:hover { filter: brightness(1.04); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--coral-d); }
+.btn.big { font-size: 1.15rem; padding: 16px 30px; }
+
+/* ── Canvas wrap (two stacked canvases) ──────────────────── */
+#canvas-wrap {
+  position: relative;
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 6px 24px var(--shadow), 0 0 0 1px var(--line);
+  background: var(--paper);
+}
+#photoCanvas, #drawCanvas {
+  position: absolute; top: 0; left: 0;
+  display: block; border-radius: 14px;
+}
+#photoCanvas { z-index: 1; pointer-events: none; }
+#drawCanvas  { z-index: 2; cursor: crosshair; touch-action: none; }
+
+/* ── Control dock ────────────────────────────────────────── */
+#dock {
+  flex-shrink: 0;
+  background: var(--paper-2);
+  border-top: 1px solid var(--line);
+  padding: 8px 12px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  display: flex; flex-direction: column; gap: 8px;
+}
+.dock-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* pill / toggle buttons */
+.pill {
+  font-family: inherit; font-weight: 600; font-size: 0.85rem;
+  background: var(--paper); color: var(--ink-soft);
+  border: 2px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer; min-height: 40px;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all 0.12s;
+}
+.pill:hover { color: var(--ink); }
+.pill.active {
+  background: #fff; color: var(--ink);
+  border-color: var(--teal);
+  box-shadow: 0 2px 0 rgba(43,185,168,0.35);
+}
+.pill.tiny { padding: 7px 11px; font-size: 0.8rem; min-height: 36px; }
+.seg { display: inline-flex; gap: 4px; background: var(--paper); border-radius: 999px; padding: 3px; border: 2px solid var(--line); }
+.seg .pill { border: none; box-shadow: none; min-height: 34px; padding: 6px 12px; }
+.seg .pill.active { background: var(--teal); color: #fff; box-shadow: none; }
+
+.dock-label { font-size: 0.72rem; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* color swatches */
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.swatch {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 3px solid #fff; cursor: pointer;
+  box-shadow: 0 0 0 1.5px var(--line), 0 2px 4px var(--shadow);
+  transition: transform 0.1s;
+}
+.swatch:hover { transform: scale(1.1); }
+.swatch.active { transform: scale(1.22); box-shadow: 0 0 0 2px var(--ink), 0 2px 6px var(--shadow); }
+
+/* brush controls */
+.brush-group { display: flex; align-items: center; gap: 10px; }
+.brush-preview-wrap {
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper); border: 2px solid var(--line); border-radius: 12px;
+}
+#brush-dot { border-radius: 50%; background: var(--ink); }
+#brush-slider { width: 150px; accent-color: var(--coral); height: 34px; cursor: pointer; }
+
+/* action row buttons */
+.act {
+  font-family: inherit; font-weight: 600; font-size: 0.85rem;
+  background: var(--paper); color: var(--ink);
+  border: 2px solid var(--line); border-radius: 14px;
+  padding: 9px 13px; cursor: pointer; min-height: 42px;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all 0.12s;
+}
+.act:hover { border-color: var(--ink-soft); }
+.act:active { transform: translateY(2px); }
+.act.accent { background: var(--coral); color: #fff; border-color: var(--coral); box-shadow: 0 3px 0 var(--coral-d); }
+.act.accent:active { transform: translateY(3px); box-shadow: 0 0 0 var(--coral-d); }
+.act.hold { background: var(--amber); color: #fff; border-color: var(--amber); box-shadow: 0 3px 0 #d8901f; touch-action: none; }
+.act.hold.holding { transform: translateY(3px); box-shadow: 0 0 0 #d8901f; filter: brightness(1.08); }
+
+.hidden { display: none !important; }
+
+/* reveal hint chip */
+#reveal-hint {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(58,48,38,0.82); color: #fff;
+  font-size: 0.78rem; font-weight: 500;
+  padding: 6px 12px; border-radius: 999px; pointer-events: none;
+  opacity: 0; transition: opacity 0.25s; z-index: 5;
+}
+#reveal-hint.show { opacity: 1; }
+
+/* responsiveness: stack brush + actions tighter on phones */
+@media (max-width: 430px) {
+  .brand-title { font-size: 1.5rem; }
+  .swatch { width: 30px; height: 30px; }
+  #brush-slider { width: 110px; }
+  .act { padding: 8px 10px; font-size: 0.8rem; }
+}
+@media (max-width: 340px) {
+  .brand-title { font-size: 1.25rem; }
+  .back-link { display: none; }
+}
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Top bar ── -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-emoji">🖼️</span>
+      <span class="brand-title">Finish the Picture</span>
+    </div>
+    <div class="top-actions">
+      <a class="back-link" href="../">← Create</a>
+      <div id="kw-shell-mount"></div>
+    </div>
+  </div>
+
+  <!-- ── Stage ── -->
+  <main id="stage">
+
+    <!-- Empty state -->
+    <div id="empty-state">
+      <div class="empty-art">🖼️✏️</div>
+      <div class="empty-head">Pick a photo<br>and finish the other half!</div>
+      <div class="empty-sub">Half stays real, you draw the rest. Then peek at the original to compare.</div>
+      <button class="btn big" id="btn-choose">Choose a Photo</button>
+      <div class="privacy-note">🔒 Your photo stays on this device</div>
+    </div>
+
+    <!-- Canvas (hidden until a photo is loaded) -->
+    <div id="canvas-wrap" class="hidden">
+      <canvas id="photoCanvas"></canvas>
+      <canvas id="drawCanvas"></canvas>
+    </div>
+
+    <div id="reveal-hint">Hold <b>Reveal</b> to peek at the original</div>
+  </main>
+
+  <!-- ── Control dock ── -->
+  <div id="dock" class="hidden">
+
+    <!-- Row 1: modes -->
+    <div class="dock-row">
+      <div class="seg" id="mode-seg">
+        <button class="pill active" data-mode="free">✏️ Free Draw</button>
+        <button class="pill" data-mode="mirror">🪞 Mirror</button>
+        <button class="pill" data-mode="fold">📐 Fold &amp; Flip</button>
+      </div>
+    </div>
+
+    <!-- Row 2: cut + ghost -->
+    <div class="dock-row">
+      <span class="dock-label">Cut</span>
+      <div class="seg" id="cut-seg">
+        <button class="pill active" data-cut="vertical" title="Vertical cut">↔</button>
+        <button class="pill" data-cut="horizontal" title="Horizontal cut">↕</button>
+      </div>
+      <button class="pill tiny" id="btn-ghost" title="Show a faint trace of the hidden half">👻 Ghost: Off</button>
+    </div>
+
+    <!-- Row 3: colors -->
+    <div class="dock-row">
+      <div class="swatches" id="swatches"></div>
+    </div>
+
+    <!-- Row 4: brush + eraser -->
+    <div class="dock-row">
+      <div class="brush-group">
+        <div class="brush-preview-wrap"><div id="brush-dot"></div></div>
+        <input type="range" id="brush-slider" min="2" max="40" value="9" step="1" aria-label="Brush size">
+      </div>
+      <button class="pill tiny" id="btn-eraser">🧽 Eraser</button>
+    </div>
+
+    <!-- Row 5: actions -->
+    <div class="dock-row">
+      <button class="act hidden" id="btn-flip">↩️ Flip it!</button>
+      <button class="act hold" id="btn-reveal">👀 Reveal</button>
+      <button class="act" id="btn-undo">↶ Undo</button>
+      <button class="act" id="btn-clear">✕ Clear</button>
+      <button class="act accent" id="btn-print">🖨️ Print</button>
+      <button class="act" id="btn-worksheet">📄 Worksheet</button>
+      <button class="act" id="btn-save">💾 Save</button>
+      <button class="act" id="btn-new">📷 New</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept="image/*" class="hidden">
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   Finish the Picture — Kapework creative toy
+
+   Architecture
+   ────────────
+   Two stacked canvases inside #canvas-wrap:
+     • photoCanvas (z1): the photo on one half, paper-white (or faint
+       "ghost") on the drawable half, plus the cut-line divider.
+     • drawCanvas  (z2): the child's strokes; pointer events bind here.
+
+   The imported photo NEVER leaves the device — no upload, no network
+   call carries image data. Everything happens in-canvas.
+
+   Strokes are stored as normalized vectors (points in [0,1]×[0,1],
+   width as a fraction of canvas width) so the drawing survives resize
+   and orientation changes, and re-renders crisply at print resolution.
+   ═══════════════════════════════════════════════════════════ */
+
+const SLUG = 'finishthepicture';
+const PAPER = '#fdf6e9';
+const MAX_EDGE = 2000;          // downscale longest photo edge to this
+const GHOST_ALPHA = 0.18;       // faint trace of hidden half
+const REVEAL_MS = 200;          // crossfade duration
+const COMPLETE_STROKES = 4;     // strokes before a print/save counts as "done"
+
+/* ── Palette (12 kid-friendly colours) ───────────────────── */
+const COLORS = [
+  '#3a3026', // ink/black
+  '#ff6f61', // coral
+  '#e8453c', // red
+  '#f2a93b', // amber
+  '#ffd23f', // yellow
+  '#7cc576', // green
+  '#2bb9a8', // teal
+  '#4a90d9', // blue
+  '#8e6fd6', // purple
+  '#ff8fc7', // pink
+  '#9c6b4a', // brown
+  '#ffffff', // white
+];
+
+/* ── State ───────────────────────────────────────────────── */
+const state = {
+  mode:   'free',          // 'free' | 'mirror' | 'fold'
+  cut:    'vertical',      // 'vertical' | 'horizontal'
+  ghost:  false,
+  color:  COLORS[0],
+  brush:  9,
+  eraser: false,
+  strokes: [],             // {points:[{x,y}…], color, nw, eraser, mode, stamp?}
+  photo:  null,            // { bmp, w, h }
+  completedFired: false,
+};
+
+let W = 0, H = 0;          // logical (CSS px) canvas dimensions
+let revealCur = 0, revealTarget = 0, revealRAF = null, revealLast = 0;
+
+/* ── Elements ────────────────────────────────────────────── */
+const stage      = document.getElementById('stage');
+const wrap       = document.getElementById('canvas-wrap');
+const photoCanvas= document.getElementById('photoCanvas');
+const drawCanvas = document.getElementById('drawCanvas');
+const pctx       = photoCanvas.getContext('2d');
+const dctx       = drawCanvas.getContext('2d');
+const fileInput  = document.getElementById('file-input');
+const emptyState = document.getElementById('empty-state');
+const dock       = document.getElementById('dock');
+const revealHint = document.getElementById('reveal-hint');
+
+/* ── Analytics helper (fails silently if absent / offline) ── */
+function track(name, props) {
+  try { if (window.KapeworkAnalytics) window.KapeworkAnalytics.track(name, props || null); }
+  catch (e) {}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHOTO IMPORT  (privacy-critical: stays on device)
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('btn-choose').addEventListener('click', () => fileInput.click());
+document.getElementById('btn-new').addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  fileInput.value = '';                       // allow re-selecting the same file
+  if (!file) return;
+  try {
+    const bmp = await loadBitmap(file);
+    state.photo = bmp;
+    state.strokes = [];
+    state.completedFired = false;
+    emptyState.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    dock.classList.remove('hidden');
+    fitCanvas();
+    flashHint();
+    track('photo_imported', { w: bmp.w, h: bmp.h });
+    if (window.KapeworkAnalytics) { try { window.KapeworkAnalytics.runStart({ mode: state.mode }); } catch (e2) {} }
+  } catch (err) {
+    alert("Sorry — couldn't open that photo. Try another one.");
+  }
+});
+
+/* Decode + downscale + respect EXIF orientation. createImageBitmap with
+   imageOrientation:'from-image' keeps portrait photos upright where
+   supported; we fall back to a plain <img> decode otherwise. */
+async function loadBitmap(file) {
+  let src = null;
+  try {
+    if (window.createImageBitmap) {
+      try {
+        src = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch (e) {
+        src = await createImageBitmap(file);   // older Safari: no orientation opt
+      }
+    }
+  } catch (e) { src = null; }
+
+  if (!src) src = await decodeViaImg(file);     // fallback path
+
+  let sw = src.width, sh = src.height;
+  const longest = Math.max(sw, sh);
+  let dw = sw, dh = sh;
+  if (longest > MAX_EDGE) {
+    const k = MAX_EDGE / longest;
+    dw = Math.round(sw * k);
+    dh = Math.round(sh * k);
+  }
+
+  // Bake into a static canvas-backed bitmap at the downscaled size so we
+  // never hold a giant source image and draws stay fast on phones.
+  const c = document.createElement('canvas');
+  c.width = dw; c.height = dh;
+  c.getContext('2d').drawImage(src, 0, 0, dw, dh);
+  if (src.close) { try { src.close(); } catch (e) {} }
+  return { bmp: c, w: dw, h: dh };
+}
+
+function decodeViaImg(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+    img.src = url;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CANVAS SIZING  (DPR-aware, aspect-preserving, resize-safe)
+   ═══════════════════════════════════════════════════════════ */
+function fitCanvas() {
+  if (!state.photo) return;
+  const maxW = Math.min(stage.clientWidth - 20, 700);
+  const maxH = stage.clientHeight - 20;
+  const ar = state.photo.w / state.photo.h;
+  let w = maxW, h = w / ar;
+  if (h > maxH) { h = maxH; w = h * ar; }
+  w = Math.max(80, Math.round(w));
+  h = Math.max(80, Math.round(h));
+
+  W = w; H = h;
+  wrap.style.width  = w + 'px';
+  wrap.style.height = h + 'px';
+  setCanvasPixels(photoCanvas, pctx, w, h);
+  setCanvasPixels(drawCanvas,  dctx, w, h);
+  renderPhoto();
+  renderStrokes();
+}
+
+function setCanvasPixels(canvas, ctx, wCss, hCss) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width  = wCss + 'px';
+  canvas.style.height = hCss + 'px';
+  canvas.width  = Math.round(wCss * dpr);
+  canvas.height = Math.round(hCss * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* Re-fit (without destroying the drawing) on resize / orientation change.
+   Strokes are normalized, so they simply re-render at the new size. */
+let resizeTimer = null;
+function onResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(fitCanvas, 80);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+/* ═══════════════════════════════════════════════════════════
+   GEOMETRY HELPERS
+   ═══════════════════════════════════════════════════════════ */
+function halfPx() { return state.cut === 'vertical' ? W / 2 : H / 2; }
+
+// Photo lives on the left (vertical) / top (horizontal); blank half is the
+// right / bottom — that's where the child draws.
+function blankRect(w, h) {
+  return state.cut === 'vertical'
+    ? { x: w / 2, y: 0,     w: w / 2, h: h }
+    : { x: 0,     y: h / 2, w: w,     h: h / 2 };
+}
+
+function isOnBlank(p) {
+  return state.cut === 'vertical' ? p.x >= halfPx() : p.y >= halfPx();
+}
+
+// Reflect a px point across the divider (blank ↔ photo side).
+function mirrorPx(p) {
+  return state.cut === 'vertical' ? { x: W - p.x, y: p.y } : { x: p.x, y: H - p.y };
+}
+
+// Keep a px point on the blank side (clamp for free/fold, reflect for mirror).
+function toDrawSide(p) {
+  if (state.mode === 'mirror') return isOnBlank(p) ? p : mirrorPx(p);
+  if (state.cut === 'vertical') return { x: Math.max(p.x, halfPx()), y: p.y };
+  return { x: p.x, y: Math.max(p.y, halfPx()) };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PHOTO LAYER RENDER
+   ═══════════════════════════════════════════════════════════ */
+function renderPhoto(reveal) {
+  if (!state.photo) return;
+  if (reveal === undefined) reveal = revealCur;
+  pctx.clearRect(0, 0, W, H);
+  pctx.fillStyle = PAPER;
+  pctx.fillRect(0, 0, W, H);
+  pctx.drawImage(state.photo.bmp, 0, 0, W, H);
+
+  // Cover the blank half with paper. Ghost mode and Reveal both let the
+  // photo bleed through: visible photo = max(ghostBase, reveal).
+  const r = blankRect(W, H);
+  const ghostBase = state.ghost ? GHOST_ALPHA : 0;
+  const whiteAlpha = 1 - Math.max(ghostBase, reveal);
+  if (whiteAlpha > 0.001) {
+    pctx.save();
+    pctx.globalAlpha = whiteAlpha;
+    pctx.fillStyle = PAPER;
+    pctx.fillRect(r.x, r.y, r.w, r.h);
+    pctx.restore();
+  }
+  drawCutLine(reveal);
+}
+
+function drawCutLine(reveal) {
+  const a = 0.6 * (1 - reveal);
+  if (a <= 0.001) return;
+  pctx.save();
+  pctx.globalAlpha = a;
+  pctx.strokeStyle = '#b9a47e';
+  pctx.lineWidth = 2;
+  pctx.setLineDash([8, 7]);
+  pctx.beginPath();
+  if (state.cut === 'vertical') { pctx.moveTo(W / 2, 0); pctx.lineTo(W / 2, H); }
+  else                          { pctx.moveTo(0, H / 2); pctx.lineTo(W, H / 2); }
+  pctx.stroke();
+  pctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STROKE RENDERING  (vector → pixels, scales to any W/H)
+   ═══════════════════════════════════════════════════════════ */
+function renderStrokes() { renderStrokesTo(dctx, W, H, true); }
+
+function renderStrokesTo(ctx, w, h, doClear) {
+  if (doClear) ctx.clearRect(0, 0, w, h);
+  for (const st of state.strokes) {
+    paintStroke(ctx, st, w, h, false);
+    if (st.mode === 'mirror') paintStroke(ctx, st, w, h, true);
+  }
+}
+
+function paintStroke(ctx, st, w, h, mir) {
+  const lw = st.nw * w;
+  const map = (p) => {
+    let nx = p.x, ny = p.y;
+    if (mir) { if (state.cut === 'vertical') nx = 1 - nx; else ny = 1 - ny; }
+    return { x: nx * w, y: ny * h };
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = st.eraser ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = st.color;
+  ctx.fillStyle = st.color;
+  ctx.lineWidth = lw;
+
+  if (st.points.length === 1) {            // single tap → dot
+    const a = map(st.points[0]);
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, Math.max(0.5, lw / 2), 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    const a0 = map(st.points[0]);
+    ctx.moveTo(a0.x, a0.y);
+    for (let i = 1; i < st.points.length; i++) {
+      const a = map(st.points[i]);
+      ctx.lineTo(a.x, a.y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DRAWING  (Pointer Events: mouse + touch + pen)
+   ═══════════════════════════════════════════════════════════ */
+let current = null;     // stroke in progress
+let prevPx  = null;
+
+function eventPx(e) {
+  const r = drawCanvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (W / r.width),
+    y: (e.clientY - r.top)  * (H / r.height),
+  };
+}
+function norm(p) { return { x: p.x / W, y: p.y / H }; }
+
+drawCanvas.addEventListener('pointerdown', (e) => {
+  if (!state.photo) return;
+  e.preventDefault();
+  try { drawCanvas.setPointerCapture(e.pointerId); } catch (er) {}
+  const p = toDrawSide(eventPx(e));
+  prevPx = p;
+  current = {
+    points: [norm(p)],
+    color: state.eraser ? '#000' : state.color,
+    nw: state.brush / W,
+    eraser: state.eraser,
+    mode: state.mode,
+  };
+  // Paint the initial dot immediately for responsiveness.
+  paintLiveSeg(p, p, current);
+  firstInteractionOnce();
+});
+
+drawCanvas.addEventListener('pointermove', (e) => {
+  if (!current) return;
+  e.preventDefault();
+  // Coalesced events give smoother lines on high-rate pens/touch.
+  const events = (e.getCoalescedEvents && e.getCoalescedEvents().length)
+    ? e.getCoalescedEvents() : [e];
+  for (const ev of events) {
+    const p = toDrawSide(eventPx(ev));
+    paintLiveSeg(prevPx, p, current);
+    current.points.push(norm(p));
+    prevPx = p;
+  }
+});
+
+drawCanvas.addEventListener('pointerup', endStroke);
+drawCanvas.addEventListener('pointercancel', endStroke);
+
+function endStroke() {
+  if (!current) return;
+  state.strokes.push(current);
+  current = null;
+  prevPx = null;
+}
+
+// Live segment paint in px (mirrors live in Mirror mode).
+function paintLiveSeg(a, b, st) {
+  drawSeg(dctx, a, b, st, false);
+  if (st.mode === 'mirror') drawSeg(dctx, mirrorPx(a), mirrorPx(b), st, false);
+}
+function drawSeg(ctx, a, b, st) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.globalCompositeOperation = st.eraser ? 'destination-out' : 'source-over';
+  ctx.strokeStyle = st.color;
+  ctx.lineWidth = st.nw * W;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function firstInteractionOnce() {
+  try { if (window.KapeworkAnalytics) window.KapeworkAnalytics.firstInteraction({ mode: state.mode }); }
+  catch (e) {}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CONTROLS — modes / cut / ghost
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('mode-seg').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-mode]');
+  if (!btn) return;
+  const m = btn.dataset.mode;
+  if (m === state.mode) return;
+  state.mode = m;
+  document.querySelectorAll('#mode-seg .pill')
+    .forEach(b => b.classList.toggle('active', b === btn));
+  document.getElementById('btn-flip').classList.toggle('hidden', m !== 'fold');
+  track('mode_selected', { mode: m });
+});
+
+document.getElementById('cut-seg').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-cut]');
+  if (!btn) return;
+  const c = btn.dataset.cut;
+  if (c === state.cut) return;
+  // Switching the cut clears the drawing — confirm if there's work.
+  if (state.strokes.length && !confirm('Switching the cut line clears your drawing. Continue?')) return;
+  state.cut = c;
+  state.strokes = [];
+  document.querySelectorAll('#cut-seg .pill')
+    .forEach(b => b.classList.toggle('active', b === btn));
+  renderPhoto();
+  renderStrokes();
+  track('cut_changed', { cut: c });
+});
+
+document.getElementById('btn-ghost').addEventListener('click', function () {
+  state.ghost = !state.ghost;
+  this.textContent = '👻 Ghost: ' + (state.ghost ? 'On' : 'Off');
+  this.classList.toggle('active', state.ghost);
+  renderPhoto();
+  track('ghost_toggled', { on: state.ghost });
+});
+
+/* ═══════════════════════════════════════════════════════════
+   CONTROLS — colours / brush / eraser
+   ═══════════════════════════════════════════════════════════ */
+const swatchRow = document.getElementById('swatches');
+COLORS.forEach((col) => {
+  const sw = document.createElement('button');
+  sw.className = 'swatch' + (col === state.color ? ' active' : '');
+  sw.style.background = col;
+  sw.dataset.color = col;
+  sw.setAttribute('aria-label', 'colour ' + col);
+  swatchRow.appendChild(sw);
+});
+swatchRow.addEventListener('click', (e) => {
+  const sw = e.target.closest('.swatch');
+  if (!sw) return;
+  state.color = sw.dataset.color;
+  state.eraser = false;
+  document.getElementById('btn-eraser').classList.remove('active');
+  document.querySelectorAll('.swatch')
+    .forEach(s => s.classList.toggle('active', s.dataset.color === state.color));
+  updateBrushPreview();
+});
+
+const slider = document.getElementById('brush-slider');
+const brushDot = document.getElementById('brush-dot');
+slider.addEventListener('input', () => {
+  state.brush = parseInt(slider.value, 10);
+  updateBrushPreview();
+});
+function updateBrushPreview() {
+  const d = Math.max(4, Math.min(state.brush, 40));
+  brushDot.style.width = d + 'px';
+  brushDot.style.height = d + 'px';
+  brushDot.style.background = state.eraser ? '#cbb' : state.color;
+}
+
+document.getElementById('btn-eraser').addEventListener('click', function () {
+  state.eraser = !state.eraser;
+  this.classList.toggle('active', state.eraser);
+  updateBrushPreview();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   CONTROLS — Fold & Flip / Undo / Clear
+   ═══════════════════════════════════════════════════════════ */
+document.getElementById('btn-flip').addEventListener('click', () => {
+  // Stamp a mirrored copy of the hand-drawn strokes across the divider.
+  // Idempotent: remove prior stamps first so repeated taps don't pile up.
+  const base = state.strokes.filter(s => !s.stamp);
+  const mirrored = base.map(s => ({
+    points: s.points.map(p => state.cut === 'vertical'
+      ? { x: 1 - p.x, y: p.y } : { x: p.x, y: 1 - p.y }),
+    color: s.color, nw: s.nw, eraser: s.eraser, mode: 'free', stamp: true,
+  }));
+  state.strokes = base.concat(mirrored);
+  renderStrokes();
+  track('mode_selected', { mode: 'fold', action: 'flip' });
+});
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (!state.strokes.length) return;
+  state.strokes.pop();
+  renderStrokes();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (state.strokes.length && !confirm('Clear your whole drawing?')) return;
+  state.strokes = [];
+  renderStrokes();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   REVEAL  (hold-to-peek with crossfade)
+   ═══════════════════════════════════════════════════════════ */
+let revealUsed = false;
+const revealBtn = document.getElementById('btn-reveal');
+
+function startReveal() {
+  if (!state.photo) return;
+  revealBtn.classList.add('holding');
+  revealTarget = 1;
+  kickReveal();
+  if (!revealUsed) { revealUsed = true; track('reveal_used'); }
+}
+function endReveal() {
+  revealBtn.classList.remove('holding');
+  revealTarget = 0;
+  kickReveal();
+}
+function kickReveal() {
+  if (revealRAF) return;
+  revealLast = 0;
+  revealRAF = requestAnimationFrame(stepReveal);
+}
+function stepReveal(t) {
+  if (!revealLast) revealLast = t;
+  const dt = t - revealLast;
+  revealLast = t;
+  const speed = 1 / REVEAL_MS;
+  if (revealCur < revealTarget) revealCur = Math.min(revealTarget, revealCur + dt * speed);
+  else                          revealCur = Math.max(revealTarget, revealCur - dt * speed);
+  renderPhoto(revealCur);
+  if (revealCur !== revealTarget) revealRAF = requestAnimationFrame(stepReveal);
+  else revealRAF = null;
+}
+
+// Pointer (covers mouse + touch + pen). Also guard against the pointer
+// leaving the button while held.
+revealBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); startReveal(); });
+revealBtn.addEventListener('pointerup', endReveal);
+revealBtn.addEventListener('pointercancel', endReveal);
+revealBtn.addEventListener('pointerleave', () => { if (revealTarget === 1) endReveal(); });
+// Keyboard accessibility: hold space / enter while focused.
+revealBtn.addEventListener('keydown', (e) => {
+  if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); startReveal(); }
+});
+revealBtn.addEventListener('keyup', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); endReveal(); }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORT — flatten / print picture / worksheet / save
+   ═══════════════════════════════════════════════════════════ */
+
+// Build a print-ready flattened canvas at the photo's native resolution.
+// Always renders the resting state (no ghost, no reveal) + the drawing.
+function buildFlat() {
+  const w = state.photo.w, h = state.photo.h;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  x.fillStyle = PAPER; x.fillRect(0, 0, w, h);
+  x.drawImage(state.photo.bmp, 0, 0, w, h);
+  const r = blankRect(w, h);
+  x.fillStyle = PAPER;
+  x.fillRect(r.x, r.y, r.w, r.h);          // opaque cover (no ghost in export)
+  renderStrokesTo(x, w, h, false);
+  return c;
+}
+
+function markCompleted(via) {
+  if (state.completedFired || state.strokes.filter(s => !s.stamp).length < COMPLETE_STROKES) return;
+  state.completedFired = true;
+  track('drawing_completed', { via: via, strokes: state.strokes.length });
+}
+
+document.getElementById('btn-print').addEventListener('click', () => {
+  if (!state.photo) return;
+  const url = buildFlat().toDataURL('image/png');
+  openPrintWindow(
+    'My Picture',
+    `<img src="${url}" alt="My finished picture">`,
+    'finish-the-picture'
+  );
+  track('print_picture');
+  markCompleted('print_picture');
+});
+
+document.getElementById('btn-worksheet').addEventListener('click', () => {
+  if (!state.photo) return;
+  const url = buildWorksheet().toDataURL('image/png');
+  openPrintWindow(
+    'Finish the Picture — Worksheet',
+    `<img src="${url}" alt="Finish-the-picture worksheet">`,
+    'finish-the-picture-worksheet'
+  );
+  track('print_worksheet');
+});
+
+document.getElementById('btn-save').addEventListener('click', () => {
+  if (!state.photo) return;
+  const url = buildFlat().toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'finish-the-picture.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  track('save_image');
+  markCompleted('save_image');
+});
+
+/* Worksheet: title strip + the photo half + an equal blank bordered box,
+   so a child can finish it by hand on paper. */
+function buildWorksheet() {
+  const pad = 40, gap = 28, titleH = 90, border = 4;
+  const halfW = state.photo.w, halfH = state.photo.h;
+  let panelW, panelH, vertical = state.cut === 'vertical';
+
+  // Each panel shows half the photo's footprint (the photo's drawable region).
+  const r = blankRect(state.photo.w, state.photo.h);
+  panelW = r.w; panelH = r.h;
+
+  let cw, ch;
+  if (vertical) {
+    cw = pad * 2 + panelW * 2 + gap;
+    ch = pad * 2 + titleH + panelH;
+  } else {
+    cw = pad * 2 + panelW;
+    ch = pad * 2 + titleH + panelH * 2 + gap;
+  }
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const x = c.getContext('2d');
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, cw, ch);
+
+  // Title
+  x.fillStyle = '#3a3026';
+  x.textAlign = 'center';
+  x.font = '700 46px "Caveat", cursive';
+  x.fillText('Finish the Picture!', cw / 2, pad + 46);
+  x.font = '400 20px "Fredoka", sans-serif';
+  x.fillStyle = '#8a7a64';
+  x.fillText('Draw the other half to match.', cw / 2, pad + 74);
+
+  const top = pad + titleH;
+  // Photo half = the side of the photo NOT in the blank region.
+  const photoSrc = vertical
+    ? { x: 0, y: 0, w: state.photo.w / 2, h: state.photo.h }
+    : { x: 0, y: 0, w: state.photo.w, h: state.photo.h / 2 };
+
+  if (vertical) {
+    // left: photo half, right: blank box
+    x.drawImage(state.photo.bmp, photoSrc.x, photoSrc.y, photoSrc.w, photoSrc.h,
+                pad, top, panelW, panelH);
+    drawBox(x, pad, top, panelW, panelH);
+    drawBlankBox(x, pad + panelW + gap, top, panelW, panelH, border);
+  } else {
+    // top: photo half, bottom: blank box
+    x.drawImage(state.photo.bmp, photoSrc.x, photoSrc.y, photoSrc.w, photoSrc.h,
+                pad, top, panelW, panelH);
+    drawBox(x, pad, top, panelW, panelH);
+    drawBlankBox(x, pad, top + panelH + gap, panelW, panelH, border);
+  }
+  return c;
+}
+
+function drawBox(x, bx, by, bw, bh) {
+  x.save(); x.strokeStyle = '#3a3026'; x.lineWidth = 3;
+  x.strokeRect(bx, by, bw, bh); x.restore();
+}
+function drawBlankBox(x, bx, by, bw, bh, border) {
+  x.save();
+  x.fillStyle = '#ffffff'; x.fillRect(bx, by, bw, bh);
+  x.strokeStyle = '#b9a47e'; x.lineWidth = border; x.setLineDash([12, 9]);
+  x.strokeRect(bx, by, bw, bh);
+  x.restore();
+}
+
+/* Open a print window sized to the image and trigger the dialog after the
+   image loads. Requires a user gesture (it's button-triggered) — important
+   for iOS Safari. */
+function openPrintWindow(title, bodyHTML, fileTitle) {
+  const win = window.open('', '_blank');
+  if (!win) {
+    alert('Please allow pop-ups to print.');
+    return;
+  }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>${fileTitle}</title>
+<style>
+  @page { margin: 12mm; }
+  html,body { margin:0; padding:0; background:#fff; }
+  .sheet { display:flex; align-items:center; justify-content:center;
+           min-height:100vh; padding:10px; }
+  img { max-width:100%; max-height:96vh; height:auto; display:block; }
+  @media print { .sheet { min-height:auto; } }
+</style></head>
+<body><div class="sheet">${bodyHTML}</div>
+<script>
+  (function(){
+    var img = document.querySelector('img');
+    function go(){ try { window.focus(); window.print(); } catch(e){} }
+    if (img && !img.complete) { img.onload = go; img.onerror = go; }
+    else { setTimeout(go, 120); }
+  })();
+<\/script>
+</body></html>`);
+  win.document.close();
+}
+
+/* ── Hint chip ───────────────────────────────────────────── */
+function flashHint() {
+  revealHint.classList.add('show');
+  setTimeout(() => revealHint.classList.remove('show'), 3200);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+updateBrushPreview();
+</script>
+
+<script src="/shared/config.js"></script>
+<script src="/shared/analytics.js"></script>
+<script src="/shared/kapework-shell.js"></script>
+<script>
+  KapeworkAnalytics.init('finishthepicture');
+  KapeworkShell.init({ appSlug: 'finishthepicture', mountId: 'kw-shell-mount' });
+</script>
+</body>
+</html>
