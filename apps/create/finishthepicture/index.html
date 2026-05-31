@@ -77,11 +77,20 @@ body {
   color: var(--ink); background: rgba(58,48,38,0.07);
 }
 
+/* ── Main area (stage + dock) ────────────────────────────── *
+   Column on phones (canvas on top, dock at the bottom); becomes a
+   row on wide screens so the dock turns into a side rail and the
+   canvas can use the full height. */
+#main-area {
+  flex: 1; min-height: 0; width: 100%;
+  display: flex; flex-direction: column;
+}
+
 /* ── Stage ───────────────────────────────────────────────── */
 #stage {
-  flex: 1; min-height: 0;
+  flex: 1; min-height: 0; min-width: 0;
   display: flex; align-items: center; justify-content: center;
-  padding: 6px 10px;
+  padding: 6px;
   position: relative;
 }
 
@@ -130,16 +139,71 @@ body {
 #photoCanvas { z-index: 1; pointer-events: none; }
 #drawCanvas  { z-index: 2; cursor: crosshair; touch-action: none; }
 
-/* ── Control dock ────────────────────────────────────────── */
+/* ── Control dock ────────────────────────────────────────── *
+   Phone: a slim always-on primary bar at the bottom + a slide-up
+   "More" sheet for secondary controls.
+   Wide:  the whole dock becomes a side rail (see @media below). */
 #dock {
   flex-shrink: 0;
   background: var(--paper-2);
   border-top: 1px solid var(--line);
-  padding: 8px 12px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column;
+}
+.dock-primary {
+  padding: 7px 10px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  display: flex; flex-direction: column; gap: 7px;
 }
 .dock-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* "More" group — a bottom sheet on phones, static in the rail on wide. */
+.dock-more { display: flex; flex-direction: column; gap: 9px; }
+.sheet-handle {
+  display: none; align-items: center; justify-content: space-between;
+  font-weight: 700; color: var(--ink); font-size: 0.95rem; padding-bottom: 2px;
+}
+.sheet-close {
+  font-family: inherit; font-weight: 700; font-size: 0.85rem;
+  background: var(--ink); color: #fff; border: none; border-radius: 999px;
+  padding: 7px 16px; cursor: pointer;
+}
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(58,48,38,0.30);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+
+@media (max-width: 819px) {
+  .sheet-handle { display: flex; }
+  .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+  .dock-more {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    background: var(--paper-2);
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 30px var(--shadow);
+    padding: 12px 14px max(16px, env(safe-area-inset-bottom, 16px));
+    transform: translateY(112%);
+    transition: transform 0.24s ease;
+  }
+  .dock-more.open { transform: translateY(0); }
+}
+
+/* Wide screens: dock → side rail, More group shown inline. */
+@media (min-width: 820px) {
+  #main-area { flex-direction: row; }
+  #stage { padding: 10px; }
+  #dock {
+    width: 244px; flex-shrink: 0;
+    border-top: none; border-left: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  .dock-primary { padding: 12px; gap: 9px; }
+  .dock-row { justify-content: flex-start; }
+  .more-toggle { display: none !important; }
+  .sheet-handle, .sheet-backdrop { display: none !important; }
+  .dock-more { padding: 0 12px 14px; }
+}
 
 /* pill / toggle buttons */
 .pill {
@@ -212,12 +276,13 @@ body {
 }
 #reveal-hint.show { opacity: 1; }
 
-/* responsiveness: stack brush + actions tighter on phones */
+/* responsiveness: keep the primary bar slim on phones */
 @media (max-width: 430px) {
   .brand-title { font-size: 1.5rem; }
-  .swatch { width: 30px; height: 30px; }
-  #brush-slider { width: 110px; }
-  .act { padding: 8px 10px; font-size: 0.8rem; }
+  .swatch { width: 28px; height: 28px; }
+  #brush-slider { width: 96px; }
+  .act, .pill.tiny { padding: 8px 10px; font-size: 0.8rem; }
+  .brush-preview-wrap { width: 40px; height: 40px; }
 }
 @media (max-width: 340px) {
   .brand-title { font-size: 1.25rem; }
@@ -241,74 +306,83 @@ body {
     </div>
   </div>
 
-  <!-- ── Stage ── -->
-  <main id="stage">
+  <!-- ── Main area: stage + dock (row on wide screens) ── -->
+  <div id="main-area">
 
-    <!-- Empty state -->
-    <div id="empty-state">
-      <div class="empty-art">🖼️✏️</div>
-      <div class="empty-head">Pick a photo<br>and finish the other half!</div>
-      <div class="empty-sub">Half stays real, you draw the rest. Then peek at the original to compare.</div>
-      <button class="btn big" id="btn-choose">Choose a Photo</button>
-      <div class="privacy-note">🔒 Your photo stays on this device</div>
-    </div>
+    <!-- ── Stage ── -->
+    <main id="stage">
 
-    <!-- Canvas (hidden until a photo is loaded) -->
-    <div id="canvas-wrap" class="hidden">
-      <canvas id="photoCanvas"></canvas>
-      <canvas id="drawCanvas"></canvas>
-    </div>
+      <!-- Empty state -->
+      <div id="empty-state">
+        <div class="empty-art">🖼️✏️</div>
+        <div class="empty-head">Pick a photo<br>and finish the other half!</div>
+        <div class="empty-sub">Half stays real, you draw the rest. Then peek at the original to compare.</div>
+        <button class="btn big" id="btn-choose">Choose a Photo</button>
+        <div class="privacy-note">🔒 Your photo stays on this device</div>
+      </div>
 
-    <div id="reveal-hint">Hold <b>Reveal</b> to peek at the original</div>
-  </main>
+      <!-- Canvas (hidden until a photo is loaded) -->
+      <div id="canvas-wrap" class="hidden">
+        <canvas id="photoCanvas"></canvas>
+        <canvas id="drawCanvas"></canvas>
+      </div>
 
-  <!-- ── Control dock ── -->
-  <div id="dock" class="hidden">
+      <div id="reveal-hint">Hold <b>Reveal</b> to peek at the original</div>
+    </main>
 
-    <!-- Row 1: modes -->
-    <div class="dock-row">
-      <div class="seg" id="mode-seg">
-        <button class="pill active" data-mode="free">✏️ Free Draw</button>
-        <button class="pill" data-mode="mirror">🪞 Mirror</button>
-        <button class="pill" data-mode="fold">📐 Fold &amp; Flip</button>
+    <!-- ── Control dock ── -->
+    <div id="dock" class="hidden">
+
+      <!-- PRIMARY bar — always visible (colours + brush + core actions) -->
+      <div class="dock-primary">
+        <div class="dock-row">
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="dock-row">
+          <div class="brush-group">
+            <div class="brush-preview-wrap"><div id="brush-dot"></div></div>
+            <input type="range" id="brush-slider" min="1" max="40" value="4" step="1" aria-label="Brush size">
+          </div>
+          <button class="pill tiny" id="btn-eraser">🧽 Eraser</button>
+          <button class="act" id="btn-undo">↶ Undo</button>
+          <button class="act hold" id="btn-reveal">👀 Reveal</button>
+          <button class="act more-toggle" id="btn-more">⚙️ More</button>
+        </div>
+      </div>
+
+      <!-- MORE group — slide-up sheet on phone, inline in the rail on wide -->
+      <div class="sheet-backdrop" id="sheet-backdrop"></div>
+      <div class="dock-more" id="dock-more">
+        <div class="sheet-handle">Options <button class="sheet-close" id="btn-more-close">Done</button></div>
+
+        <div class="dock-row">
+          <div class="seg" id="mode-seg">
+            <button class="pill active" data-mode="free">✏️ Free Draw</button>
+            <button class="pill" data-mode="mirror">🪞 Mirror</button>
+            <button class="pill" data-mode="fold">📐 Fold &amp; Flip</button>
+          </div>
+        </div>
+
+        <div class="dock-row">
+          <span class="dock-label">Cut</span>
+          <div class="seg" id="cut-seg">
+            <button class="pill active" data-cut="vertical" title="Vertical cut">↔</button>
+            <button class="pill" data-cut="horizontal" title="Horizontal cut">↕</button>
+          </div>
+          <button class="pill tiny" id="btn-ghost" title="Show a faint trace of the hidden half">👻 Ghost: Off</button>
+        </div>
+
+        <div class="dock-row">
+          <button class="act hidden" id="btn-flip">↩️ Flip it!</button>
+          <button class="act" id="btn-clear">✕ Clear</button>
+          <button class="act accent" id="btn-print">🖨️ Print</button>
+          <button class="act" id="btn-worksheet">📄 Worksheet</button>
+          <button class="act" id="btn-save">💾 Save</button>
+          <button class="act" id="btn-new">📷 New</button>
+        </div>
       </div>
     </div>
 
-    <!-- Row 2: cut + ghost -->
-    <div class="dock-row">
-      <span class="dock-label">Cut</span>
-      <div class="seg" id="cut-seg">
-        <button class="pill active" data-cut="vertical" title="Vertical cut">↔</button>
-        <button class="pill" data-cut="horizontal" title="Horizontal cut">↕</button>
-      </div>
-      <button class="pill tiny" id="btn-ghost" title="Show a faint trace of the hidden half">👻 Ghost: Off</button>
-    </div>
-
-    <!-- Row 3: colors -->
-    <div class="dock-row">
-      <div class="swatches" id="swatches"></div>
-    </div>
-
-    <!-- Row 4: brush + eraser -->
-    <div class="dock-row">
-      <div class="brush-group">
-        <div class="brush-preview-wrap"><div id="brush-dot"></div></div>
-        <input type="range" id="brush-slider" min="2" max="40" value="9" step="1" aria-label="Brush size">
-      </div>
-      <button class="pill tiny" id="btn-eraser">🧽 Eraser</button>
-    </div>
-
-    <!-- Row 5: actions -->
-    <div class="dock-row">
-      <button class="act hidden" id="btn-flip">↩️ Flip it!</button>
-      <button class="act hold" id="btn-reveal">👀 Reveal</button>
-      <button class="act" id="btn-undo">↶ Undo</button>
-      <button class="act" id="btn-clear">✕ Clear</button>
-      <button class="act accent" id="btn-print">🖨️ Print</button>
-      <button class="act" id="btn-worksheet">📄 Worksheet</button>
-      <button class="act" id="btn-save">💾 Save</button>
-      <button class="act" id="btn-new">📷 New</button>
-    </div>
   </div>
 </div>
 
@@ -364,7 +438,7 @@ const state = {
   cut:    'vertical',      // 'vertical' | 'horizontal'
   ghost:  false,
   color:  COLORS[0],
-  brush:  9,
+  brush:  4,
   eraser: false,
   strokes: [],             // {points:[{x,y}…], color, nw, eraser, mode, stamp?}
   photo:  null,            // { bmp, w, h }
@@ -469,11 +543,14 @@ function decodeViaImg(file) {
    ═══════════════════════════════════════════════════════════ */
 function fitCanvas() {
   if (!state.photo) return;
-  const maxW = Math.min(stage.clientWidth - 20, 700);
-  const maxH = stage.clientHeight - 20;
+  const availW = Math.max(80, stage.clientWidth  - 12);
+  const availH = Math.max(80, stage.clientHeight - 12);
   const ar = state.photo.w / state.photo.h;
-  let w = maxW, h = w / ar;
-  if (h > maxH) { h = maxH; w = h * ar; }
+  // Fill the available space, preserving aspect ratio…
+  let w = availW, h = w / ar;
+  if (h > availH) { h = availH; w = h * ar; }
+  // …but never upscale beyond the photo's own resolution (keeps it crisp).
+  if (w > state.photo.w) { w = state.photo.w; h = w / ar; }
   w = Math.max(80, Math.round(w));
   h = Math.max(80, Math.round(h));
 
@@ -495,14 +572,21 @@ function setCanvasPixels(canvas, ctx, wCss, hCss) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
-/* Re-fit (without destroying the drawing) on resize / orientation change.
-   Strokes are normalized, so they simply re-render at the new size. */
+/* Re-fit (without destroying the drawing) whenever the available space
+   changes — window resize, orientation flip, OR the dock/rail/sheet
+   changing the stage size. Strokes are normalized, so they simply
+   re-render at the new size. A ResizeObserver on the stage catches all
+   of these in one place. */
 let resizeTimer = null;
 function onResize() {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(fitCanvas, 80);
+  resizeTimer = setTimeout(fitCanvas, 60);
 }
-window.addEventListener('resize', onResize);
+if (window.ResizeObserver) {
+  new ResizeObserver(onResize).observe(stage);
+} else {
+  window.addEventListener('resize', onResize);
+}
 window.addEventListener('orientationchange', onResize);
 
 /* ═══════════════════════════════════════════════════════════
@@ -771,7 +855,7 @@ slider.addEventListener('input', () => {
   updateBrushPreview();
 });
 function updateBrushPreview() {
-  const d = Math.max(4, Math.min(state.brush, 40));
+  const d = Math.max(2, Math.min(state.brush, 40));
   brushDot.style.width = d + 'px';
   brushDot.style.height = d + 'px';
   brushDot.style.background = state.eraser ? '#cbb' : state.color;
@@ -1021,6 +1105,24 @@ function openPrintWindow(title, bodyHTML, fileTitle) {
 </body></html>`);
   win.document.close();
 }
+
+/* ═══════════════════════════════════════════════════════════
+   "MORE" SHEET  (bottom sheet on phone; inline in the rail on wide)
+   ═══════════════════════════════════════════════════════════ */
+const dockMore = document.getElementById('dock-more');
+const sheetBackdrop = document.getElementById('sheet-backdrop');
+function openMore()  { dockMore.classList.add('open');    sheetBackdrop.classList.add('open'); }
+function closeMore() { dockMore.classList.remove('open'); sheetBackdrop.classList.remove('open'); }
+document.getElementById('btn-more').addEventListener('click', () => {
+  dockMore.classList.contains('open') ? closeMore() : openMore();
+});
+document.getElementById('btn-more-close').addEventListener('click', closeMore);
+sheetBackdrop.addEventListener('click', closeMore);
+// Close the sheet after a terminal/navigational action so the canvas
+// comes straight back into view.
+['btn-print', 'btn-worksheet', 'btn-save', 'btn-new'].forEach((id) => {
+  document.getElementById(id).addEventListener('click', closeMore);
+});
 
 /* ── Hint chip ───────────────────────────────────────────── */
 function flashHint() {
