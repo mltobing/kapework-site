@@ -35,14 +35,31 @@ no PII) are sent, and they fail silently when offline.
 - **DPR-aware sizing** keeps lines sharp on retina screens.
 - **Adaptive layout** maximises the photo on every device:
   - **Phone:** the canvas goes near full-screen; a slim always-on bar
-    (colours + brush + eraser + Undo + Reveal) sits at the bottom, and a
-    **More** button opens a slide-up sheet with modes / cut / ghost /
-    print / worksheet / save / new.
+    sits at the bottom, and a 🎒 **More** button opens a slide-up sheet
+    with modes / cut / ghost / exact size / print / worksheet / save / new.
   - **Wide screens (laptop / tablet landscape):** the dock becomes a
     right-hand **side rail**, so the canvas uses the full height.
   - The canvas fills the available space but never upscales beyond the
     photo's own resolution (so it stays crisp). A `ResizeObserver` on the
     stage re-fits on any layout change without losing the drawing.
+
+### "Kid Mode" UI (designed for a 7-year-old)
+- **Crayon-sized colour swatches** in a tidy 2×6 grid (46px touch targets),
+  with a "pop" animation on selection.
+- **Brush size as four big dots** (fine / small / medium / large) that show
+  their *true* thickness in the current colour — kids think "thin vs fat,"
+  not pixels. An exact 1–40px slider lives in the **More** sheet and stays
+  in sync with the dots.
+- **Round icon buttons** for eraser and undo; a dominant amber
+  **"👀 Hold to Peek!"** hero button so the magic reveal is the obvious
+  thing to try.
+- **Squash-and-bounce press feedback** on every control (disabled under
+  `prefers-reduced-motion`).
+- A one-time hand-written **"Draw here! ✏️"** hint bobs over the blank half
+  until the first stroke, then disappears. The play area stays clean while
+  drawing — no clutter over the photo.
+- On phones the top bar **shrinks to just the 🖼️ emoji** while editing to
+  give the canvas more height (full title returns on desktop / start screen).
 
 ## Modes
 
@@ -67,7 +84,9 @@ the comparison is self-judged, per Kapework philosophy.
 ## Tools
 
 - 12-colour swatch palette (selected swatch enlarges)
-- Brush size slider (1–40px, defaults to a fine 4px for precise, pencil-like drawing) with a live preview dot
+- Brush size: four big size-dot buttons (fine ~2px / small 5px default /
+  medium 12px / large 24px), plus an exact 1–40px slider in the More sheet
+  (the two stay in sync) — defaults to small for precise, pencil-like drawing
 - Eraser (`destination-out` on the draw layer only — never touches the photo)
 - Undo (pops the last stroke; instant) · Clear (confirms)
 - New photo (re-runs the import flow)

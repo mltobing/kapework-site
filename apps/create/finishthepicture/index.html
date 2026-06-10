@@ -194,12 +194,16 @@ body {
   #main-area { flex-direction: row; }
   #stage { padding: 10px; }
   #dock {
-    width: 244px; flex-shrink: 0;
+    width: 264px; flex-shrink: 0;
     border-top: none; border-left: 1px solid var(--line);
     overflow-y: auto;
   }
-  .dock-primary { padding: 12px; gap: 9px; }
-  .dock-row { justify-content: flex-start; }
+  .dock-primary { padding: 12px; gap: 12px; }
+  .dock-row { justify-content: center; }
+  /* #dock scope raises specificity above the base .swatch rule below */
+  #dock .swatches { grid-template-columns: repeat(6, 34px); gap: 7px; }
+  #dock .swatch { width: 34px; height: 34px; }
+  .brush-dots { flex-wrap: wrap; }
   .more-toggle { display: none !important; }
   .sheet-handle, .sheet-backdrop { display: none !important; }
   .dock-more { padding: 0 12px 14px; }
@@ -227,42 +231,106 @@ body {
 
 .dock-label { font-size: 0.72rem; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 
-/* color swatches */
-.swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+/* color swatches — crayon-sized, tidy 2×6 grid */
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 46px);
+  gap: 9px; justify-content: center; margin: 0 auto;
+}
 .swatch {
-  width: 34px; height: 34px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 50%;
   border: 3px solid #fff; cursor: pointer;
   box-shadow: 0 0 0 1.5px var(--line), 0 2px 4px var(--shadow);
   transition: transform 0.1s;
 }
 .swatch:hover { transform: scale(1.1); }
-.swatch.active { transform: scale(1.22); box-shadow: 0 0 0 2px var(--ink), 0 2px 6px var(--shadow); }
+.swatch.active {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 3px var(--ink), 0 3px 7px var(--shadow);
+  animation: pop 0.28s ease;
+}
+@keyframes pop {
+  0% { transform: scale(0.9); }
+  55% { transform: scale(1.32); }
+  100% { transform: scale(1.18); }
+}
 
-/* brush controls */
-.brush-group { display: flex; align-items: center; gap: 10px; }
-.brush-preview-wrap {
+/* brush size — discrete dot buttons (true thickness preview) */
+.brush-dots { display: flex; align-items: center; gap: 8px; justify-content: center; }
+.size-dot {
+  width: 48px; height: 48px; flex-shrink: 0;
+  background: var(--paper); border: 2px solid var(--line); border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s, border-color 0.12s, box-shadow 0.12s;
+}
+.size-dot > i {
+  display: block; border-radius: 50%; background: var(--ink);
+  transition: background 0.12s;
+}
+.size-dot:hover { border-color: var(--ink-soft); }
+.size-dot.active {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal), 0 2px 6px var(--shadow);
+}
+/* exact slider lives in the More sheet */
+.exact-size { display: flex; align-items: center; gap: 10px; }
+.exact-size .brush-preview-wrap {
   width: 44px; height: 44px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   background: var(--paper); border: 2px solid var(--line); border-radius: 12px;
 }
 #brush-dot { border-radius: 50%; background: var(--ink); }
-#brush-slider { width: 150px; accent-color: var(--coral); height: 34px; cursor: pointer; }
+#brush-slider { flex: 1; min-width: 120px; accent-color: var(--coral); height: 34px; cursor: pointer; }
+
+/* round icon buttons (eraser / undo) */
+.icon-round {
+  width: 48px; height: 48px; flex-shrink: 0;
+  background: var(--paper); color: var(--ink);
+  border: 2px solid var(--line); border-radius: 50%;
+  cursor: pointer; font-size: 1.25rem; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform 0.1s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.icon-round:hover { border-color: var(--ink-soft); }
+.icon-round.active {
+  background: var(--teal); color: #fff; border-color: var(--teal);
+  box-shadow: 0 2px 0 rgba(43,185,168,0.4);
+}
 
 /* action row buttons */
 .act {
   font-family: inherit; font-weight: 600; font-size: 0.85rem;
   background: var(--paper); color: var(--ink);
   border: 2px solid var(--line); border-radius: 14px;
-  padding: 9px 13px; cursor: pointer; min-height: 42px;
+  padding: 9px 13px; cursor: pointer; min-height: 44px;
   display: inline-flex; align-items: center; gap: 5px;
-  transition: all 0.12s;
+  transition: transform 0.1s, border-color 0.12s, box-shadow 0.12s;
 }
 .act:hover { border-color: var(--ink-soft); }
-.act:active { transform: translateY(2px); }
 .act.accent { background: var(--coral); color: #fff; border-color: var(--coral); box-shadow: 0 3px 0 var(--coral-d); }
-.act.accent:active { transform: translateY(3px); box-shadow: 0 0 0 var(--coral-d); }
-.act.hold { background: var(--amber); color: #fff; border-color: var(--amber); box-shadow: 0 3px 0 #d8901f; touch-action: none; }
-.act.hold.holding { transform: translateY(3px); box-shadow: 0 0 0 #d8901f; filter: brightness(1.08); }
+.act.accent:active { box-shadow: 0 0 0 var(--coral-d); }
+
+/* Hero "Hold to Peek!" button — the magic moment, biggest control */
+.hero-row { display: flex; align-items: center; gap: 8px; }
+.act.hold {
+  flex: 1; min-height: 58px; font-size: 1.05rem; font-weight: 700;
+  border-radius: 18px;
+  background: var(--amber); color: #fff; border: none;
+  box-shadow: 0 4px 0 #d8901f; touch-action: none;
+}
+.act.hold.holding { box-shadow: 0 0 0 #d8901f; filter: brightness(1.08); }
+/* "More" — compact round backpack button beside the hero */
+.more-toggle {
+  width: 52px; height: 52px; flex-shrink: 0; padding: 0;
+  border-radius: 16px; font-size: 1.3rem; min-height: 52px;
+}
+
+/* squash-and-bounce press feedback (shared) */
+.swatch:active, .size-dot:active, .icon-round:active,
+.act:active, .pill:active, .more-toggle:active {
+  transform: scale(0.93);
+}
+.act.hold:active { transform: scale(0.97); }
 
 .hidden { display: none !important; }
 
@@ -276,17 +344,42 @@ body {
 }
 #reveal-hint.show { opacity: 1; }
 
-/* responsiveness: keep the primary bar slim on phones */
+/* "Draw here!" hint over the blank half (until first stroke) */
+#draw-hint {
+  position: absolute; z-index: 4; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--ink-soft); text-align: center;
+  transition: opacity 0.3s; opacity: 0;
+}
+#draw-hint.show { opacity: 0.85; animation: bob 1.8s ease-in-out infinite; }
+#draw-hint .dh-emoji { font-size: 1.9rem; line-height: 1; }
+#draw-hint .dh-text { font-family: 'Caveat', cursive; font-weight: 700; font-size: 1.5rem; }
+/* Centring (translate -50%,-50%) is baked in so the bob doesn't undo it. */
+@keyframes bob {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-7px); }
+}
+
+/* responsiveness: tune the kid-mode bar on phones */
 @media (max-width: 430px) {
   .brand-title { font-size: 1.5rem; }
-  .swatch { width: 28px; height: 28px; }
-  #brush-slider { width: 96px; }
   .act, .pill.tiny { padding: 8px 10px; font-size: 0.8rem; }
-  .brush-preview-wrap { width: 40px; height: 40px; }
 }
 @media (max-width: 340px) {
   .brand-title { font-size: 1.25rem; }
   .back-link { display: none; }
+}
+
+/* shrink the top bar to emoji-only while editing on phones */
+@media (max-width: 819px) {
+  body.editing .brand-title { display: none; }
+  body.editing .topbar { padding-top: max(5px, env(safe-area-inset-top, 5px)); padding-bottom: 5px; }
+  body.editing .brand-emoji { font-size: 1.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch.active { animation: none; }
+  #draw-hint.show { animation: none; }
 }
   </style>
 </head>
@@ -325,28 +418,36 @@ body {
       <div id="canvas-wrap" class="hidden">
         <canvas id="photoCanvas"></canvas>
         <canvas id="drawCanvas"></canvas>
+        <div id="draw-hint">
+          <span class="dh-emoji">✏️</span>
+          <span class="dh-text">Draw here!</span>
+        </div>
       </div>
 
-      <div id="reveal-hint">Hold <b>Reveal</b> to peek at the original</div>
+      <div id="reveal-hint">Hold <b>Peek</b> to see the original</div>
     </main>
 
     <!-- ── Control dock ── -->
     <div id="dock" class="hidden">
 
-      <!-- PRIMARY bar — always visible (colours + brush + core actions) -->
+      <!-- PRIMARY bar — always visible (colours + sizes + core actions) -->
       <div class="dock-primary">
         <div class="dock-row">
           <div class="swatches" id="swatches"></div>
         </div>
         <div class="dock-row">
-          <div class="brush-group">
-            <div class="brush-preview-wrap"><div id="brush-dot"></div></div>
-            <input type="range" id="brush-slider" min="1" max="40" value="4" step="1" aria-label="Brush size">
+          <div class="brush-dots" id="brush-dots">
+            <button class="size-dot" data-size="2"  aria-label="Fine brush"><i></i></button>
+            <button class="size-dot active" data-size="5"  aria-label="Small brush"><i></i></button>
+            <button class="size-dot" data-size="12" aria-label="Medium brush"><i></i></button>
+            <button class="size-dot" data-size="24" aria-label="Large brush"><i></i></button>
+            <button class="icon-round" id="btn-eraser" aria-label="Eraser" title="Eraser">🧽</button>
+            <button class="icon-round" id="btn-undo" aria-label="Undo" title="Undo">↶</button>
           </div>
-          <button class="pill tiny" id="btn-eraser">🧽 Eraser</button>
-          <button class="act" id="btn-undo">↶ Undo</button>
-          <button class="act hold" id="btn-reveal">👀 Reveal</button>
-          <button class="act more-toggle" id="btn-more">⚙️ More</button>
+        </div>
+        <div class="dock-row hero-row">
+          <button class="act hold" id="btn-reveal">👀 Hold to Peek!</button>
+          <button class="act more-toggle" id="btn-more" aria-label="More options" title="More">🎒</button>
         </div>
       </div>
 
@@ -360,6 +461,14 @@ body {
             <button class="pill active" data-mode="free">✏️ Free Draw</button>
             <button class="pill" data-mode="mirror">🪞 Mirror</button>
             <button class="pill" data-mode="fold">📐 Fold &amp; Flip</button>
+          </div>
+        </div>
+
+        <div class="dock-row">
+          <span class="dock-label">Exact size</span>
+          <div class="exact-size">
+            <div class="brush-preview-wrap"><div id="brush-dot"></div></div>
+            <input type="range" id="brush-slider" min="1" max="40" value="5" step="1" aria-label="Exact brush size">
           </div>
         </div>
 
@@ -438,11 +547,12 @@ const state = {
   cut:    'vertical',      // 'vertical' | 'horizontal'
   ghost:  false,
   color:  COLORS[0],
-  brush:  4,
+  brush:  5,
   eraser: false,
   strokes: [],             // {points:[{x,y}…], color, nw, eraser, mode, stamp?}
   photo:  null,            // { bmp, w, h }
   completedFired: false,
+  drawnOnce: false,        // hides the "Draw here!" hint after first stroke
 };
 
 let W = 0, H = 0;          // logical (CSS px) canvas dimensions
@@ -459,6 +569,7 @@ const fileInput  = document.getElementById('file-input');
 const emptyState = document.getElementById('empty-state');
 const dock       = document.getElementById('dock');
 const revealHint = document.getElementById('reveal-hint');
+const drawHint   = document.getElementById('draw-hint');
 
 /* ── Analytics helper (fails silently if absent / offline) ── */
 function track(name, props) {
@@ -481,10 +592,13 @@ fileInput.addEventListener('change', async (e) => {
     state.photo = bmp;
     state.strokes = [];
     state.completedFired = false;
+    state.drawnOnce = false;
     emptyState.classList.add('hidden');
     wrap.classList.remove('hidden');
     dock.classList.remove('hidden');
+    document.body.classList.add('editing');   // shrink top bar on phones
     fitCanvas();
+    showDrawHint();
     flashHint();
     track('photo_imported', { w: bmp.w, h: bmp.h });
     if (window.KapeworkAnalytics) { try { window.KapeworkAnalytics.runStart({ mode: state.mode }); } catch (e2) {} }
@@ -561,6 +675,26 @@ function fitCanvas() {
   setCanvasPixels(drawCanvas,  dctx, w, h);
   renderPhoto();
   renderStrokes();
+  positionDrawHint();
+}
+
+/* Centre the "Draw here!" hint over the blank half (uses the same
+   geometry as drawing). pointer-events:none so it never blocks input. */
+function positionDrawHint() {
+  if (!drawHint) return;
+  const r = blankRect(W, H);
+  drawHint.style.left = (r.x + r.w / 2) + 'px';
+  drawHint.style.top  = (r.y + r.h / 2) + 'px';
+  drawHint.style.transform = 'translate(-50%, -50%)';
+}
+function showDrawHint() {
+  if (state.drawnOnce) return;
+  positionDrawHint();
+  drawHint.classList.add('show');
+}
+function hideDrawHint() {
+  state.drawnOnce = true;
+  drawHint.classList.remove('show');
 }
 
 function setCanvasPixels(canvas, ctx, wCss, hCss) {
@@ -735,6 +869,7 @@ drawCanvas.addEventListener('pointerdown', (e) => {
   };
   // Paint the initial dot immediately for responsiveness.
   paintLiveSeg(p, p, current);
+  hideDrawHint();
   firstInteractionOnce();
 });
 
@@ -848,17 +983,44 @@ swatchRow.addEventListener('click', (e) => {
   updateBrushPreview();
 });
 
+/* Brush size: 4 discrete dot buttons (kid-easy) in the main bar, plus an
+   exact 1–40px slider in the More sheet. They stay in sync — picking a dot
+   moves the slider, and the slider highlights a dot only on an exact match. */
 const slider = document.getElementById('brush-slider');
 const brushDot = document.getElementById('brush-dot');
-slider.addEventListener('input', () => {
-  state.brush = parseInt(slider.value, 10);
+const sizeDots = document.getElementById('brush-dots');
+
+function setBrush(size, fromSlider) {
+  state.brush = Math.max(1, Math.min(size, 40));
+  if (!fromSlider) slider.value = state.brush;
+  // Highlight a dot only when its preset matches exactly.
+  document.querySelectorAll('.size-dot').forEach((d) =>
+    d.classList.toggle('active', parseInt(d.dataset.size, 10) === state.brush));
   updateBrushPreview();
+}
+
+sizeDots.addEventListener('click', (e) => {
+  const dot = e.target.closest('.size-dot');
+  if (!dot) return;
+  setBrush(parseInt(dot.dataset.size, 10), false);
 });
+slider.addEventListener('input', () => setBrush(parseInt(slider.value, 10), true));
+
 function updateBrushPreview() {
+  const tint = state.eraser ? '#cbb' : state.color;
+  // Slider preview dot
   const d = Math.max(2, Math.min(state.brush, 40));
   brushDot.style.width = d + 'px';
   brushDot.style.height = d + 'px';
-  brushDot.style.background = state.eraser ? '#cbb' : state.color;
+  brushDot.style.background = tint;
+  // Size-dot inner circles: render true thickness, tinted to current colour
+  document.querySelectorAll('.size-dot > i').forEach((i) => {
+    const s = parseInt(i.parentElement.dataset.size, 10);
+    const px = Math.max(4, Math.min(s, 30));   // cap so it fits the 48px button
+    i.style.width = px + 'px';
+    i.style.height = px + 'px';
+    i.style.background = tint;
+  });
 }
 
 document.getElementById('btn-eraser').addEventListener('click', function () {
