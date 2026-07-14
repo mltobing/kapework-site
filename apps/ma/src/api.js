@@ -9,7 +9,7 @@
  * Expected Supabase schema:
  *   ma_families, ma_profiles, ma_family_members,
  *   ma_posts, ma_comments, ma_attachments,
- *   ma_calendar_sources, ma_calendar_events
+ *   ma_calendar_sources, ma_calendar_events, ma_briefings
  *
  * Foreign-key joins assume:
  *   ma_posts.author_id          → ma_profiles.user_id
@@ -201,6 +201,61 @@ export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
     .limit(limit);
   if (error) throw error;
   return data ?? [];
+}
+
+// ─── Briefings ────────────────────────────────────────────────────────────────
+
+/**
+ * Today's date in Europe/Amsterdam as an ISO date string (YYYY-MM-DD).
+ * Briefing boundaries follow the family's local day, not the browser's.
+ */
+function amsterdamToday() {
+  // 'en-CA' formats as YYYY-MM-DD; timeZone pins the day to Amsterdam.
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Amsterdam' });
+}
+
+/**
+ * Fetch generated briefings from today onward (Europe/Amsterdam), soonest first.
+ * Texts are written only by the sync job; this app reads them and flips status.
+ */
+export async function fetchBriefings(familyId, { limit = 7 } = {}) {
+  const { data, error } = await supabase
+    .from('ma_briefings')
+    .select('id, family_id, briefing_date, caren_text, whatsapp_text, status, sent_at, sent_by, generated_at')
+    .eq('family_id', familyId)
+    .gte('briefing_date', amsterdamToday())
+    .order('briefing_date', { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Mark a briefing as sent by the current user. Returns the updated row.
+ */
+export async function markBriefingSent(id, userId) {
+  const { data, error } = await supabase
+    .from('ma_briefings')
+    .update({ status: 'sent', sent_at: new Date().toISOString(), sent_by: userId })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Reopen a briefing (undo "sent"), clearing the sent metadata. Returns the row.
+ */
+export async function reopenBriefing(id) {
+  const { data, error } = await supabase
+    .from('ma_briefings')
+    .update({ status: 'ready', sent_at: null, sent_by: null })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 // ─── People ──────────────────────────────────────────────────────────────────
