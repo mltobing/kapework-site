@@ -21,6 +21,7 @@ import { fetchProfile, fetchFamilyId } from './api.js';
 import { renderTopbar }               from './components/topbar.js';
 import { renderNav }                  from './components/nav.js';
 import { mount as mountToday }        from './views/today.js';
+import { mount as mountBriefing }     from './views/briefing.js';
 import { mount as mountFamily }       from './views/family.js';
 import { mount as mountPhotos }       from './views/photos.js';
 import { mount as mountCalendar }     from './views/calendar.js';
@@ -29,6 +30,7 @@ import { mount as mountCompose }      from './views/compose.js';
 
 const VIEWS = {
   today:    mountToday,
+  briefing: mountBriefing,
   family:   mountFamily,
   photos:   mountPhotos,
   calendar: mountCalendar,

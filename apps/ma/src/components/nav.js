@@ -9,6 +9,7 @@ import { navigate } from '../router.js';
 
 const TABS = [
   { id: 'today',    label: 'Today',    icon: iconToday()    },
+  { id: 'briefing', label: 'Briefing', icon: iconBriefing() },
   { id: 'family',   label: 'Family',   icon: iconFamily()   },
   { id: 'photos',   label: 'Photos',   icon: iconPhotos()   },
   { id: 'calendar', label: 'Calendar', icon: iconCalendar() },
@@ -54,6 +55,16 @@ function iconToday() {
     <line x1="17.66" y1="17.66" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     <line x1="4.22"  y1="19.78" x2="6.34"  y2="17.66" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     <line x1="17.66" y1="6.34"  x2="19.78" y2="4.22"  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function iconBriefing() {
+  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="8" y="3" width="8" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+    <path d="M9 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="8"  y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="8"  y1="16" x2="13" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
   </svg>`;
 }
 

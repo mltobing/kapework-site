@@ -50,6 +50,7 @@ apps/ma/
 
     views/
       today.js          Today tab: greeting, recent posts, upcoming events
+      briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts
       family.js         Family tab: chronological feed + compose FAB
       photos.js         Photos tab: 3-column photo grid
       calendar.js       Calendar tab: read-only event agenda
@@ -58,7 +59,7 @@ apps/ma/
 
     components/
       topbar.js         Top app bar with menu / sign out
-      nav.js            Bottom tab bar (Today · Family · Photos · Calendar · People)
+      nav.js            Bottom tab bar (Today · Briefing · Family · Photos · Calendar · People)
       post-card.js      Post display with async photo loading
       comment-list.js   Comment thread + reply input
       event-card.js     Calendar event card
@@ -183,6 +184,7 @@ ma_calendar_events (
   family_id          uuid references ma_families(id),
   source_id          uuid references ma_calendar_sources(id),
   external_event_uid text,
+  external_uid       text unique,   -- iCal UID the irma-sync job upserts on
   title              text not null,
   starts_at          timestamptz not null,
   ends_at            timestamptz,
@@ -192,6 +194,23 @@ ma_calendar_events (
   external_url       text,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
+)
+
+-- Generated daily briefing texts (see supabase-migrations/003_ma_briefings.sql)
+-- Written only by the private irma-sync job (service role). Members read all
+-- rows and flip status; the generated texts are immutable to members.
+ma_briefings (
+  id            uuid primary key,
+  family_id     uuid references ma_families(id) on delete cascade,
+  briefing_date date not null,
+  caren_text    text,               -- Caren cluster line + WINDOW line
+  whatsapp_text text,               -- WhatsApp evening reminder draft
+  source_hash   text not null,      -- SHA-256 of the day's source clusters
+  status        text not null,      -- 'ready' | 'sent' | 'changed_after_sent'
+  sent_at       timestamptz,
+  sent_by       uuid references ma_profiles(user_id),
+  generated_at  timestamptz default now(),
+  unique (family_id, briefing_date)
 )
 ```
 
@@ -203,6 +222,8 @@ All tables should have RLS enabled.  At minimum:
 - `ma_family_members`: members can read rows where `family_id` matches their family
 - `ma_posts`, `ma_comments`, `ma_attachments`: members can read/insert where `family_id` matches
 - `ma_calendar_events`, `ma_calendar_sources`: read-only for family members
+- `ma_briefings`: members read all family rows and may update only the status /
+  sent fields; inserts and text edits are service-role-only (see migration 003)
 - `ma_families`: read for members
 
 ### Storage bucket

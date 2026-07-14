@@ -5,7 +5,7 @@
  * Routes correspond to the bottom-tab navigation tabs.
  */
 
-const TABS = new Set(['today', 'family', 'photos', 'calendar', 'people', 'compose']);
+const TABS = new Set(['today', 'briefing', 'family', 'photos', 'calendar', 'people', 'compose']);
 
 const _listeners = new Set();
 
