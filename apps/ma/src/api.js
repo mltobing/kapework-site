@@ -39,6 +39,22 @@ export async function fetchProfile(userId) {
 }
 
 /**
+ * Create the ma_profiles row for the current user on first sign-in.
+ * Permitted by the `ma_profiles: insert own` RLS policy (user_id = auth.uid()).
+ * `relationship` is left null — it isn't required.
+ * Returns the inserted row.
+ */
+export async function createProfile({ userId, displayName }) {
+  const { data, error } = await supabase
+    .from('ma_profiles')
+    .insert({ user_id: userId, display_name: displayName })
+    .select('user_id, display_name, relationship, avatar_url')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Fetch the family_id for a given auth user id.
  * Returns null if the user is not a member of any family.
  */
