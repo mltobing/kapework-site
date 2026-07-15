@@ -351,6 +351,47 @@ h1, h2, h3 { line-height: 1.25; }
   margin-top: var(--sp-6);
 }
 
+/* Calm confirmation ("Check je e-mail…") — deliberately not an error colour. */
+.auth-message {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.auth-success {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* Gentle notice above the form (e.g. expired link) — informational, not alarming. */
+.auth-notice {
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: center;
+  margin-bottom: var(--sp-5);
+}
+
+/* Secondary text toggle (password fallback, sign-out) — subordinate to the CTA. */
+.auth-toggle {
+  display: block;
+  margin: var(--sp-4) auto 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.auth-toggle:active { opacity: .6; }
+
 /* ─── Buttons ───────────────────────────────────────────────────────────── */
 .btn-primary {
   background: var(--accent);
