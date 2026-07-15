@@ -10,6 +10,7 @@
 
 import { fetchEvents }     from '../api.js';
 import { renderEventCard } from '../components/event-card.js';
+import { amsDateKey, todayAms, addDaysKey } from '../lib/datetime.js';
 
 /**
  * @param {HTMLElement} container
@@ -71,25 +72,27 @@ export async function mount(container, { familyId }) {
 
 /**
  * Groups events into Today / This week / Coming up buckets.
- * Boundaries are in local time (correct for calendar display).
+ * Boundaries follow the Amsterdam calendar day, so an event never lands in the
+ * wrong bucket because the viewer is in a different timezone.
  *
  * @param {Array} events — sorted ascending by starts_at
  * @returns {Array<[string, Array]>}
  */
 function groupByTime(events) {
-  const now      = new Date();
-  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const weekEnd  = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+  const todayKey    = todayAms();
+  const tomorrowKey = addDaysKey(todayKey, 1);
+  const weekEndKey  = addDaysKey(todayKey, 7);
 
   const today    = [];
   const thisWeek = [];
   const later    = [];
 
   for (const event of events) {
-    const start = new Date(event.starts_at);
-    if (start < midnight)       today.push(event);
-    else if (start < weekEnd)   thisWeek.push(event);
-    else                        later.push(event);
+    // YYYY-MM-DD keys compare chronologically as plain strings.
+    const key = amsDateKey(event.starts_at);
+    if (key < tomorrowKey)     today.push(event);
+    else if (key < weekEndKey) thisWeek.push(event);
+    else                       later.push(event);
   }
 
   return [
