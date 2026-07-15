@@ -20,6 +20,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { todayAms, startOfTodayAmsISO } from './lib/datetime.js';
 
 // ─── Profile & family membership ────────────────────────────────────────────
 
@@ -189,9 +190,14 @@ export async function fetchPhotos(familyId, { limit = 60, offset = 0 } = {}) {
  * Fetch upcoming calendar events from the mirrored ma_calendar_events table.
  * Events are read-only; the source of truth is the family iCloud calendar,
  * synced separately into this table.
+ *
+ * The default lower bound is the start of *today in Amsterdam*, not "now", so
+ * that today's already-started events and all-day rows (stored at Amsterdam
+ * midnight) are included rather than dropped as "past" — the schedule belongs
+ * to the person in Amsterdam, not to the viewer's clock.
  */
 export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
-  const fromDate = from ?? new Date().toISOString();
+  const fromDate = from ?? startOfTodayAmsISO();
   const { data, error } = await supabase
     .from('ma_calendar_events')
     .select('id, title, starts_at, ends_at, all_day, location, notes, external_url')
@@ -206,15 +212,6 @@ export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
 // ─── Briefings ────────────────────────────────────────────────────────────────
 
 /**
- * Today's date in Europe/Amsterdam as an ISO date string (YYYY-MM-DD).
- * Briefing boundaries follow the family's local day, not the browser's.
- */
-function amsterdamToday() {
-  // 'en-CA' formats as YYYY-MM-DD; timeZone pins the day to Amsterdam.
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Amsterdam' });
-}
-
-/**
  * Fetch generated briefings from today onward (Europe/Amsterdam), soonest first.
  * Texts are written only by the sync job; this app reads them and flips status.
  */
@@ -223,7 +220,7 @@ export async function fetchBriefings(familyId, { limit = 7 } = {}) {
     .from('ma_briefings')
     .select('id, family_id, briefing_date, caren_text, whatsapp_text, status, sent_at, sent_by, generated_at')
     .eq('family_id', familyId)
-    .gte('briefing_date', amsterdamToday())
+    .gte('briefing_date', todayAms())
     .order('briefing_date', { ascending: true })
     .limit(limit);
   if (error) throw error;

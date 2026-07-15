@@ -3,22 +3,27 @@
  *
  * Renders a single calendar event as a DOM element.
  * Events are read-only — the source of truth is the family iCloud calendar.
+ *
+ * All dates and times are rendered in Europe/Amsterdam (see src/lib/datetime.js),
+ * so an event reads the same for every viewer regardless of their device timezone.
  */
 
-import { formatTime, escapeHtml } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { formatTime, dayNumberAms, monthShortAms } from '../lib/datetime.js';
 
 /**
- * @param {object} event — row from ma_calendar_events
+ * @param {object}  event          — row from ma_calendar_events
+ * @param {object}  [opts]
+ * @param {boolean} [opts.past=false] — de-emphasise an event that has already ended
  * @returns {HTMLElement}
  */
-export function renderEventCard(event) {
+export function renderEventCard(event, { past = false } = {}) {
   const card = document.createElement('div');
-  card.className = 'event-card';
+  card.className = past ? 'event-card event-card--past' : 'event-card';
 
-  const start   = new Date(event.starts_at);
-  const dayNum  = start.getDate();
-  const monthAbbr = start.toLocaleDateString('en-US', { month: 'short' });
-  const timeStr = event.all_day ? 'All day' : formatTime(event.starts_at);
+  const dayNum    = dayNumberAms(event.starts_at);
+  const monthAbbr = monthShortAms(event.starts_at);
+  const timeStr   = event.all_day ? 'Hele dag' : formatTime(event.starts_at);
 
   const locationHtml = event.location ? `
     <div class="event-location">

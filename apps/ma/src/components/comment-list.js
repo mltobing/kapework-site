@@ -8,7 +8,8 @@
 
 import { fetchComments, addComment } from '../api.js';
 import { getState }                  from '../state.js';
-import { formatRelative, escapeHtml } from '../utils.js';
+import { escapeHtml }     from '../utils.js';
+import { formatRelative } from '../lib/datetime.js';
 
 /**
  * Renders the comment list (and reply form) into `container`.

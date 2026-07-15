@@ -8,7 +8,8 @@
  * If showComments is true, a comment thread is appended below the post body.
  */
 
-import { formatRelative, escapeHtml, getInitial } from '../utils.js';
+import { escapeHtml, getInitial } from '../utils.js';
+import { formatRelative }         from '../lib/datetime.js';
 import { getPhotoUrl }                             from '../storage.js';
 import { renderCommentList }                       from './comment-list.js';
 

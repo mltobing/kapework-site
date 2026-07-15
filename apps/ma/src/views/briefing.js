@@ -14,7 +14,8 @@
 
 import { fetchBriefings, markBriefingSent, reopenBriefing } from '../api.js';
 import { getState }   from '../state.js';
-import { escapeHtml, formatRelative } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { formatRelative, formatDateKeyHeader } from '../lib/datetime.js';
 
 const STATUS_BADGE = {
   ready:              { label: 'Klaar',                     cls: 'briefing-badge--ready'   },
@@ -169,7 +170,7 @@ function renderCard(b) {
   return `
     <article class="briefing-card">
       <header class="briefing-card-head">
-        <h2 class="briefing-date">${escapeHtml(formatDutchDate(b.briefing_date))}</h2>
+        <h2 class="briefing-date">${escapeHtml(formatDateKeyHeader(b.briefing_date))}</h2>
         <span class="briefing-badge ${badge.cls}">${escapeHtml(badge.label)}</span>
       </header>
       ${carenBlock}
@@ -184,18 +185,4 @@ function renderCard(b) {
       </footer>
     </article>
   `;
-}
-
-/**
- * Formats a YYYY-MM-DD date as a Dutch weekday + date, e.g. "vrijdag 17 juli".
- * Parsed as a local calendar date to avoid a timezone day-shift.
- */
-function formatDutchDate(dateStr) {
-  const [y, m, d] = String(dateStr).split('-').map(Number);
-  const date = new Date(y, (m || 1) - 1, d || 1);
-  return date.toLocaleDateString('nl-NL', {
-    weekday: 'long',
-    day:     'numeric',
-    month:   'long',
-  });
 }

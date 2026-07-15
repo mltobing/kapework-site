@@ -476,25 +476,35 @@ h1, h2, h3 { line-height: 1.25; }
   border-bottom: 1px solid var(--border-light);
 }
 
-.today-greeting {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: .8px;
-  margin-bottom: var(--sp-1);
-}
-
 .today-date {
   font-family: var(--font-serif);
   font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
+  text-transform: capitalize;
 }
 
 .today-section {
   padding-bottom: var(--sp-2);
+}
+
+/* Per-day sub-heading inside "Binnenkort" (e.g. "donderdag 16 juli"). */
+.today-day-group {
+  padding-bottom: var(--sp-2);
+}
+
+.today-day-header {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+  padding: var(--sp-3) var(--sp-5) var(--sp-2);
+}
+
+/* An event whose end time has already passed — calm, never hidden. */
+.event-card--past {
+  opacity: .55;
 }
 
 /* ─── Post Card ─────────────────────────────────────────────────────────── */
