@@ -212,6 +212,37 @@ ma_briefings (
   generated_at  timestamptz default now(),
   unique (family_id, briefing_date)
 )
+
+-- Ride-reconciliation notices (see supabase-migrations/004_ma_ride_notices.sql)
+-- Written only by the private irma-sync job (service role): it reads forwarded
+-- ride e-mails, compares them against ma_calendar_events, and records each
+-- discrepancy (missing / conflict / cancellation / unparsed) for a human. This
+-- feature never writes to the calendar. Members read open rows and may dismiss
+-- them; every other column is immutable to members (BEFORE UPDATE guard trigger).
+ma_ride_notices (
+  id                 uuid primary key,
+  family_id          uuid references ma_families(id) on delete cascade,
+  source_message_id  text not null,
+  thread_id          text,
+  received_at        timestamptz not null,
+  kind               text not null,     -- 'ride' | 'cancellation' | 'change' | 'unknown'
+  ride_date          date,
+  driver             text,
+  pickup_time        time,
+  return_time        time,
+  destination        text,
+  return_place       text,
+  excerpt            text not null,     -- verbatim source sentence (shown to the human)
+  confidence         text not null,     -- 'high' | 'low'
+  match_status       text not null,     -- 'matched' | 'missing' | 'conflict' | 'unparsed'
+  matched_event_uid  text,
+  state              text not null,     -- 'open' | 'dismissed' | 'resolved'
+  dismissed_by       uuid references ma_profiles(user_id),
+  dismissed_at       timestamptz,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now(),
+  unique (family_id, source_message_id, ride_date)
+)
 ```
 
 ### RLS policies (minimum viable)
@@ -224,6 +255,9 @@ All tables should have RLS enabled.  At minimum:
 - `ma_calendar_events`, `ma_calendar_sources`: read-only for family members
 - `ma_briefings`: members read all family rows and may update only the status /
   sent fields; inserts and text edits are service-role-only (see migration 003)
+- `ma_ride_notices`: members read all family rows and may update only the
+  dismissal fields (`state` / `dismissed_by` / `dismissed_at`); inserts and every
+  other column are service-role-only (see migration 004)
 - `ma_families`: read for members
 
 ### Storage bucket
