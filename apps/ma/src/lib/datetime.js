@@ -84,6 +84,20 @@ export function formatTime(iso) {
 }
 
 /**
+ * `HH:MM` from a bare wall-clock time string ("HH:MM" or "HH:MM:SS").
+ *
+ * Unlike formatTime(), this takes a time-of-day with no date and no instant — a
+ * value extracted from an e-mail sentence and already normalised to Amsterdam
+ * wall-clock by the reconciliation job. A bare time has no timezone, so there is
+ * nothing to convert here, only seconds to trim. Returns '' for null/empty.
+ */
+export function formatClock(hhmmss) {
+  if (!hhmmss) return '';
+  const [h, m = '00'] = String(hhmmss).split(':');
+  return `${pad2(Number(h))}:${pad2(Number(m))}`;
+}
+
+/**
  * Dutch weekday + day + month for a YYYY-MM-DD *calendar date*, e.g.
  * "vrijdag 17 juli". Use for anything already keyed to an Amsterdam date
  * (day headers, briefing_date, todayAms()).

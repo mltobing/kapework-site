@@ -216,7 +216,7 @@ export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
   const fromDate = from ?? startOfTodayAmsISO();
   const { data, error } = await supabase
     .from('ma_calendar_events')
-    .select('id, title, starts_at, ends_at, all_day, location, notes, external_url')
+    .select('id, external_uid, title, starts_at, ends_at, all_day, location, notes, external_url')
     .eq('family_id', familyId)
     .gte('starts_at', fromDate)
     .order('starts_at', { ascending: true })
@@ -264,6 +264,55 @@ export async function reopenBriefing(id) {
   const { data, error } = await supabase
     .from('ma_briefings')
     .update({ status: 'ready', sent_at: null, sent_by: null })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── Ride notices (e-mail reconciliation) ─────────────────────────────────────
+
+/**
+ * Fetch OPEN ride-reconciliation notices for a family, soonest ride first.
+ *
+ * Each notice is a discrepancy the private irma-sync job found between a forwarded
+ * ride e-mail and the mirrored calendar: a ride the calendar is missing, a time
+ * that differs, a cancellation the calendar still shows, or an e-mail it couldn't
+ * parse. Rows are written only by that job (service role); this app reads open
+ * ones and lets a member dismiss them. Notices with no ride_date (unparsed
+ * e-mails) sort last, after every dated one.
+ *
+ * Only 'open' rows are returned: once the job auto-resolves a notice (the missing
+ * event now exists) or a member dismisses one, it drops out here on the next load,
+ * so the strip clears itself with no further action.
+ */
+export async function fetchOpenRideNotices(familyId) {
+  const { data, error } = await supabase
+    .from('ma_ride_notices')
+    .select(`
+      id, kind, ride_date, driver, pickup_time, return_time,
+      destination, return_place, excerpt, confidence,
+      match_status, matched_event_uid, received_at
+    `)
+    .eq('family_id', familyId)
+    .eq('state', 'open')
+    .order('ride_date', { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Dismiss a ride notice ("Negeer"): records who dismissed it and when. The
+ * BEFORE UPDATE guard permits members to change only these three columns.
+ * There is deliberately no "accept" — accepting a ride means opening Apple
+ * Calendar and entering the event by hand, which lives outside this app.
+ * Returns the updated row.
+ */
+export async function dismissRideNotice(id, userId) {
+  const { data, error } = await supabase
+    .from('ma_ride_notices')
+    .update({ state: 'dismissed', dismissed_at: new Date().toISOString(), dismissed_by: userId })
     .eq('id', id)
     .select()
     .single();

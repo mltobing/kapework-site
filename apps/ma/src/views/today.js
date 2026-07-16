@@ -15,6 +15,7 @@
 import { fetchPosts, fetchPinnedPosts, fetchEvents } from '../api.js';
 import { renderPostCard }  from '../components/post-card.js';
 import { renderEventCard } from '../components/event-card.js';
+import { mountRideNotices } from '../components/ride-notices.js';
 import {
   amsDateKey, todayAms, addDaysKey, formatDateKeyHeader, isPast,
 } from '../lib/datetime.js';
@@ -31,6 +32,9 @@ export async function mount(container, { familyId }) {
       <div class="today-header">
         <h1 class="today-date">${formatDateKeyHeader(todayKey)}</h1>
       </div>
+
+      <!-- Ride-reconciliation strip: populated only when open notices exist. -->
+      <div id="today-notices"></div>
 
       <section class="today-section">
         <h2 class="section-title">Vandaag</h2>
@@ -52,6 +56,7 @@ export async function mount(container, { familyId }) {
   const vandaagEl    = container.querySelector('#today-vandaag');
   const binnenkortEl = container.querySelector('#today-binnenkort');
   const postsEl      = container.querySelector('#today-posts');
+  const noticesEl    = container.querySelector('#today-notices');
 
   if (!familyId) {
     vandaagEl.innerHTML    = '<p class="empty-state">Geen afspraken vandaag</p>';
@@ -68,6 +73,23 @@ export async function mount(container, { familyId }) {
 
   renderSchedule(eventsResult, todayKey, vandaagEl, binnenkortEl);
   renderPosts(postsResult, postsEl);
+
+  // Ride-reconciliation strip. It runs its own query and stays empty on quiet
+  // days, so it renders after the schedule and never blocks or blanks it. The
+  // events already loaded above let a "conflict" card show the calendar's own
+  // time alongside the e-mail's.
+  await mountRideNotices(noticesEl, { familyId, eventsByUid: buildEventsByUid(eventsResult) });
+}
+
+/** Map ma_calendar_events.external_uid → event, for matching conflict notices. */
+function buildEventsByUid(eventsResult) {
+  const map = new Map();
+  if (eventsResult.status === 'fulfilled') {
+    for (const ev of eventsResult.value ?? []) {
+      if (ev.external_uid) map.set(ev.external_uid, ev);
+    }
+  }
+  return map;
 }
 
 // ─── Schedule (Vandaag + Binnenkort) ─────────────────────────────────────────
