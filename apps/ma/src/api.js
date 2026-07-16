@@ -216,7 +216,7 @@ export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
   const fromDate = from ?? startOfTodayAmsISO();
   const { data, error } = await supabase
     .from('ma_calendar_events')
-    .select('id, title, starts_at, ends_at, all_day, location, notes, external_url')
+    .select('id, external_event_uid, title, starts_at, ends_at, all_day, location, notes, external_url')
     .eq('family_id', familyId)
     .gte('starts_at', fromDate)
     .order('starts_at', { ascending: true })

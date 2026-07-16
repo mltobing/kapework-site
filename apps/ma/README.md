@@ -184,7 +184,7 @@ ma_calendar_events (
   family_id          uuid references ma_families(id),
   source_id          uuid references ma_calendar_sources(id),
   external_event_uid text,
-  external_uid       text unique,   -- iCal UID the irma-sync job upserts on
+  external_event_uid text not null,   -- iCal UID; unique (source_id, external_event_uid)
   title              text not null,
   starts_at          timestamptz not null,
   ends_at            timestamptz,

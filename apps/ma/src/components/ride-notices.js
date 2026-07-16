@@ -30,7 +30,7 @@ import { formatDateKeyHeader, formatTime, formatClock } from '../lib/datetime.js
  *
  * @param {HTMLElement} container
  * @param {{ familyId: string, eventsByUid?: Map<string, object> }} opts
- *   eventsByUid maps ma_calendar_events.external_uid → event, used to show the
+ *   eventsByUid maps ma_calendar_events.external_event_uid → event, used to show the
  *   calendar's own time on a "conflict" card. It is best-effort: if the matched
  *   event is outside the loaded window the headline falls back gracefully.
  */

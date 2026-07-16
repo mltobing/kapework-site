@@ -81,12 +81,12 @@ export async function mount(container, { familyId }) {
   await mountRideNotices(noticesEl, { familyId, eventsByUid: buildEventsByUid(eventsResult) });
 }
 
-/** Map ma_calendar_events.external_uid → event, for matching conflict notices. */
+/** Map ma_calendar_events.external_event_uid → event, for matching conflict notices. */
 function buildEventsByUid(eventsResult) {
   const map = new Map();
   if (eventsResult.status === 'fulfilled') {
     for (const ev of eventsResult.value ?? []) {
-      if (ev.external_uid) map.set(ev.external_uid, ev);
+      if (ev.external_event_uid) map.set(ev.external_event_uid, ev);
     }
   }
   return map;
