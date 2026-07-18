@@ -23,6 +23,16 @@
 [build]
   command = "node scripts/generate-config.js"
 
+# ── Secrets scanning ──────────────────────────────────────────────────────────
+# generate-config.js intentionally writes the *public* Supabase values
+# (SUPABASE_URL and the browser-safe SUPABASE_ANON_KEY) into shared/config.js —
+# that is how the client reads them. Exempt only those two public keys from
+# Netlify's secrets scanning so a by-design public value doesn't fail the deploy.
+# The real server-only secrets (SUPABASE_SERVICE_ROLE_KEY, MA_DEVICE_TOKEN_PEPPER)
+# are deliberately NOT exempted — they must never appear in build output.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_ANON_KEY"
+
 # ── Netlify Functions ─────────────────────────────────────────────────────────
 [functions]
   directory = "netlify/functions"
