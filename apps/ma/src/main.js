@@ -19,7 +19,7 @@
 
 import { supabase }                             from './supabase.js';
 import { getState, setState }                   from './state.js';
-import { currentRoute, onRoute }                from './router.js';
+import { currentRoute, onRoute, navigate }      from './router.js';
 import { escapeHtml }                           from './utils.js';
 import { fetchProfile, fetchFamilyId, createProfile } from './api.js';
 import { renderTopbar }                         from './components/topbar.js';
@@ -31,6 +31,7 @@ import { mount as mountPhotos }                 from './views/photos.js';
 import { mount as mountCalendar }               from './views/calendar.js';
 import { mount as mountPeople }                 from './views/people.js';
 import { mount as mountCompose }                from './views/compose.js';
+import { mount as mountDevices }                from './views/devices.js';
 
 const VIEWS = {
   today:    mountToday,
@@ -40,6 +41,7 @@ const VIEWS = {
   calendar: mountCalendar,
   people:   mountPeople,
   compose:  mountCompose,
+  devices:  mountDevices,
 };
 
 // Where the magic link sends the user back to. Hardcoded to production so a link
@@ -410,7 +412,7 @@ function renderShell(appEl, user, profile, familyId) {
   const viewEl   = appEl.querySelector('#view-container');
   const navEl    = appEl.querySelector('#bottom-nav');
 
-  renderTopbar(topbarEl, { onSignOut: handleSignOut });
+  renderTopbar(topbarEl, { onSignOut: handleSignOut, onDevices: () => navigate('devices') });
   renderNav(navEl, currentRoute());
 
   if (_routeUnsubscribe) _routeUnsubscribe();

@@ -94,8 +94,9 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  height: 100dvh;
-  height: 100vh; /* fallback */
+  height: 100vh;   /* fallback for browsers without dvh */
+  height: 100dvh;  /* wins where supported — fixes Safari hiding the bottom nav
+                      behind its toolbar when 100vh overshoots the visible area */
 }
 
 img { max-width: 100%; display: block; }
@@ -121,8 +122,8 @@ h1, h2, h3 { line-height: 1.25; }
 
 /* ─── App Shell ─────────────────────────────────────────────────────────── */
 #app {
-  height: 100dvh;
-  height: 100vh;
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* wins where supported (Safari bottom-nav fix) */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1355,3 +1356,206 @@ h1, h2, h3 { line-height: 1.25; }
 .view-container {
   scroll-behavior: smooth;
 }
+
+/* ─── Today · Nu card (deterministic current-state) ─────────────────────────── */
+.today-now {
+  margin: var(--sp-4) var(--sp-4) var(--sp-3);
+  padding: var(--sp-5);
+  background: var(--accent-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.today-now--stale { background: var(--amber-light); }
+
+.today-now-headline {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+.today-now-detail {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin-top: var(--sp-2);
+}
+.today-now-stale {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--amber);
+  margin-top: var(--sp-3);
+}
+
+/* ─── Today · Vanavond versturen ────────────────────────────────────────────── */
+.today-tonight {
+  margin: var(--sp-2) var(--sp-4) var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.today-tonight-head {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+.today-tonight-body {
+  font-size: var(--text-base);
+  color: var(--text);
+  margin-bottom: var(--sp-3);
+}
+.today-tonight-btn {
+  width: 100%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: var(--text-base);
+  font-weight: 600;
+  padding: var(--sp-3);
+  border-radius: var(--radius-md);
+  transition: background .12s;
+  -webkit-appearance: none;
+}
+.today-tonight-btn:active { background: var(--accent-hover); }
+
+/* ─── Apparaten (device management) ─────────────────────────────────────────── */
+.view-devices { padding-bottom: var(--sp-8); }
+
+.view-header--back {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.dev-back {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-base);
+  font-weight: 600;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) 0;
+  cursor: pointer;
+}
+.dev-body { padding: 0 var(--sp-4); }
+
+.dev-intro {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--sp-4);
+}
+
+.dev-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  box-shadow: var(--shadow-sm);
+}
+.dev-card--result { background: var(--accent-light); border-color: var(--accent-light); }
+
+.dev-field-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-2);
+}
+.dev-input {
+  width: 100%;
+  font-size: var(--text-base);
+  padding: var(--sp-3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.dev-input:focus { outline: none; border-color: var(--accent); }
+
+.dev-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: var(--sp-3);
+}
+.dev-card-actions--wrap { flex-wrap: wrap; }
+
+.dev-ghost {
+  background: none;
+  border: 1.5px solid var(--border);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.dev-ghost:active { background: var(--surface-alt); }
+.dev-done { width: 100%; margin-top: var(--sp-3); }
+
+.dev-error { color: var(--danger); font-size: var(--text-sm); font-weight: 600; margin-top: var(--sp-2); }
+
+.dev-result-title { font-size: var(--text-lg); font-weight: 700; margin-bottom: var(--sp-2); }
+.dev-result-help  { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.6; margin-bottom: var(--sp-4); }
+.dev-result-codelabel {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-muted);
+}
+.dev-result-code {
+  font-size: var(--text-3xl);
+  font-weight: 800;
+  letter-spacing: .18em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  margin: var(--sp-1) 0 var(--sp-3);
+}
+.dev-copy-msg { font-size: var(--text-sm); color: var(--success); font-weight: 600; text-align: right; }
+
+.dev-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-3);
+  box-shadow: var(--shadow-sm);
+}
+.dev-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+}
+.dev-row-label { font-size: var(--text-base); font-weight: 700; }
+.dev-row-meta  { font-size: var(--text-sm); color: var(--text-muted); }
+
+.dev-badge {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+.dev-badge--active  { background: var(--success); color: #FFFFFF; }
+.dev-badge--revoked { background: var(--surface-alt); color: var(--text-muted); }
+.dev-badge--expired { background: var(--surface-alt); color: var(--text-muted); }
+
+.dev-revoke {
+  margin-top: var(--sp-3);
+  background: var(--surface);
+  color: var(--danger);
+  border: 1.5px solid var(--border);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.dev-revoke:active   { background: var(--danger-light); }
+.dev-revoke:disabled { opacity: .5; }

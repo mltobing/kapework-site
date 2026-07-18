@@ -1,0 +1,15 @@
+{
+  "name": "Vandaag",
+  "short_name": "Vandaag",
+  "description": "Wat er vandaag op de planning staat.",
+  "lang": "nl",
+  "start_url": "/vandaag",
+  "scope": "/vandaag",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF7F4",
+  "theme_color": "#FAF7F4",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

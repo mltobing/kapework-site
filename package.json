@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Kapework — Netlify Functions dependencies",
+  "scripts": {
+    "test": "node --test apps/ma/src/lib/today-state.test.mjs netlify/functions/_ma-crypto.test.js netlify/functions/_ma-today-derive.test.js",
+    "test:today-state": "for tz in UTC America/New_York Europe/Amsterdam Asia/Jakarta; do echo \"TZ=$tz\"; TZ=$tz node --test apps/ma/src/lib/today-state.test.mjs || exit 1; done"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4"
   }

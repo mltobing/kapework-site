@@ -1,0 +1,233 @@
+/* apps/ma/vandaag/vandaag.css
+ *
+ * Styles for the care recipient's read-only Vandaag display and its pairing
+ * screen. Deliberately self-contained (this page does not load the family app's
+ * styles.css): large type, high contrast, generous spacing, calm colours.
+ * Designed to be readable across a room by a 91-year-old.
+ */
+
+:root {
+  --bg:        #FAF7F4;
+  --surface:   #FFFFFF;
+  --text:      #1C1917;
+  --text-soft: #5A5048;
+  --accent:    #7C5247;
+  --accent-lt: #F3EBE8;
+  --amber:     #B5761F;
+  --amber-lt:  #FBF1E1;
+  --border:    #E6DDD5;
+  --shadow:    0 2px 10px rgba(0,0,0,.06);
+  --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --serif:     Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  min-height: 100vh; /* fallback */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.vandaag-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60dvh;
+  font-size: 22px;
+  color: var(--text-soft);
+}
+
+/* ─── Today display ─────────────────────────────────────────────────────────── */
+
+.vandaag-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 22px 40px;
+}
+
+.vandaag-date {
+  font-family: var(--serif);
+  font-size: clamp(28px, 7vw, 40px);
+  font-weight: 700;
+  text-transform: capitalize;
+  margin-bottom: 22px;
+}
+
+.vandaag-now {
+  background: var(--accent-lt);
+  border-radius: 20px;
+  padding: 26px 24px;
+  margin-bottom: 26px;
+  box-shadow: var(--shadow);
+}
+
+.vandaag-now--stale {
+  background: var(--amber-lt);
+}
+
+.vandaag-now-headline {
+  font-size: clamp(26px, 6.5vw, 36px);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.vandaag-now-detail {
+  font-size: clamp(19px, 4.6vw, 24px);
+  color: var(--text-soft);
+  margin-top: 12px;
+}
+
+/* ─── Event list ────────────────────────────────────────────────────────────── */
+
+.vandaag-events {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.vandaag-event {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+
+.vandaag-event--now { border-color: var(--accent); border-width: 2px; }
+.vandaag-event--past { opacity: .5; }
+
+.vandaag-event-time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: clamp(20px, 5vw, 26px);
+  color: var(--accent);
+  min-width: 3.2em;
+}
+
+.vandaag-event-body { display: flex; flex-direction: column; gap: 4px; }
+
+.vandaag-event-title {
+  font-size: clamp(19px, 4.6vw, 24px);
+  font-weight: 600;
+}
+
+.vandaag-event-loc {
+  font-size: clamp(16px, 4vw, 19px);
+  color: var(--text-soft);
+}
+
+.vandaag-note {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  font-size: clamp(18px, 4.4vw, 22px);
+  color: var(--text-soft);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin-bottom: 24px;
+}
+
+/* ─── Footer / status ───────────────────────────────────────────────────────── */
+
+.vandaag-foot { margin-top: 8px; }
+
+.vandaag-updated {
+  font-size: 17px;
+  color: var(--text-soft);
+}
+
+.vandaag-offline {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--amber);
+  background: var(--amber-lt);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+/* ─── Setup / pairing ───────────────────────────────────────────────────────── */
+
+.vandaag-setup {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.vandaag-setup-title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 7vw, 38px);
+  font-weight: 700;
+}
+
+.vandaag-setup-text {
+  font-size: clamp(19px, 4.6vw, 23px);
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.vandaag-btn {
+  min-height: 68px;
+  font-size: clamp(20px, 5vw, 24px);
+  font-weight: 700;
+  color: #FFFFFF;
+  background: var(--accent);
+  border: none;
+  border-radius: 16px;
+  padding: 16px 22px;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+.vandaag-btn:active     { background: #6A443B; }
+.vandaag-btn:disabled   { opacity: .6; }
+
+.vandaag-code-input {
+  font-size: clamp(30px, 9vw, 44px);
+  font-weight: 700;
+  letter-spacing: .3em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding: 16px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+}
+.vandaag-code-input:focus { outline: none; border-color: var(--accent); }
+
+.vandaag-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 18px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.vandaag-setup-error {
+  color: #B94040;
+  font-size: 18px;
+  font-weight: 600;
+}

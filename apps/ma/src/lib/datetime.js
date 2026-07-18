@@ -117,6 +117,20 @@ export function dayNumberAms(iso) {
   return Number(amsParts(iso).day);
 }
 
+/**
+ * Minutes since Amsterdam midnight for an instant, e.g. 09:30 → 570.
+ *
+ * Used by the deterministic today-state engine so it can compare "now" against
+ * event/downstairs/window times as plain integers *within a single Amsterdam
+ * day*. Because both operands are derived from Amsterdam wall-clock parts (via
+ * Intl, which knows CET/CEST), the comparison is DST-safe and identical for a
+ * viewer in any device timezone.
+ */
+export function amsMinutesOfDay(iso) {
+  const p = amsParts(iso);
+  return Number(p.hour) * 60 + Number(p.minute);
+}
+
 /** Short Dutch month for an instant in Amsterdam, e.g. "jul". */
 export function monthShortAms(iso) {
   return DUTCH_MONTHS_SHORT[Number(amsParts(iso).month) - 1];
