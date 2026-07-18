@@ -1,12 +1,14 @@
 /* Tests for the dependency-free trusted-device crypto/cookie primitives.
- * Run: node --test netlify/functions/_ma-crypto.test.js
+ * Kept OUT of netlify/functions/ so Netlify never bundles it as a function
+ * (a name like "_ma-crypto.test" is an invalid function name and fails deploy).
+ * Run: node --test netlify/functions-tests/_ma-crypto.test.js
  */
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   hashSecret, randomToken, randomCode, parseCookies, deviceCookie, DEVICE_COOKIE,
-} = require('./_ma-crypto');
+} = require('../functions/_ma-crypto');
 
 test('hashSecret is deterministic, pepper-dependent, and 64 hex chars', () => {
   const a = hashSecret('token-abc', 'pepper1');

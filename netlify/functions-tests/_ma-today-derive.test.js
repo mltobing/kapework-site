@@ -1,10 +1,11 @@
 /* Tests for the server-side Amsterdam/derive helpers.
- * Run: node --test netlify/functions/_ma-today-derive.test.js
+ * Kept OUT of netlify/functions/ so Netlify never bundles it as a function.
+ * Run: node --test netlify/functions-tests/_ma-today-derive.test.js
  */
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { amsDateKey, deriveDownstairsAt, deriveContactWindow, sanitizeEvent } = require('./_ma-today-derive');
+const { amsDateKey, deriveDownstairsAt, deriveContactWindow, sanitizeEvent } = require('../functions/_ma-today-derive');
 
 test('amsDateKey buckets an instant onto its Amsterdam calendar date', () => {
   // 22:30 UTC on 20 July is 00:30 Amsterdam on 21 July (CEST, +02:00).
