@@ -7,9 +7,9 @@
 
 /**
  * @param {HTMLElement} container
- * @param {{ onSignOut?: () => void }} options
+ * @param {{ onSignOut?: () => void, onDevices?: () => void }} options
  */
-export function renderTopbar(container, { onSignOut } = {}) {
+export function renderTopbar(container, { onSignOut, onDevices } = {}) {
   container.innerHTML = `
     <div class="topbar-inner">
       <span class="topbar-brand">Ma</span>
@@ -22,6 +22,7 @@ export function renderTopbar(container, { onSignOut } = {}) {
       </button>
     </div>
     <div class="topbar-menu" id="topbar-menu" hidden>
+      <button class="topbar-menu-item" id="topbar-devices-btn">Apparaten</button>
       <button class="topbar-menu-item" id="topbar-signout-btn">Sign out</button>
     </div>
   `;
@@ -29,6 +30,7 @@ export function renderTopbar(container, { onSignOut } = {}) {
   const menuBtn    = container.querySelector('#topbar-menu-btn');
   const menu       = container.querySelector('#topbar-menu');
   const signOutBtn = container.querySelector('#topbar-signout-btn');
+  const devicesBtn = container.querySelector('#topbar-devices-btn');
 
   function openMenu() {
     menu.hidden = false;
@@ -43,6 +45,11 @@ export function renderTopbar(container, { onSignOut } = {}) {
   menuBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     menu.hidden ? openMenu() : closeMenu();
+  });
+
+  devicesBtn.addEventListener('click', () => {
+    closeMenu();
+    if (onDevices) onDevices();
   });
 
   signOutBtn.addEventListener('click', async () => {

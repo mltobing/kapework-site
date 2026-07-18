@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Vandaag">
+  <rect width="512" height="512" rx="112" fill="#7C5247"/>
+  <circle cx="256" cy="238" r="96" fill="#F3EBE8"/>
+  <g fill="none" stroke="#F3EBE8" stroke-width="20" stroke-linecap="round">
+    <line x1="256" y1="70"  x2="256" y2="104"/>
+    <line x1="256" y1="372" x2="256" y2="406"/>
+    <line x1="88"  y1="238" x2="122" y2="238"/>
+    <line x1="390" y1="238" x2="424" y2="238"/>
+    <line x1="137" y1="119" x2="161" y2="143"/>
+    <line x1="351" y1="333" x2="375" y2="357"/>
+    <line x1="137" y1="357" x2="161" y2="333"/>
+    <line x1="351" y1="143" x2="375" y2="119"/>
+  </g>
+</svg>

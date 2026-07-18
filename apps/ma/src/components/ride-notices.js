@@ -29,12 +29,14 @@ import { formatDateKeyHeader, formatTime, formatClock } from '../lib/datetime.js
  * feature on quiet days and a reconciliation error never blanks the view.
  *
  * @param {HTMLElement} container
- * @param {{ familyId: string, eventsByUid?: Map<string, object> }} opts
+ * @param {{ familyId: string, eventsByUid?: Map<string, object>, filter?: (notice) => boolean }} opts
  *   eventsByUid maps ma_calendar_events.external_event_uid → event, used to show the
  *   calendar's own time on a "conflict" card. It is best-effort: if the matched
  *   event is outside the loaded window the headline falls back gracefully.
+ *   filter, when given, narrows which open notices are shown (e.g. the Today view
+ *   surfaces only today-relevant/overdue ones instead of every future notice).
  */
-export async function mountRideNotices(container, { familyId, eventsByUid }) {
+export async function mountRideNotices(container, { familyId, eventsByUid, filter }) {
   let notices;
   try {
     notices = await fetchOpenRideNotices(familyId);
@@ -43,6 +45,8 @@ export async function mountRideNotices(container, { familyId, eventsByUid }) {
     container.innerHTML = '';
     return;
   }
+
+  if (typeof filter === 'function') notices = notices.filter(filter);
 
   if (!notices.length) {
     container.innerHTML = '';

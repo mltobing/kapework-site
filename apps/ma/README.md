@@ -19,7 +19,8 @@ Live at: **https://ma.kapework.com**
 | Layer       | Detail                                                       |
 |-------------|--------------------------------------------------------------|
 | Hosting     | Netlify static site, routed via the existing subdomain edge function |
-| Auth        | Supabase Auth (email + password)                             |
+| Auth        | Supabase Auth — magic link (primary), email + password (fallback); signup closed |
+| Trusted device | Care recipient's read-only `/vandaag` display, auth'd by an HttpOnly cookie via same-origin Netlify Functions (no Supabase session on that device) |
 | Database    | Supabase (PostgREST), tables prefixed `ma_`                  |
 | Storage     | Supabase private bucket `ma-media`                           |
 | Frontend    | Vanilla JS ES modules, no build step, imported from esm.sh   |
@@ -39,33 +40,52 @@ apps/ma/
   _headers              X-Robots-Tag headers for Netlify
   README.md             This file
 
+  vandaag/              Trusted read-only display (separate entry; no auth shell)
+    index.html          /vandaag — display or six-digit-code pairing
+    koppelen/index.html /vandaag/koppelen — one-tap link activation
+    vandaag.css         Large, high-contrast styles
+    manifest.webmanifest, icon.svg, sw.js   Installable PWA (static shell only)
+    src/trusted.js      Display + pairing bootstrap (cookie-authed)
+
   src/
     main.js             Boot: session check → auth screen or app shell
     supabase.js         Supabase client (reads window.KapeworkConfig)
     state.js            Reactive state store (user, profile, familyId)
-    router.js           Hash-based tab router
+    router.js           Hash-based tab router (+ non-nav 'devices' route)
     api.js              All Supabase table queries
     storage.js          Photo upload + signed-URL helpers
-    utils.js            Date formatting, escapeHtml, getInitial
+    utils.js            escapeHtml, getInitial
+
+    lib/
+      datetime.js       Europe/Amsterdam date/time helpers (single source of truth)
+      today-state.js    Deterministic "what now" engine (pure; unit-tested)
+      event-derive.js   Conservative title/notes → safe derived fields
+      devices-api.js    Client wrappers for the trusted-device Functions
 
     views/
-      today.js          Today tab: greeting, recent posts, upcoming events
+      today.js          Today tab: Nu card + today's events + urgent notices + Vanavond
       briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts
       family.js         Family tab: chronological feed + compose FAB
       photos.js         Photos tab: 3-column photo grid
       calendar.js       Calendar tab: read-only event agenda
       people.js         People tab: family member cards
       compose.js        Compose view: photo picker + caption + post
+      devices.js        Apparaten: set up / list / revoke trusted devices
 
     components/
-      topbar.js         Top app bar with menu / sign out
+      topbar.js         Top app bar with menu (Apparaten / sign out)
       nav.js            Bottom tab bar (Today · Briefing · Family · Photos · Calendar · People)
+      ride-notices.js   Ride-reconciliation strip
       post-card.js      Post display with async photo loading
       comment-list.js   Comment thread + reply input
       event-card.js     Calendar event card
       photo-grid.js     3-column photo grid with lazy loading
       modal.js          Full-screen photo lightbox
 ```
+
+Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
+`ma-device-activate`, `ma-today`, `ma-devices-list`, `ma-device-revoke`, plus
+shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js`).
 
 ---
 
@@ -92,14 +112,19 @@ Or run the Netlify CLI (`netlify dev`) with the env vars set in a local `.env` f
 
 ## Environment variables (Netlify)
 
-| Variable             | Required | Notes                                      |
-|----------------------|----------|--------------------------------------------|
-| `SUPABASE_URL`       | Yes      | Supabase project URL                       |
-| `SUPABASE_ANON_KEY`  | Yes      | Supabase public anon key (browser-safe)    |
-| `GA_MEASUREMENT_ID`  | No       | Google Analytics — already used site-wide  |
+| Variable                     | Required | Scope        | Notes                                                        |
+|------------------------------|----------|--------------|--------------------------------------------------------------|
+| `SUPABASE_URL`               | Yes      | client + fn  | Supabase project URL                                         |
+| `SUPABASE_ANON_KEY`          | Yes      | client       | Supabase public anon key (browser-safe)                     |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Yes      | **fn only**  | Service role; used by Netlify Functions. **Never** exposed to the browser. |
+| `MA_DEVICE_TOKEN_PEPPER`     | Yes      | **fn only**  | Random server-only secret; peppers device-token/code hashes. Set as a Netlify **secret**. |
+| `GA_MEASUREMENT_ID`          | No       | client       | Google Analytics — already used site-wide                   |
 
-These are written into `/shared/config.js` by `scripts/generate-config.js` at build time.
-The Ma app reads them via `window.KapeworkConfig` (loaded from `/shared/config.js`).
+Only the three `client`-scoped values are written into `/shared/config.js` by
+`scripts/generate-config.js` at build time (the app reads them via
+`window.KapeworkConfig`). The `fn only` secrets are read solely from
+`process.env` inside Netlify Functions and are **never** written to any client
+bundle — verify by grepping `shared/config.js` after a build.
 
 ---
 
@@ -117,22 +142,22 @@ ma_families (
   created_at  timestamptz default now()
 )
 
--- Profile per auth user (id matches auth.users.id)
+-- Profile per auth user (user_id matches auth.users.id — this is the PK)
 ma_profiles (
-  id            uuid primary key references auth.users(id),
-  display_name  text,
+  user_id       uuid primary key references auth.users(id),
+  display_name  text not null,
   relationship  text,    -- e.g. "Mum", "Son", "Daughter"
   avatar_url    text,
-  created_at    timestamptz default now()
+  created_at    timestamptz not null default now()
 )
 
--- Many-to-many: auth users ↔ families
+-- Many-to-many: auth users ↔ families (composite key, no surrogate id)
 ma_family_members (
-  id         uuid primary key,
-  family_id  uuid references ma_families(id),
-  user_id    uuid references ma_profiles(id),
-  role       text,
-  joined_at  timestamptz default now()
+  family_id  uuid not null references ma_families(id),
+  user_id    uuid not null references ma_profiles(user_id),
+  role       text not null,
+  created_at timestamptz not null default now(),
+  primary key (family_id, user_id)
 )
 
 -- Family feed posts
@@ -161,7 +186,9 @@ ma_comments (
 ma_attachments (
   id            uuid primary key,
   post_id       uuid references ma_posts(id),
-  storage_path  text not null,    -- path in the ma-media bucket
+  family_id     uuid references ma_families(id),
+  uploader_id   uuid references ma_profiles(user_id),
+  object_path   text not null,    -- path in the ma-media bucket
   mime_type     text,
   created_at    timestamptz default now()
 )
@@ -181,19 +208,19 @@ ma_calendar_sources (
 -- Source of truth is the family iCloud calendar; events are synced externally
 ma_calendar_events (
   id                 uuid primary key,
-  family_id          uuid references ma_families(id),
+  family_id          uuid not null references ma_families(id),
   source_id          uuid references ma_calendar_sources(id),
-  external_event_uid text,
-  external_event_uid text not null,   -- iCal UID; unique (source_id, external_event_uid)
+  external_event_uid text not null,       -- opaque iCal UID (the mirror upserts on it)
   title              text not null,
   starts_at          timestamptz not null,
   ends_at            timestamptz,
-  all_day            boolean default false,
+  all_day            boolean not null default false,
   location           text,
   notes              text,
   external_url       text,
-  created_at         timestamptz default now(),
-  updated_at         timestamptz default now()
+  status             text not null,       -- iCal status, e.g. 'confirmed' | 'cancelled'
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
 )
 
 -- Generated daily briefing texts (see supabase-migrations/003_ma_briefings.sql)
@@ -258,6 +285,10 @@ All tables should have RLS enabled.  At minimum:
 - `ma_ride_notices`: members read all family rows and may update only the
   dismissal fields (`state` / `dismissed_by` / `dismissed_at`); inserts and every
   other column are service-role-only (see migration 004)
+- `ma_trusted_devices`, `ma_device_pairings`: **default-deny** — RLS enabled with
+  no policies, and table grants revoked from `anon`/`authenticated`. Browsers get
+  no direct access; all reads/writes go through service-role Netlify Functions that
+  verify membership first (see migration 005)
 - `ma_families`: read for members
 
 ### Storage bucket
@@ -278,10 +309,15 @@ Policy:  authenticated users in the family can upload/download
 1. **Netlify domain alias** — add `ma.kapework.com` as a domain alias in the Netlify site settings
 2. **DNS** — add a CNAME record `ma → <netlify-site>.netlify.app` in the Kapework DNS config
 3. **Supabase URL allowlist** — add `https://ma.kapework.com` to the list of allowed redirect URLs in Supabase Auth settings
-4. **Environment variables** — ensure `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set in Netlify site environment settings (they are likely already set for the main Kapework site)
+4. **Environment variables** — ensure `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, and `MA_DEVICE_TOKEN_PEPPER` are set in Netlify
+   (mark the last two as **secrets**; they are Functions-only).
+5. **Migrations** — apply DB migrations **before** the deploy that ships code
+   depending on them, in order. Trusted devices need `005_ma_trusted_devices.sql`.
 
 The subdomain edge function (`netlify/edge-functions/subdomain-router.ts`) will automatically
-route `ma.kapework.com/*` → `/apps/ma/*` with no code changes required.
+route `ma.kapework.com/*` → `/apps/ma/*` (including `/vandaag` and
+`/.netlify/functions/*`) with no code changes required.
 
 ---
 
@@ -306,15 +342,65 @@ cron job) that reads the family iCloud calendar's public ICS feed and upserts in
 
 ---
 
+## Trusted devices — the care recipient's `/vandaag` display
+
+`ma.kapework.com/vandaag` is a **separate, read-only** entry point (its own
+`apps/ma/vandaag/index.html`; it never loads the family app or Supabase Auth). It
+shows only a server-built, sanitized snapshot of *today in Europe/Amsterdam* — no
+posts, attachments, ride excerpts, notes, external URLs, profiles, emails, or
+briefing management. A device is enrolled once and then needs no sign-in.
+
+**Security model**
+
+- The device credential is a long-lived, revocable **HttpOnly + Secure +
+  SameSite=Strict** same-origin cookie (`ma_today_device`). JavaScript can never
+  read it. Only `SHA-256(token + MA_DEVICE_TOKEN_PEPPER)` is stored in the DB.
+- All device endpoints are same-origin Netlify Functions (reachable at
+  `ma.kapework.com/.netlify/functions/*` — the edge router passes `/.netlify/`
+  through). They use the service-role key; the two device tables are RLS
+  default-deny to browsers.
+- Nothing here can write to the calendar; the payload is strictly read-only.
+
+**Endpoints** (`netlify/functions/`)
+
+| Function | Auth | Purpose |
+|----------|------|---------|
+| `ma-pairing-create` | family member (Bearer) | Mint a one-time link + 6-digit code (15-min expiry). Returns raw secrets **once**. |
+| `ma-device-activate` | pairing token/code | Consume a pairing atomically, mint a device token, set the cookie. |
+| `ma-today` | device cookie | Sanitized today payload (`Cache-Control: no-store`). |
+| `ma-devices-list` | family member (Bearer) | List devices (no hashes). |
+| `ma-device-revoke` | family member (Bearer) | Revoke a device; effective on its next refresh. |
+
+**Setup (family side):** top-bar menu → **Apparaten** → *Nieuw apparaat instellen*
+→ share the link (`Deel link`) or dictate the six-digit code. On the device, open
+the link or visit `/vandaag` and type the code.
+
+**Revocation & recovery**
+
+- Revoke any device in one tap from **Apparaten**; the display loses access on its
+  next 60-second refresh.
+- Lost/cleared device? Just create a new pairing — the old token is never revealed
+  or recoverable (only its hash is stored). Cleanup of expired/consumed rows is
+  handled by `ma_cleanup_device_rows()` (run on a schedule; not required for normal
+  operation).
+
+---
+
 ## Accounts
 
-The following email addresses should be provisioned as Supabase Auth users and added
-as `ma_family_members` with corresponding `ma_profiles`:
+Signup is **closed**: sign-in only works for accounts an admin has pre-created.
+For each family member, provision (real addresses live only in the Supabase
+dashboard and Netlify config — never in this public repo):
 
-- irma.tobing@gmail.com
-- mltobing@gmail.com
-- loemban@gmail.com
-- john@gmail.com
+1. A Supabase Auth user (their email address).
+2. A matching `ma_profiles` row (created automatically on first sign-in, or by hand).
+3. An `ma_family_members` row linking that `user_id` to the family.
+
+Sign-in is passwordless by default (magic link); email + password remains as a
+demoted fallback.
+
+The care recipient does **not** get an account — their device is paired instead
+(see “Trusted devices”, below).
 
 ---
 
@@ -326,4 +412,7 @@ as `ma_family_members` with corresponding `ma_profiles`:
 | Deploy                | Push to `main` → Netlify auto-deploys                |
 | Add env vars          | Netlify → Site settings → Environment variables      |
 | Apply DB migrations   | Supabase dashboard → SQL editor, or `supabase db push` |
+| Run tests             | `npm test` (state engine + device crypto/derive)    |
+| State engine × TZ     | `npm run test:today-state` (UTC/NY/Amsterdam/Jakarta) |
+| Manual acceptance     | See `apps/ma/TRUSTED_DEVICES.md`                     |
 | Check errors          | Browser console; errors logged with `[ma/...]` prefix |

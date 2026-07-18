@@ -216,13 +216,30 @@ export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
   const fromDate = from ?? startOfTodayAmsISO();
   const { data, error } = await supabase
     .from('ma_calendar_events')
-    .select('id, external_event_uid, title, starts_at, ends_at, all_day, location, notes, external_url')
+    .select('id, external_event_uid, title, starts_at, ends_at, all_day, location, notes, external_url, status')
     .eq('family_id', familyId)
     .gte('starts_at', fromDate)
     .order('starts_at', { ascending: true })
     .limit(limit);
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Most recent calendar sync time for a family (max last_synced_at across its
+ * sources), or null if unknown. Feeds the today-state engine's freshness check so
+ * it can suppress "go now" instructions when the mirror has gone stale.
+ */
+export async function fetchCalendarLastSyncedAt(familyId) {
+  const { data, error } = await supabase
+    .from('ma_calendar_sources')
+    .select('last_synced_at')
+    .eq('family_id', familyId)
+    .order('last_synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.last_synced_at ?? null;
 }
 
 // ─── Briefings ────────────────────────────────────────────────────────────────
