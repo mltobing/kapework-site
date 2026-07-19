@@ -7,7 +7,7 @@
 
 // 'devices' (Apparaten) is a routable view reached from the top-bar menu, not the
 // bottom navigation — it is rarely needed and must not crowd the six core tabs.
-const TABS = new Set(['today', 'briefing', 'family', 'photos', 'calendar', 'people', 'compose', 'devices']);
+const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'people', 'compose', 'devices']);
 
 const _listeners = new Set();
 

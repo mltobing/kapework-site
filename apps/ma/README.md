@@ -1,6 +1,7 @@
 # Ma — Private Family App
 
-A private, family-only web app for photo sharing, family updates, and shared calendar events.
+A private, family-only web app for photo sharing, family updates, and shared calendar events —
+plus a **Logboek** (logbook) that a family can optionally share with an active care team.
 Live at: **https://ma.kapework.com**
 
 ---
@@ -61,25 +62,28 @@ apps/ma/
       today-state.js    Deterministic "what now" engine (pure; unit-tested)
       event-derive.js   Conservative title/notes → safe derived fields
       devices-api.js    Client wrappers for the trusted-device Functions
+      logboek-types.js  Entry-type / audience labels, icons, and filter chip definitions
 
     views/
       today.js          Today tab: Nu card + today's events + urgent notices + Vanavond
-      briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts
-      family.js         Family tab: chronological feed + compose FAB
-      photos.js         Photos tab: 3-column photo grid
-      calendar.js       Calendar tab: read-only event agenda
-      people.js         People tab: family member cards
-      compose.js        Compose view: photo picker + caption + post
-      devices.js        Apparaten: set up / list / revoke trusted devices
+                         + quick "Notitie of foto toevoegen" action. Caregivers get a
+                         reduced Today (no calendar — see "Follow-up risks" below).
+      briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts (family only)
+      logboek.js        Logboek tab: chronological, filterable timeline + compose FAB
+      calendar.js       Calendar tab: read-only event agenda (family only)
+      people.js         People tab: family member cards (family only)
+      compose.js        Logboek compose flow: type, title, body, date, photos/PDF,
+                         tags, linked event (family only), visibility
+      devices.js        Apparaten: set up / list / revoke trusted devices (family only)
 
     components/
-      topbar.js         Top app bar with menu (Apparaten / sign out)
-      nav.js            Bottom tab bar (Today · Briefing · Family · Photos · Calendar · People)
+      topbar.js         Top app bar with menu (Apparaten hidden for caregivers / sign out)
+      nav.js             Bottom tab bar — family: Vandaag · Briefing · Logboek · Agenda · Mensen;
+                         caregiver: Vandaag · Logboek only
       ride-notices.js   Ride-reconciliation strip
-      post-card.js      Post display with async photo loading
-      comment-list.js   Comment thread + reply input
+      logboek-entry.js  Entry card: type/audience badges, photos, documents, tags, comments
+      logboek-comments.js Comment thread + reply input (Dutch)
       event-card.js     Calendar event card
-      photo-grid.js     3-column photo grid with lazy loading
       modal.js          Full-screen photo lightbox
 ```
 
@@ -160,17 +164,37 @@ ma_family_members (
   primary key (family_id, user_id)
 )
 
--- Family feed posts
+-- Logboek entries (formerly "family feed posts" — see supabase-migrations/006_ma_logboek_care_team.sql)
 ma_posts (
-  id          uuid primary key,
-  family_id   uuid references ma_families(id),
-  author_id   uuid references ma_profiles(id),
-  kind        text,        -- 'note' | 'photo'
-  title       text,
-  body        text,
-  event_date  date,
-  pinned      boolean default false,
-  created_at  timestamptz default now()
+  id                uuid primary key,
+  family_id         uuid references ma_families(id),
+  author_id         uuid references ma_profiles(id),
+  kind              text,        -- 'note' | 'photo' | 'document' | 'observation' | 'event_report'
+                                  -- (plus pre-existing 'voice' | 'prompt' | 'today', kept valid but
+                                  -- not author-selectable — see migration 006's comment)
+  title             text,
+  body              text,
+  event_date        date,        -- the date the entry concerns, shown in the timeline
+  audience          text not null default 'family',  -- 'family' | 'care_team' — see below
+  tags              text[] not null default '{}',
+  linked_event_uid  text,        -- optional ma_calendar_events.external_event_uid, no FK (mirrors
+                                  -- the ma_ride_notices.matched_event_uid precedent)
+  pinned            boolean default false,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz not null default now()  -- kept current by a BEFORE UPDATE trigger
+)
+
+-- Care-team membership — deliberately a SEPARATE table from ma_family_members so
+-- existing family RLS (built on ma_is_family_member) can never accidentally widen
+-- to include care-team users.
+ma_care_team_members (
+  id          uuid primary key default gen_random_uuid(),
+  family_id   uuid not null references ma_families(id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  created_by  uuid not null references auth.users(id),
+  created_at  timestamptz not null default now(),
+  revoked_at  timestamptz,  -- null = active; set = revoked (checked by ma_is_care_team_member)
+  unique (family_id, user_id)
 )
 
 -- Comments on posts
@@ -276,10 +300,22 @@ ma_ride_notices (
 
 All tables should have RLS enabled.  At minimum:
 
-- `ma_profiles`: users can read/update their own row
+- `ma_profiles`: users can read/update their own row; can also read another
+  user's profile if they share a family context — either directly (both in
+  `ma_family_members` for the same family) or via `ma_care_team_members`
+  (family ↔ active caregiver, or two active caregivers of the same family).
+  That cross-table lookup runs through the `ma_shares_family_context()`
+  SECURITY DEFINER helper, never a bare subquery — a caregiver has no RLS
+  grant into `ma_family_members` at all, so a direct subquery there is
+  silently blocked before it ever compares rows (this bit a first draft of
+  migration 006; fixed same-day, see the migration's comments).
 - `ma_family_members`: members can read rows where `family_id` matches their family
-- `ma_posts`, `ma_comments`, `ma_attachments`: members can read/insert where `family_id` matches
+- `ma_care_team_members`: a user can read their own membership row; a family
+  member can read the full roster for their family. No insert/update/delete
+  policy — provisioning is a manual step (see "Care team" below).
+- `ma_posts`, `ma_comments`, `ma_attachments`: see the audience matrix below
 - `ma_calendar_events`, `ma_calendar_sources`: read-only for family members
+  (not extended to care team in this PR — see "Follow-up risks")
 - `ma_briefings`: members read all family rows and may update only the status /
   sent fields; inserts and text edits are service-role-only (see migration 003)
 - `ma_ride_notices`: members read all family rows and may update only the
@@ -291,16 +327,91 @@ All tables should have RLS enabled.  At minimum:
   verify membership first (see migration 005)
 - `ma_families`: read for members
 
+### Logboek — audience & the care team
+
+Every `ma_posts` row (a "Logboek entry") carries an `audience`:
+
+| Value       | Who can read it                                          |
+|-------------|------------------------------------------------------------|
+| `family`    | Family owner/member only (the safe default for new entries) |
+| `care_team` | Family owner/member **and** active care-team users for that family |
+
+`ma_comments` and `ma_attachments` have no `audience` column of their own —
+access always resolves through a join back to the parent `ma_posts` row, so a
+comment or attachment can never be *more* visible than its parent entry.
+
+Care-team membership lives in `ma_care_team_members`, checked by the
+`ma_is_care_team_member(family_id)` SECURITY DEFINER helper (fixed
+`search_path`, active only while `revoked_at is null` — mirrors
+`ma_is_family_member`/`ma_is_family_owner`). A care-team user is **never**
+given a row in `ma_family_members`, so none of the existing family policies
+accidentally widen to include them.
+
+Authorization matrix (verified with live SQL RLS tests against synthetic
+data — see "Tests" below):
+
+| Actor | Read family entry | Read care_team entry | Create family entry | Create care_team entry | Edit/delete own | Edit/delete others' |
+|---|---|---|---|---|---|---|
+| Family owner | yes | yes | yes | yes | yes | yes (any family entry) |
+| Family member | yes | yes | yes | yes | yes | no |
+| Active caregiver | no | yes (own family only) | no | yes | yes (care_team only, can't retarget to `family`) | no |
+| Revoked caregiver | no | no | no | no | no | no |
+| Unrelated signed-in user | no | no | no | no | no | no |
+| Anonymous | no | no | no | no | no | no |
+| Trusted `/vandaag` device | no — has no Supabase session at all | | | | | |
+
+### Care team — provisioning & revocation
+
+Invitations are intentionally **not** self-service in this PR — a half-secure
+client-side invite flow was judged out of scope (see "Follow-up risks"). An
+admin provisions a caregiver by hand, in the Supabase SQL editor:
+
+```sql
+-- 1. Create the Supabase Auth user first (Dashboard → Authentication → Add user,
+--    or supabase.auth.admin.createUser via the service role) — get their user_id.
+-- 2. Grant care-team access for a family:
+insert into ma_care_team_members (family_id, user_id, created_by)
+values ('<family-uuid>', '<caregiver-auth-user-uuid>', '<admin-auth-user-uuid>');
+```
+
+The caregiver then signs in the same way family members do (magic link) — their
+`ma_profiles` row is created automatically on first sign-in, same as anyone else.
+No email/name goes in this repository or in fixtures.
+
+To revoke, set `revoked_at` — access is checked live on every query, so it takes
+effect immediately (no cached session to invalidate, no signed URL stays valid
+past its own short TTL):
+
+```sql
+update ma_care_team_members
+   set revoked_at = now()
+ where family_id = '<family-uuid>' and user_id = '<caregiver-auth-user-uuid>';
+```
+
 ### Storage bucket
 
 Create a **private** bucket named `ma-media` in Supabase Storage.
-Objects are accessed via time-limited signed URLs generated by the app.
+Objects are accessed via time-limited (15-minute) signed URLs generated by the app —
+short-lived because Logboek attachments can include care observations and
+appointment documents, not just holiday photos; re-signed fresh on every
+render rather than cached.
 
 ```
 Bucket:  ma-media
-Policy:  authenticated users in the family can upload/download
-         (implement via storage RLS or a Supabase function)
+Path:    <family_id>/<post_id>/<random-uuid>.<ext>
+Policy:  family members can read/upload/update/delete under their family's
+         path prefix (path-based is equivalent to post-visibility for them,
+         since family sees every entry in their family regardless of audience).
+         Active caregivers can read/upload/delete only under a care_team post
+         — resolved by joining the path's post_id back to ma_posts, so a
+         guessed object path cannot bypass a post's audience the way a bare
+         family-path check would.
 ```
+
+Client-side upload limits (also enforced by the bucket's own
+`allowed_mime_types`/`file_size_limit`): images (jpeg/png/gif/webp/heic) or a
+single PDF, max 15 MB per file — see `apps/ma/src/storage.js`. Object names use
+`crypto.randomUUID()`, never a timestamp alone.
 
 ---
 
@@ -313,7 +424,11 @@ Policy:  authenticated users in the family can upload/download
    `SUPABASE_SERVICE_ROLE_KEY`, and `MA_DEVICE_TOKEN_PEPPER` are set in Netlify
    (mark the last two as **secrets**; they are Functions-only).
 5. **Migrations** — apply DB migrations **before** the deploy that ships code
-   depending on them, in order. Trusted devices need `005_ma_trusted_devices.sql`.
+   depending on them, in order. Trusted devices need `005_ma_trusted_devices.sql`;
+   Logboek + care team need `006_ma_logboek_care_team.sql` applied on top of it.
+   (As of this PR both have been applied to the live project — `005` had been
+   merged into `main` but never actually applied, which was caught and fixed
+   as part of shipping `006`; see "Follow-up risks".)
 
 The subdomain edge function (`netlify/edge-functions/subdomain-router.ts`) will automatically
 route `ma.kapework.com/*` → `/apps/ma/*` (including `/vandaag` and
@@ -349,6 +464,13 @@ cron job) that reads the family iCloud calendar's public ICS feed and upserts in
 shows only a server-built, sanitized snapshot of *today in Europe/Amsterdam* — no
 posts, attachments, ride excerpts, notes, external URLs, profiles, emails, or
 briefing management. A device is enrolled once and then needs no sign-in.
+
+This separation is structural, not just a UI choice: `apps/ma/vandaag/src/trusted.js`
+imports only `lib/today-state.js`, `lib/datetime.js`, and `utils.js` — it has
+never imported anything Logboek-related, has no Supabase client of its own, and
+never will, since it authenticates via an HttpOnly cookie against Netlify
+Functions, not a Supabase session. Logboek entries (of either audience) never
+reach this route.
 
 **Security model**
 
@@ -402,6 +524,48 @@ demoted fallback.
 The care recipient does **not** get an account — their device is paired instead
 (see “Trusted devices”, below).
 
+A **caregiver** (active care-team member) is a normal Supabase Auth user who
+signs in the same way, but is granted access via `ma_care_team_members`
+instead of `ma_family_members` — see "Care team — provisioning & revocation"
+above. The app resolves `accessType` (`owner` | `member` | `caregiver`) once
+at sign-in from those two tables (`fetchAccessContext` in `src/api.js`) and
+never infers it from the UI or an email address. A caregiver gets a
+deliberately reduced app: **Vandaag · Logboek** only — no Briefing, Agenda,
+Mensen, or Apparaten (device management), and Logboek shows only
+`care_team`-audience entries. This is enforced twice, independently: the
+route itself doesn't exist for a caregiver (`main.js`'s `CAREGIVER_ALLOWED_ROUTES`
+guard, even against a hand-typed hash), and the underlying data is RLS-gated
+regardless of what the UI shows.
+
+---
+
+## Logboek — follow-up risks
+
+Deliberately deferred out of this PR's scope, tracked here rather than shipped
+as a half-finished feature:
+
+- **Care-team Agenda access.** The brief's suggested caregiver nav included
+  Agenda, but `ma_calendar_events` has no care-team RLS policy in this PR —
+  calendar entries can carry travel/administrative detail the brief also lists
+  as something a caregiver must never see, so extending read access needs its
+  own deliberate design (e.g. a filtered view of only care-relevant
+  appointments) rather than a blanket grant. A caregiver's Today/Logboek work
+  fully without it; they simply see no Agenda tab right now.
+- **Self-service care-team invitations.** Provisioning is a manual SQL step
+  (see above) by design — a secure invite flow (token generation, expiry,
+  claim endpoint) is a real feature in its own right and was judged out of
+  scope rather than shipped half-secure.
+- **One orphaned `storage.objects` test row.** The RLS test run below inserted
+  synthetic rows directly via SQL (including one `storage.objects` metadata
+  row) to exercise Storage policies without touching real family data.
+  Everything else was cleaned up in the same session; that one row couldn't be,
+  because Supabase's `storage.protect_delete()` trigger blocks direct SQL
+  deletes on `storage.objects` (by design, to prevent orphaning real files) —
+  it has to go through the Storage API instead. The row is inert: it points at
+  a family/post that no longer exists, so no current RLS policy can match it
+  for any real user. Safe to delete via the Storage dashboard if you want a
+  pristine bucket listing; harmless if left alone.
+
 ---
 
 ## Shortcuts
@@ -414,5 +578,6 @@ The care recipient does **not** get an account — their device is paired instea
 | Apply DB migrations   | Supabase dashboard → SQL editor, or `supabase db push` |
 | Run tests             | `npm test` (state engine + device crypto/derive)    |
 | State engine × TZ     | `npm run test:today-state` (UTC/NY/Amsterdam/Jakarta) |
+| Logboek RLS tests     | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in transactions/cleanup — see the PR description for the full authorization-matrix results) |
 | Manual acceptance     | See `apps/ma/TRUSTED_DEVICES.md`                     |
 | Check errors          | Browser console; errors logged with `[ma/...]` prefix |

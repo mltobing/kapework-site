@@ -21,13 +21,12 @@ import { supabase }                             from './supabase.js';
 import { getState, setState }                   from './state.js';
 import { currentRoute, onRoute, navigate }      from './router.js';
 import { escapeHtml }                           from './utils.js';
-import { fetchProfile, fetchFamilyId, createProfile } from './api.js';
+import { fetchProfile, fetchAccessContext, createProfile } from './api.js';
 import { renderTopbar }                         from './components/topbar.js';
 import { renderNav }                            from './components/nav.js';
 import { mount as mountToday }                  from './views/today.js';
 import { mount as mountBriefing }               from './views/briefing.js';
-import { mount as mountFamily }                 from './views/family.js';
-import { mount as mountPhotos }                 from './views/photos.js';
+import { mount as mountLogboek }                from './views/logboek.js';
 import { mount as mountCalendar }               from './views/calendar.js';
 import { mount as mountPeople }                 from './views/people.js';
 import { mount as mountCompose }                from './views/compose.js';
@@ -36,13 +35,22 @@ import { mount as mountDevices }                from './views/devices.js';
 const VIEWS = {
   today:    mountToday,
   briefing: mountBriefing,
-  family:   mountFamily,
-  photos:   mountPhotos,
+  logboek:  mountLogboek,
   calendar: mountCalendar,
   people:   mountPeople,
   compose:  mountCompose,
   devices:  mountDevices,
 };
+
+// Routes a caregiver may never reach, even by typing the hash directly — RLS
+// already blocks the underlying data (see apps/ma/README.md), but the route
+// itself must not exist for them either: Briefing management/copy, ride-email
+// excerpts, People/access management, and trusted-device management.
+const CAREGIVER_ALLOWED_ROUTES = new Set(['today', 'logboek', 'compose']);
+
+function routeAllowedFor(route, accessType) {
+  return accessType !== 'caregiver' || CAREGIVER_ALLOWED_ROUTES.has(route);
+}
 
 // Where the magic link sends the user back to. Hardcoded to production so a link
 // opened from any device lands where the real session lives (closed signup).
@@ -399,7 +407,7 @@ function renderLoadError(appEl) {
 
 // ─── App shell ────────────────────────────────────────────────────────────────
 
-function renderShell(appEl, user, profile, familyId) {
+function renderShell(appEl, user, profile, familyId, accessType) {
   appEl.innerHTML = `
     <div class="app-shell">
       <div class="topbar"       id="topbar"></div>
@@ -412,16 +420,23 @@ function renderShell(appEl, user, profile, familyId) {
   const viewEl   = appEl.querySelector('#view-container');
   const navEl    = appEl.querySelector('#bottom-nav');
 
-  renderTopbar(topbarEl, { onSignOut: handleSignOut, onDevices: () => navigate('devices') });
-  renderNav(navEl, currentRoute());
+  renderTopbar(topbarEl, {
+    onSignOut: handleSignOut,
+    onDevices: () => navigate('devices'),
+    showDevices: accessType !== 'caregiver',
+  });
+
+  const startRoute = routeAllowedFor(currentRoute(), accessType) ? currentRoute() : 'logboek';
+  renderNav(navEl, startRoute, accessType);
 
   if (_routeUnsubscribe) _routeUnsubscribe();
   _routeUnsubscribe = onRoute(async (route) => {
-    renderNav(navEl, route);
+    if (!routeAllowedFor(route, accessType)) { navigate('logboek'); return; }
+    renderNav(navEl, route, accessType);
     await switchView(viewEl, route);
   });
 
-  return switchView(viewEl, currentRoute());
+  return switchView(viewEl, startRoute);
 }
 
 async function switchView(container, route) {
@@ -441,7 +456,7 @@ async function switchView(container, route) {
     console.error(`[ma] Error mounting view "${route}":`, err);
     container.innerHTML = `
       <div class="view-error">
-        <p>Something went wrong loading this page. Please try again.</p>
+        <p>Er ging iets mis bij het laden van deze pagina. Probeer het opnieuw.</p>
       </div>
     `;
   }
@@ -450,7 +465,7 @@ async function switchView(container, route) {
 // ─── Post-auth routing ────────────────────────────────────────────────────────
 
 async function routeAfterAuth(appEl, user) {
-  setState({ user, profile: null, familyId: null });
+  setState({ user, profile: null, familyId: null, accessType: null });
 
   // 1. Profile — create it on first sign-in if missing.
   let profile = null;
@@ -467,24 +482,27 @@ async function routeAfterAuth(appEl, user) {
     if (!profile) return; // signed out mid-prompt; auth listener handles it
   }
 
-  // 2. Membership — a user can be authenticated but not yet granted access.
+  // 2. Access — family membership (owner/member) or active care-team
+  // membership. Never inferred from the UI or an email address; resolved
+  // once here and carried in state for every view/query to read.
+  let accessType = null;
   let familyId = null;
   try {
-    familyId = await fetchFamilyId(user.id);
+    ({ accessType, familyId } = await fetchAccessContext(user.id));
   } catch (err) {
-    console.error('[ma] Failed to load membership:', err);
+    console.error('[ma] Failed to load access context:', err);
     renderLoadError(appEl);
     return;
   }
 
-  setState({ user, profile, familyId });
+  setState({ user, profile, familyId, accessType });
 
   if (!familyId) {
     renderNoMembership(appEl);
     return;
   }
 
-  await renderShell(appEl, user, profile, familyId);
+  await renderShell(appEl, user, profile, familyId, accessType);
 }
 
 // ─── Sign out ────────────────────────────────────────────────────────────────
@@ -510,7 +528,7 @@ async function showForSession(appEl, session) {
   _renderedUserId = uid;
 
   teardownShell();
-  setState({ user: null, profile: null, familyId: null });
+  setState({ user: null, profile: null, familyId: null, accessType: null });
   appEl.innerHTML = '';
 
   if (session?.user) {

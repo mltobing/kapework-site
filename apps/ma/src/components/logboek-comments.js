@@ -1,7 +1,7 @@
 /**
- * components/comment-list.js
+ * components/logboek-comments.js
  *
- * Fetches and renders comments for a post.
+ * Fetches and renders the comment thread for a Logboek entry.
  * Includes a reply input for signed-in users.
  * Comments are appended optimistically on submit.
  */
@@ -9,7 +9,7 @@
 import { fetchComments, addComment } from '../api.js';
 import { getState }                  from '../state.js';
 import { escapeHtml }     from '../utils.js';
-import { formatRelative } from '../lib/datetime.js';
+import { formatRelativeNl as formatRelative } from '../lib/datetime.js';
 
 /**
  * Renders the comment list (and reply form) into `container`.
@@ -18,14 +18,14 @@ import { formatRelative } from '../lib/datetime.js';
  * @param {HTMLElement} container
  * @param {string}      postId
  */
-export async function renderCommentList(container, postId) {
-  container.innerHTML = '<div class="section-loading" style="padding:8px 0">Loading replies…</div>';
+export async function renderLogboekComments(container, postId) {
+  container.innerHTML = '<div class="section-loading" style="padding:8px 0">Reacties laden…</div>';
 
   let comments = [];
   try {
     comments = await fetchComments(postId);
   } catch (err) {
-    console.error('[ma/comment-list] Failed to fetch comments:', err);
+    console.error('[ma/logboek-comments] Failed to fetch comments:', err);
     container.innerHTML = '';
     return;
   }
@@ -37,7 +37,7 @@ function _render(container, postId, comments) {
   const { user, profile, familyId } = getState();
 
   const listHtml = comments.map(c => {
-    const name = c.ma_profiles?.display_name || 'Family';
+    const name = c.ma_profiles?.display_name || 'Familie';
     return `
       <div class="comment">
         <span class="comment-author">${escapeHtml(name)}</span>
@@ -54,11 +54,11 @@ function _render(container, postId, comments) {
         <input
           class="comment-input"
           type="text"
-          placeholder="Add a reply\u2026"
+          placeholder="Reageer…"
           maxlength="500"
           autocomplete="off"
         >
-        <button type="submit" class="comment-submit">Reply</button>
+        <button type="submit" class="comment-submit">Stuur</button>
       </form>
     ` : ''}
   `;
@@ -85,17 +85,17 @@ function _render(container, postId, comments) {
       const commentEl = document.createElement('div');
       commentEl.className = 'comment comment--new';
       commentEl.innerHTML = `
-        <span class="comment-author">${escapeHtml(profile?.display_name || 'You')}</span>
+        <span class="comment-author">${escapeHtml(profile?.display_name || 'Jij')}</span>
         <span class="comment-body">${escapeHtml(body)}</span>
-        <span class="comment-time">Just now</span>
+        <span class="comment-time">Zojuist</span>
       `;
       listEl.appendChild(commentEl);
     } catch (err) {
-      console.error('[ma/comment-list] Failed to add reply:', err);
+      console.error('[ma/logboek-comments] Failed to add reply:', err);
       // Surface inline rather than alert (friendlier on mobile)
       const errEl = document.createElement('p');
       errEl.style.cssText = 'color:var(--danger);font-size:13px;padding:4px 0';
-      errEl.textContent   = 'Could not send reply. Please try again.';
+      errEl.textContent   = 'Kon reactie niet versturen. Probeer het opnieuw.';
       form.appendChild(errEl);
       setTimeout(() => errEl.remove(), 4000);
     } finally {
