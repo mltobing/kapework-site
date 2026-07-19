@@ -9,7 +9,8 @@
  *   - The device credential is an HttpOnly + Secure + SameSite=Strict, same-origin
  *     cookie for ma.kapework.com.
  *   - All DB access uses the service-role key (RLS default-denies these tables to
- *     browser roles). Membership is verified server-side before any family action.
+ *     browser roles). Family *ownership* (not just membership) is verified
+ *     server-side before any administrative device action.
  *
  * Logging rule: never log tokens, codes, labels, names, or family data — counts,
  * statuses, and opaque ids only.
@@ -29,15 +30,16 @@ function serviceClient() {
   });
 }
 
-// ── Auth: validate a Supabase access token and confirm family membership ───────
+// ── Auth: validate a Supabase access token and confirm family ownership ────────
 
 /**
  * Returns { ok:true, userId } when the bearer token is a valid Supabase session
- * whose user is an active member of `familyId`; otherwise { ok:false, status }.
- * Uses the service client to both validate the JWT and read membership (which is
- * itself RLS-protected, so the service role is required).
+ * whose user is an `owner` of `familyId`; otherwise { ok:false, status }.
+ * Trusted-device administration is owner-only (see apps/ma/README.md) — a plain
+ * family member no longer passes this check. Uses the service client to both
+ * validate the JWT and read membership (itself RLS-protected, hence service role).
  */
-async function verifyMember(supabase, authHeader, familyId) {
+async function verifyOwner(supabase, authHeader, familyId) {
   const token = /^Bearer\s+(.+)$/i.exec(String(authHeader || ''))?.[1];
   if (!token || !familyId) return { ok: false, status: 401 };
 
@@ -50,6 +52,7 @@ async function verifyMember(supabase, authHeader, familyId) {
     .select('user_id')
     .eq('family_id', familyId)
     .eq('user_id', userId)
+    .eq('role', 'owner')
     .maybeSingle();
   if (memErr) return { ok: false, status: 500 };
   if (!membership) return { ok: false, status: 403 };
@@ -95,7 +98,7 @@ module.exports = {
   serviceClient,
   parseCookies,
   deviceCookie,
-  verifyMember,
+  verifyOwner,
   corsHeaders,
   json,
 };

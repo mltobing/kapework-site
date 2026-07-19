@@ -24,7 +24,7 @@
  */
 
 import { supabase } from './supabase.js';
-import { todayAms, startOfTodayAmsISO } from './lib/datetime.js';
+import { todayAms, addDaysKey, startOfTodayAmsISO } from './lib/datetime.js';
 
 const LOGBOEK_ENTRY_COLUMNS = `
   id, title, body, kind, audience, tags, event_date, linked_event_uid,
@@ -389,21 +389,131 @@ export async function dismissRideNotice(id, userId) {
   return data;
 }
 
-// ─── People ──────────────────────────────────────────────────────────────────
+// ─── Presence ────────────────────────────────────────────────────────────────
 
 /**
- * Fetch family member profiles. Family-only (RLS: ma_is_family_member) — a
- * caregiver's request here always returns an empty list, never an error.
+ * Touch the current user's "last active" signal for this family. Safe to call
+ * liberally — ma_touch_presence() throttles at the database layer (~10 min)
+ * and silently no-ops for anyone who isn't an active family member or active
+ * care-team member of familyId. Never sends the route/URL/title.
  */
-export async function fetchPeople(familyId) {
+export async function touchPresence(familyId) {
+  const { error } = await supabase.rpc('ma_touch_presence', { p_family_id: familyId });
+  if (error) throw error;
+}
+
+// ─── Beheer (owner-only admin dashboard) ──────────────────────────────────────
+// Every function below is owner-only at the RLS/RPC layer (see
+// supabase-migrations/007_ma_admin_dashboard.sql) — a non-owner request
+// returns an empty result, never an error, and never a leak.
+
+/**
+ * Most recent private irma-sync pipeline run for this family, or null if none
+ * has ever reported in yet (rendered as a calm "no data yet" state, not a
+ * failure — see views/beheer.js).
+ */
+export async function fetchLatestIntegrationRun(familyId) {
   const { data, error } = await supabase
-    .from('ma_family_members')
+    .from('ma_integration_runs')
     .select(`
-      role, created_at,
-      ma_profiles!user_id ( user_id, display_name, relationship, avatar_url )
+      id, run_key, started_at, finished_at, status,
+      calendar_status, briefing_status, notices_status,
+      events_seen, events_created, events_updated, events_unchanged, events_cancelled,
+      briefings_updated, briefings_unchanged, briefings_failed,
+      mail_messages_seen, mail_extract_calls, notice_rows_written,
+      notices_superseded, notices_auto_resolved, mail_parse_failures,
+      mail_dropped_non_ride, mail_dropped_no_excerpt, error_stage
     `)
     .eq('family_id', familyId)
-    .order('created_at', { ascending: true });
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (error) throw error;
-  return (data ?? []).filter(m => m.ma_profiles);
+  return data;
+}
+
+/**
+ * Most recent calendar source sync timestamp, for the Agenda & synchronisatie
+ * card (independent of ma_integration_runs, so a stale/missing run doesn't
+ * also blank this — the two are cross-checked in the view, not here).
+ */
+export async function fetchCalendarSourceAdminStatus(familyId) {
+  const { data, error } = await supabase
+    .from('ma_calendar_sources')
+    .select('last_synced_at')
+    .eq('family_id', familyId)
+    .order('last_synced_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Tomorrow's briefing (Europe/Amsterdam), if any, with who marked it sent
+ * where available. Returns null when there simply isn't one yet — not
+ * automatically a failure (see views/beheer.js health rules).
+ */
+export async function fetchTomorrowBriefingAdminStatus(familyId) {
+  const tomorrow = addDaysKey(todayAms(), 1);
+  const { data, error } = await supabase
+    .from('ma_briefings')
+    .select(`
+      id, briefing_date, status, generated_at, sent_at, sent_by,
+      ma_profiles!sent_by ( display_name )
+    `)
+    .eq('family_id', familyId)
+    .eq('briefing_date', tomorrow)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Open ride-reconciliation notice count + newest received timestamp, for the
+ * AutoMaatje card. Never returns sender/excerpt/driver/destination/times —
+ * those must never surface in Beheer.
+ */
+export async function fetchRideNoticeAdminSummary(familyId) {
+  const { data, error } = await supabase
+    .from('ma_ride_notices')
+    .select('id, received_at')
+    .eq('family_id', familyId)
+    .eq('state', 'open')
+    .order('received_at', { ascending: false });
+  if (error) throw error;
+  const rows = data ?? [];
+  return { openCount: rows.length, newestReceivedAt: rows[0]?.received_at ?? null };
+}
+
+/**
+ * A page of the owner-only activity timeline, newest first. Familie/Zorgteam
+ * filtering happens in the view (cross-referenced against fetchAdminRoster —
+ * ma_activity_events itself has no actor-role column), so this always
+ * returns the raw page; only pagination lives here.
+ */
+export async function fetchAdminActivity(familyId, { limit = 30, offset = 0 } = {}) {
+  const { data, error } = await supabase
+    .from('ma_activity_events')
+    .select(`
+      id, occurred_at, actor_type, actor_user_id, source, action,
+      object_type, object_id, severity, metadata,
+      ma_profiles!actor_user_id ( display_name )
+    `)
+    .eq('family_id', familyId)
+    .order('occurred_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Family + care-team roster with access status and last-active/last-action
+ * timestamps, via the ma_admin_roster() RPC (verifies ownership server-side;
+ * returns no rows for anyone else). No email addresses, no auth metadata.
+ */
+export async function fetchAdminRoster(familyId) {
+  const { data, error } = await supabase.rpc('ma_admin_roster', { p_family_id: familyId });
+  if (error) throw error;
+  return data ?? [];
 }

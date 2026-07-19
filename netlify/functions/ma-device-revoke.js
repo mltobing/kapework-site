@@ -1,13 +1,14 @@
 /* netlify/functions/ma-device-revoke.js
  *
- * Authenticated family member revokes a trusted device. Takes effect on the
+ * Authenticated family owner revokes a trusted device. Takes effect on the
  * device's next payload refresh (ma-today rejects revoked devices). Idempotent.
  *
  * Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
 const { checkRateLimit, getClientIp, requireEnvVars, logError } = require('./_utils');
-const { serviceClient, verifyMember, json, corsHeaders } = require('./_ma-devices');
+const { serviceClient, verifyOwner, json, corsHeaders } = require('./_ma-devices');
+const { recordActivity } = require('./_ma-activity');
 
 const RATE_LIMIT = 30;
 
@@ -36,10 +37,10 @@ exports.handler = async (event) => {
   if (!familyId || !deviceId) return json(400, { error: 'bad_request' }, origin);
 
   const supabase = serviceClient();
-  const auth = await verifyMember(supabase, event.headers['authorization'], familyId);
+  const auth = await verifyOwner(supabase, event.headers['authorization'], familyId);
   if (!auth.ok) return json(auth.status, { error: 'not_authorized' }, origin);
 
-  // Scope the update by family_id too, so a member can only revoke their own
+  // Scope the update by family_id too, so an owner can only revoke their own
   // family's devices even if a deviceId from elsewhere is supplied.
   const { data, error } = await supabase
     .from('ma_trusted_devices')
@@ -56,6 +57,29 @@ exports.handler = async (event) => {
     return json(500, { error: 'server_error' }, origin);
   }
 
-  // Already-revoked or unknown id → still report success (idempotent, no leak).
+  // Only a first-time revoke (data present) gets an activity row — a repeat
+  // call against an already-revoked or unknown device is a silent no-op, not
+  // a second event. No label/token/hash in the metadata, only the device id.
+  if (data) {
+    try {
+      await recordActivity(supabase, {
+        familyId,
+        actorType: 'user',
+        actorUserId: auth.userId,
+        source: 'trusted_device',
+        action: 'trusted_device_revoked',
+        objectType: 'trusted_device',
+        objectId: data.id,
+        idempotencyKey: `trusted-device-revoked-${data.id}`,
+      });
+    } catch (activityErr) {
+      console.error('[ma-device-revoke] activity write failed:', activityErr.message);
+      await logError(supabase, 'ma-device-revoke', activityErr.message, { familyId });
+      // The revoke itself already happened — but we must not claim a fully
+      // audited administrative action succeeded when the audit trail didn't.
+      return json(500, { error: 'server_error' }, origin);
+    }
+  }
+
   return json(200, { ok: true, revoked: Boolean(data) }, origin);
 };

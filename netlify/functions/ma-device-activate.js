@@ -16,6 +16,7 @@ const { checkRateLimit, getClientIp, requireEnvVars, sanitiseString, logError } 
 const {
   DEVICE_TTL_MS, hashSecret, randomToken, serviceClient, deviceCookie, json, corsHeaders,
 } = require('./_ma-devices');
+const { recordActivity } = require('./_ma-activity');
 
 // Deliberately tight: at most 6 activation attempts/minute/IP. With a 15-minute
 // window that caps a 6-digit brute force far below the 1,000,000 keyspace.
@@ -86,17 +87,41 @@ exports.handler = async (event) => {
 
   // 3. Mint the device token; store only its hash.
   const deviceToken = randomToken(32);
-  const { error: devErr } = await supabase.from('ma_trusted_devices').insert({
-    family_id:  consumed.family_id,
-    label:      consumed.requested_label || 'Apparaat',
-    token_hash: hashSecret(deviceToken, pepper),
-    created_by: consumed.created_by,
-    expires_at: new Date(Date.now() + DEVICE_TTL_MS).toISOString(),
-  });
+  const { data: device, error: devErr } = await supabase
+    .from('ma_trusted_devices')
+    .insert({
+      family_id:  consumed.family_id,
+      label:      consumed.requested_label || 'Apparaat',
+      token_hash: hashSecret(deviceToken, pepper),
+      created_by: consumed.created_by,
+      expires_at: new Date(Date.now() + DEVICE_TTL_MS).toISOString(),
+    })
+    .select('id')
+    .single();
 
   if (devErr) {
     console.error('[ma-device-activate] device insert error:', devErr.message);
     await logError(supabase, 'ma-device-activate', devErr.message, {});
+    return json(500, GENERIC_FAIL, origin);
+  }
+
+  // 3b. Record the activation — no label/token/code/hash in the metadata, only
+  // the opaque device id. A failed audit write must not report activation as
+  // successful: the device would exist with no record of who set it up.
+  try {
+    await recordActivity(supabase, {
+      familyId: consumed.family_id,
+      actorType: 'user',
+      actorUserId: consumed.created_by,
+      source: 'trusted_device',
+      action: 'trusted_device_activated',
+      objectType: 'trusted_device',
+      objectId: device.id,
+      idempotencyKey: `trusted-device-activated-${device.id}`,
+    });
+  } catch (activityErr) {
+    console.error('[ma-device-activate] activity write failed:', activityErr.message);
+    await logError(supabase, 'ma-device-activate', activityErr.message, {});
     return json(500, GENERIC_FAIL, origin);
   }
 

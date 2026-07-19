@@ -21,14 +21,15 @@ import { supabase }                             from './supabase.js';
 import { getState, setState }                   from './state.js';
 import { currentRoute, onRoute, navigate }      from './router.js';
 import { escapeHtml }                           from './utils.js';
-import { fetchProfile, fetchAccessContext, createProfile } from './api.js';
+import { fetchProfile, fetchAccessContext, createProfile, touchPresence } from './api.js';
+import { createPresenceHeartbeat }              from './lib/presence-heartbeat.js';
 import { renderTopbar }                         from './components/topbar.js';
 import { renderNav }                            from './components/nav.js';
 import { mount as mountToday }                  from './views/today.js';
 import { mount as mountBriefing }               from './views/briefing.js';
 import { mount as mountLogboek }                from './views/logboek.js';
 import { mount as mountCalendar }               from './views/calendar.js';
-import { mount as mountPeople }                 from './views/people.js';
+import { mount as mountBeheer }                 from './views/beheer.js';
 import { mount as mountCompose }                from './views/compose.js';
 import { mount as mountDevices }                from './views/devices.js';
 
@@ -37,19 +38,44 @@ const VIEWS = {
   briefing: mountBriefing,
   logboek:  mountLogboek,
   calendar: mountCalendar,
-  people:   mountPeople,
+  beheer:   mountBeheer,
   compose:  mountCompose,
   devices:  mountDevices,
 };
 
-// Routes a caregiver may never reach, even by typing the hash directly — RLS
-// already blocks the underlying data (see apps/ma/README.md), but the route
-// itself must not exist for them either: Briefing management/copy, ride-email
-// excerpts, People/access management, and trusted-device management.
-const CAREGIVER_ALLOWED_ROUTES = new Set(['today', 'logboek', 'compose']);
+// Explicit per-route allowlist by accessType — RLS/functions are the real
+// security boundary (see apps/ma/README.md), but the route itself must not
+// even exist for a role that shouldn't see it. 'people' is handled separately
+// below (legacy alias, never mounts a view of its own).
+const ROUTE_ACCESS = {
+  today:    ['owner', 'member', 'caregiver'],
+  briefing: ['owner', 'member'],
+  logboek:  ['owner', 'member', 'caregiver'],
+  calendar: ['owner', 'member'],
+  compose:  ['owner', 'member', 'caregiver'],
+  beheer:   ['owner'],
+  devices:  ['owner'],
+};
 
 function routeAllowedFor(route, accessType) {
-  return accessType !== 'caregiver' || CAREGIVER_ALLOWED_ROUTES.has(route);
+  const allowed = ROUTE_ACCESS[route];
+  return allowed ? allowed.includes(accessType) : true;
+}
+
+/**
+ * Resolves the hash the router handed us into the route that should actually
+ * mount: applies the legacy '#people' alias (owner → beheer, everyone else →
+ * today) and redirects away from anything the current accessType can't reach
+ * (caregiver → logboek, matching its pre-Beheer fallback; anyone else → today).
+ */
+function resolveRoute(route, accessType) {
+  if (route === 'people') {
+    return { target: accessType === 'owner' ? 'beheer' : 'today', redirect: true };
+  }
+  if (!routeAllowedFor(route, accessType)) {
+    return { target: accessType === 'caregiver' ? 'logboek' : 'today', redirect: true };
+  }
+  return { target: route, redirect: false };
 }
 
 // Where the magic link sends the user back to. Hardcoded to production so a link
@@ -423,20 +449,25 @@ function renderShell(appEl, user, profile, familyId, accessType) {
   renderTopbar(topbarEl, {
     onSignOut: handleSignOut,
     onDevices: () => navigate('devices'),
-    showDevices: accessType !== 'caregiver',
+    showDevices: accessType === 'owner',
   });
 
-  const startRoute = routeAllowedFor(currentRoute(), accessType) ? currentRoute() : 'logboek';
-  renderNav(navEl, startRoute, accessType);
+  const initial = resolveRoute(currentRoute(), accessType);
+  if (initial.redirect) {
+    navigate(initial.target);
+  } else {
+    renderNav(navEl, initial.target, accessType);
+  }
 
   if (_routeUnsubscribe) _routeUnsubscribe();
   _routeUnsubscribe = onRoute(async (route) => {
-    if (!routeAllowedFor(route, accessType)) { navigate('logboek'); return; }
-    renderNav(navEl, route, accessType);
-    await switchView(viewEl, route);
+    const resolved = resolveRoute(route, accessType);
+    if (resolved.redirect) { navigate(resolved.target); return; }
+    renderNav(navEl, resolved.target, accessType);
+    await switchView(viewEl, resolved.target);
   });
 
-  return switchView(viewEl, startRoute);
+  return initial.redirect ? null : switchView(viewEl, initial.target);
 }
 
 async function switchView(container, route) {
@@ -503,7 +534,23 @@ async function routeAfterAuth(appEl, user) {
   }
 
   await renderShell(appEl, user, profile, familyId, accessType);
+  _presenceHeartbeat.start(familyId);
 }
+
+// ─── Presence heartbeat ─────────────────────────────────────────────────────
+// A compact "last active" signal for the owner-only roster — never an event
+// stream, never the route/URL/title. ma_touch_presence() itself throttles at
+// ~10 minutes DB-side; the client throttle in presence-heartbeat.js just
+// avoids firing pointless network calls on rapid tab-visibility flicker.
+// Never blocks first render; failures are console-safe (see onError below)
+// and never surfaced to the user.
+
+const _presenceHeartbeat = createPresenceHeartbeat({
+  touch: touchPresence,
+  addVisibilityListener:    (fn) => document.addEventListener('visibilitychange', fn),
+  removeVisibilityListener: (fn) => document.removeEventListener('visibilitychange', fn),
+  isVisible: () => document.visibilityState === 'visible',
+});
 
 // ─── Sign out ────────────────────────────────────────────────────────────────
 
@@ -520,6 +567,7 @@ async function handleSignOut() {
 function teardownShell() {
   if (_routeUnsubscribe)   { _routeUnsubscribe();   _routeUnsubscribe = null; }
   if (_cleanupCurrentView) { _cleanupCurrentView(); _cleanupCurrentView = null; }
+  _presenceHeartbeat.stop();
 }
 
 async function showForSession(appEl, session) {
