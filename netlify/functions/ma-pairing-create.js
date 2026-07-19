@@ -9,7 +9,7 @@
 const { checkRateLimit, getClientIp, requireEnvVars, sanitiseString, logError } = require('./_utils');
 const {
   MA_ORIGIN, PAIRING_TTL_MS, hashSecret, randomToken, randomCode,
-  serviceClient, verifyMember, json, corsHeaders,
+  serviceClient, verifyOwner, json, corsHeaders,
 } = require('./_ma-devices');
 
 const RATE_LIMIT = 10; // pairings/minute/IP
@@ -40,7 +40,7 @@ exports.handler = async (event) => {
 
   const supabase = serviceClient();
 
-  const auth = await verifyMember(supabase, event.headers['authorization'], familyId);
+  const auth = await verifyOwner(supabase, event.headers['authorization'], familyId);
   if (!auth.ok) return json(auth.status, { error: 'not_authorized' }, origin);
 
   const pepper       = process.env.MA_DEVICE_TOKEN_PEPPER;

@@ -7,7 +7,7 @@
  */
 
 const { checkRateLimit, getClientIp, requireEnvVars } = require('./_utils');
-const { serviceClient, verifyMember, json, corsHeaders } = require('./_ma-devices');
+const { serviceClient, verifyOwner, json, corsHeaders } = require('./_ma-devices');
 
 const RATE_LIMIT = 30;
 
@@ -35,7 +35,7 @@ exports.handler = async (event) => {
   if (!familyId) return json(400, { error: 'bad_request' }, origin);
 
   const supabase = serviceClient();
-  const auth = await verifyMember(supabase, event.headers['authorization'], familyId);
+  const auth = await verifyOwner(supabase, event.headers['authorization'], familyId);
   if (!auth.ok) return json(auth.status, { error: 'not_authorized' }, origin);
 
   const { data, error } = await supabase

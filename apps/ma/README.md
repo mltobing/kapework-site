@@ -58,27 +58,32 @@ apps/ma/
     utils.js            escapeHtml, getInitial
 
     lib/
-      datetime.js       Europe/Amsterdam date/time helpers (single source of truth)
-      today-state.js    Deterministic "what now" engine (pure; unit-tested)
-      event-derive.js   Conservative title/notes → safe derived fields
-      devices-api.js    Client wrappers for the trusted-device Functions
-      logboek-types.js  Entry-type / audience labels, icons, and filter chip definitions
+      datetime.js           Europe/Amsterdam date/time helpers (single source of truth)
+      today-state.js        Deterministic "what now" engine (pure; unit-tested)
+      event-derive.js       Conservative title/notes → safe derived fields
+      devices-api.js        Client wrappers for the trusted-device Functions
+      logboek-types.js      Entry-type / audience labels, icons, and filter chip definitions
+      admin-activity.js     Beheer: action→Dutch-sentence/icon/actor/bucket mapping (pure; unit-tested)
+      beheer-health.js      Beheer: Systeemstatus green/amber/red/neutral rules (pure; unit-tested)
+      presence-heartbeat.js Beheer: dependency-injected presence-touch scheduler (pure; unit-tested)
 
     views/
       today.js          Today tab: Nu card + today's events + urgent notices + Vanavond
                          + quick "Notitie of foto toevoegen" action. Caregivers get a
                          reduced Today (no calendar — see "Follow-up risks" below).
-      briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts (family only)
+      briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts (family/member only)
       logboek.js        Logboek tab: chronological, filterable timeline + compose FAB
-      calendar.js       Calendar tab: read-only event agenda (family only)
-      people.js         People tab: family member cards (family only)
+      calendar.js       Calendar tab: read-only event agenda (family/member only)
+      beheer.js         Beheer tab: Systeemstatus, Recente activiteit, Mensen en toegang,
+                         Apparaten summary (owner only — see "Beheer" below)
       compose.js        Logboek compose flow: type, title, body, date, photos/PDF,
                          tags, linked event (family only), visibility
-      devices.js        Apparaten: set up / list / revoke trusted devices (family only)
+      devices.js        Apparaten: set up / list / revoke trusted devices (owner only)
 
     components/
-      topbar.js         Top app bar with menu (Apparaten hidden for caregivers / sign out)
-      nav.js             Bottom tab bar — family: Vandaag · Briefing · Logboek · Agenda · Mensen;
+      topbar.js         Top app bar with menu (Apparaten shown owner-only / sign out)
+      nav.js            Bottom tab bar — owner: Vandaag · Briefing · Logboek · Agenda · Beheer;
+                         member: Vandaag · Briefing · Logboek · Agenda (no Beheer);
                          caregiver: Vandaag · Logboek only
       ride-notices.js   Ride-reconciliation strip
       logboek-entry.js  Entry card: type/audience badges, photos, documents, tags, comments
@@ -89,7 +94,9 @@ apps/ma/
 
 Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
 `ma-device-activate`, `ma-today`, `ma-devices-list`, `ma-device-revoke`, plus
-shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js`).
+shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js` /
+`_ma-activity.js` — the last records Beheer activity events from the
+device-activation/revocation endpoints).
 
 ---
 
@@ -122,7 +129,7 @@ Or run the Netlify CLI (`netlify dev`) with the env vars set in a local `.env` f
 | `SUPABASE_ANON_KEY`          | Yes      | client       | Supabase public anon key (browser-safe)                     |
 | `SUPABASE_SERVICE_ROLE_KEY`  | Yes      | **fn only**  | Service role; used by Netlify Functions. **Never** exposed to the browser. |
 | `MA_DEVICE_TOKEN_PEPPER`     | Yes      | **fn only**  | Random server-only secret; peppers device-token/code hashes. Set as a Netlify **secret**. |
-| `GA_MEASUREMENT_ID`          | No       | client       | Google Analytics — already used site-wide                   |
+| `GA_MEASUREMENT_ID`          | No       | client       | Google Analytics — used by other Kapework apps; **Ma deliberately never loads `/shared/analytics.js`, so this has no effect here** (see "Why no Google Analytics?" below) |
 
 Only the three `client`-scoped values are written into `/shared/config.js` by
 `scripts/generate-config.js` at build time (the app reads them via
@@ -194,6 +201,9 @@ ma_care_team_members (
   created_by  uuid not null references auth.users(id),
   created_at  timestamptz not null default now(),
   revoked_at  timestamptz,  -- null = active; set = revoked (checked by ma_is_care_team_member)
+  revoked_by  uuid references auth.users(id),  -- who revoked it — added in migration 007, for the
+                                                -- Beheer activity trail's "caregiver_access_revoked" event
+  updated_at  timestamptz not null default now(),  -- kept current by a BEFORE UPDATE trigger
   unique (family_id, user_id)
 )
 
@@ -294,6 +304,61 @@ ma_ride_notices (
   updated_at         timestamptz default now(),
   unique (family_id, source_message_id, ride_date)
 )
+
+-- One row per private irma-sync pipeline execution (see supabase-migrations/007_ma_admin_dashboard.sql).
+-- Written only by the service-role sync job. Backs the Beheer "Systeemstatus" cards.
+ma_integration_runs (
+  id                       uuid primary key default gen_random_uuid(),
+  family_id                uuid not null references ma_families(id) on delete cascade,
+  run_key                  text not null,
+  started_at               timestamptz not null,
+  finished_at              timestamptz,
+  status                   text not null default 'running',        -- running|success|partial|failed
+  calendar_status          text not null default 'pending',        -- pending|success|failed|skipped
+  briefing_status          text not null default 'pending',        -- pending|success|failed|skipped
+  notices_status           text not null default 'pending',        -- pending|success|failed|disabled|misconfigured|skipped
+  events_seen              integer not null default 0,   -- + events_created/updated/unchanged/cancelled
+  briefings_updated        integer not null default 0,   -- + briefings_unchanged/briefings_failed
+  mail_messages_seen       integer not null default 0,   -- + mail_extract_calls/notice_rows_written/
+                                                           --   notices_superseded/notices_auto_resolved/
+                                                           --   mail_parse_failures/mail_dropped_non_ride/
+                                                           --   mail_dropped_no_excerpt
+  error_stage              text,
+  created_at               timestamptz not null default now(),
+  unique (family_id, run_key)
+)
+
+-- Append-only owner-visible activity timeline. Single write path is
+-- ma_record_activity_event() (SECURITY DEFINER, EXECUTE revoked from every
+-- browser role) — never a direct browser insert. See "Beheer" below for the
+-- full privacy contract (what may and may never appear in `metadata`).
+ma_activity_events (
+  id                 uuid primary key default gen_random_uuid(),
+  family_id          uuid not null references ma_families(id) on delete cascade,
+  occurred_at        timestamptz not null default now(),
+  actor_type         text not null,        -- 'user' | 'system'
+  actor_user_id      uuid references ma_profiles(user_id) on delete set null,
+  source             text not null,        -- 'database' | 'app' | 'trusted_device' | 'irma_sync'
+  action             text not null,        -- e.g. 'logboek_created', 'trusted_device_revoked'
+  object_type        text,
+  object_id          uuid,
+  severity           text not null default 'info',   -- 'info' | 'attention' | 'error'
+  metadata           jsonb not null default '{}'::jsonb,  -- counts/dates/statuses/labels/opaque ids only
+  idempotency_key    text,
+  created_at         timestamptz not null default now(),
+  unique (family_id, idempotency_key)  -- partial: only where idempotency_key is not null
+)
+
+-- Compact "last active" signal for the roster — a single upserted row per
+-- (family, user), NOT an event stream. Written only via ma_touch_presence().
+ma_user_presence (
+  family_id    uuid not null references ma_families(id) on delete cascade,
+  user_id      uuid not null references ma_profiles(user_id) on delete cascade,
+  last_seen_at timestamptz not null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  primary key (family_id, user_id)
+)
 ```
 
 ### RLS policies (minimum viable)
@@ -324,7 +389,15 @@ All tables should have RLS enabled.  At minimum:
 - `ma_trusted_devices`, `ma_device_pairings`: **default-deny** — RLS enabled with
   no policies, and table grants revoked from `anon`/`authenticated`. Browsers get
   no direct access; all reads/writes go through service-role Netlify Functions that
-  verify membership first (see migration 005)
+  verify **ownership**, not just membership, first (see migration 005 and "Trusted
+  devices" below — this tightened from member to owner-only in migration 007)
+- `ma_integration_runs`, `ma_activity_events`, `ma_user_presence`: **owner-only
+  SELECT**, no browser INSERT/UPDATE/DELETE policy at all (grants revoked from
+  `anon`/`authenticated`). Writes go only through `ma_record_activity_event()`
+  and `ma_touch_presence()` (both SECURITY DEFINER, narrowly scoped — see
+  "Beheer" below) or the service-role sync job. A family member, active
+  caregiver, or unrelated user gets an empty result, never an error and never
+  another family's data — see the RLS matrix under "Beheer" below.
 - `ma_families`: read for members
 
 ### Logboek — audience & the care team
@@ -378,13 +451,18 @@ The caregiver then signs in the same way family members do (magic link) — thei
 `ma_profiles` row is created automatically on first sign-in, same as anyone else.
 No email/name goes in this repository or in fixtures.
 
-To revoke, set `revoked_at` — access is checked live on every query, so it takes
-effect immediately (no cached session to invalidate, no signed URL stays valid
-past its own short TTL):
+To revoke, set both `revoked_at` **and** `revoked_by` — access is checked live
+on every query, so it takes effect immediately (no cached session to
+invalidate, no signed URL stays valid past its own short TTL). `revoked_by`
+matters beyond bookkeeping: the `ma_care_team_members_activity_trg` trigger
+(migration 007) reads it to decide whether the resulting Beheer activity row
+is attributed to the admin who acted (`revoked_by` set) or logged as a
+system event (`revoked_by` left null) — always set it for a manual revoke:
 
 ```sql
 update ma_care_team_members
-   set revoked_at = now()
+   set revoked_at = now(),
+       revoked_by = '<admin-auth-user-uuid>'
  where family_id = '<family-uuid>' and user_id = '<caregiver-auth-user-uuid>';
 ```
 
@@ -445,6 +523,27 @@ route `ma.kapework.com/*` → `/apps/ma/*` (including `/vandaag` and
 Note: The edge router passes `/robots.txt` through to the root `robots.txt`.
 The meta tag and `X-Robots-Tag` header are the primary defences for this app's noindex requirement.
 
+### Why no Google Analytics?
+
+Every other Kapework app loads `/shared/analytics.js`. Ma deliberately does
+not, and never has — none of its HTML entry points (`index.html`,
+`vandaag/index.html`, `vandaag/koppelen/index.html`) reference it, and no app
+source file imports `KapeworkAnalytics` or a `gtag`/Google Tag Manager
+snippet. This is enforced by a regression test
+(`apps/ma/src/lib/no-analytics.test.mjs`, part of `npm test`) so it can't
+regress silently.
+
+The reason is what Ma's data actually is: a record of who did what around the
+daily care of a specific, named, vulnerable person. Route views, session
+counts, and event props are exactly the kind of general-purpose analytics
+signal a third-party product is built to collect and retain — and exactly
+the kind of signal that should never leave this app for a family caregiving
+tool. The Beheer dashboard's own `ma_activity_events` audit trail (see
+"Supabase schema" above) covers the one legitimate need — "is the pipeline
+healthy, and who did what" — as a first-party, owner-only, RLS-gated table
+that never records route views, scrolls, photo opens, or keystrokes. That is
+a deliberate, permanent design decision, not a gap to fill in later.
+
 ---
 
 ## Calendar sync
@@ -487,15 +586,23 @@ reach this route.
 
 | Function | Auth | Purpose |
 |----------|------|---------|
-| `ma-pairing-create` | family member (Bearer) | Mint a one-time link + 6-digit code (15-min expiry). Returns raw secrets **once**. |
-| `ma-device-activate` | pairing token/code | Consume a pairing atomically, mint a device token, set the cookie. |
+| `ma-pairing-create` | family **owner** (Bearer) | Mint a one-time link + 6-digit code (15-min expiry). Returns raw secrets **once**. |
+| `ma-device-activate` | pairing token/code | Consume a pairing atomically, mint a device token, set the cookie. Records one `trusted_device_activated` activity event (see "Beheer" below). |
 | `ma-today` | device cookie | Sanitized today payload (`Cache-Control: no-store`). |
-| `ma-devices-list` | family member (Bearer) | List devices (no hashes). |
-| `ma-device-revoke` | family member (Bearer) | Revoke a device; effective on its next refresh. |
+| `ma-devices-list` | family **owner** (Bearer) | List devices (no hashes). |
+| `ma-device-revoke` | family **owner** (Bearer) | Revoke a device; effective on its next refresh. Records one `trusted_device_revoked` activity event, and only on a first-time revoke — a repeat call against an already-revoked device is a silent no-op, not a second event. |
 
-**Setup (family side):** top-bar menu → **Apparaten** → *Nieuw apparaat instellen*
-→ share the link (`Deel link`) or dictate the six-digit code. On the device, open
-the link or visit `/vandaag` and type the code.
+Device administration was tightened from **any family member** to
+**owner-only** in migration 007 — `verifyOwner()` in
+`netlify/functions/_ma-devices.js` now checks `role = 'owner'`, not just
+family membership. This lines up trusted-device management with the same
+owner-only bar as the rest of Beheer, since both control access to the care
+recipient's daily schedule.
+
+**Setup (owner side):** top-bar menu → **Beheer → Apparaten** (or the
+Apparaten card's link) → *Nieuw apparaat instellen* → share the link (`Deel
+link`) or dictate the six-digit code. On the device, open the link or visit
+`/vandaag` and type the code.
 
 **Revocation & recovery**
 
@@ -505,6 +612,184 @@ the link or visit `/vandaag` and type the code.
   or recoverable (only its hash is stored). Cleanup of expired/consumed rows is
   handled by `ma_cleanup_device_rows()` (run on a schedule; not required for normal
   operation).
+- Every activation/revocation is one append-only, owner-visible activity row
+  (see "Beheer" below) — never the pairing code, link token, device token
+  hash, cookie, or device label. Only an opaque device id.
+
+---
+
+## Beheer — the owner-only admin dashboard
+
+**Beheer** replaced the previously-unused **Mensen** nav destination
+(`src/views/people.js`, deleted) as an owner-only administrative dashboard
+(`src/views/beheer.js`). It answers five questions for the family's
+administrators, and nothing else:
+
+1. **Werkt alles?** — is the private irma-sync pipeline (calendar sync,
+   briefings, AutoMaatje ride-mail checks) healthy right now?
+2. **Wat is er gebeurd?** — a privacy-safe, append-only activity timeline.
+3. **Wie heeft wat gedaan?** — verified attribution (a real display name or
+   a system-source label, never a guess).
+4. **Wie heeft toegang?** — the full family + care-team roster in one place.
+5. **Welke apparaten zijn gekoppeld?** — trusted-device status.
+
+It is deliberately **not** a general analytics dashboard and **not** a
+surveillance feed — see "Why no Google Analytics?" above. It never records
+route views, scrolls, photo opens, or keystrokes; only the handful of
+meaningful mutations listed below.
+
+**Access:** `beheer` and `devices` are `owner`-only routes
+(`ROUTE_ACCESS` in `src/main.js`); a member or caregiver who hand-types the
+hash is redirected before any data fetch runs, and every underlying query is
+independently RLS-gated regardless of what the UI shows (see the matrix
+below). The legacy `#people` hash still resolves — to `#beheer` for an
+owner, `#today` for anyone else — so no old bookmark breaks.
+
+### Systeemstatus
+
+Three cards, each colour-coded **groen / oranje / rood / neutraal** by a pure
+function in `src/lib/beheer-health.js` (`computeAgendaHealth`,
+`computeBriefingHealth`, `computeNoticesHealth` — unit-tested in
+`beheer-health.test.mjs` at exact Europe/Amsterdam boundaries, not the
+device's local time):
+
+| Card | Source | Rule (summary) |
+|---|---|---|
+| Agenda & synchronisatie | `ma_integration_runs` (latest run) + `ma_calendar_sources.last_synced_at` | green ≤6h old; amber 6–12h; red >12h; red if the latest run reports `calendar_status = 'failed'` (amber instead if the source still looks fresh — the two disagreeing is itself worth flagging, not silently resolved either way) |
+| Briefings | tomorrow's `ma_briefings` row | neutral before 17:00 with nothing yet; amber if still missing after 17:00; green once `sent`; amber if `ready` but not sent after 18:00; red if `changed_after_sent` |
+| AutoMaatje | latest run's `notices_status` + open `ma_ride_notices` count | neutral if disabled/no data; red on `failed`/`misconfigured`; green if `success` with zero open discrepancies; amber if `success` with open discrepancies |
+
+`ma_integration_runs` is written only by the private irma-sync job (out of
+scope for this repo) — this dashboard only ever reads it.
+
+**Legacy note:** an older `ma_calendar_sync_runs` table predates
+`ma_integration_runs` and is untouched by migration 007 — confirmed **empty**
+on the live project before this migration was written. It is not the
+contract Beheer reads from, is not dropped or renamed, and nothing here
+depends on it. Left for a later cleanup PR.
+
+### Recente activiteit
+
+A reverse-chronological feed of `ma_activity_events`, filterable by
+**Alles / Familie / Zorgteam / Systeem**. Every row is rendered through
+`src/lib/admin-activity.js`:
+
+- `actorLabel(event)` — a real `ma_profiles.display_name` for a human actor,
+  or a best-effort system-source label (`Agenda-sync`, `Briefing-sync`,
+  `E-mailcontrole`, falling back to `Systeem`) for `actor_type = 'system'`.
+  The private irma-sync job's exact action vocabulary lives outside this
+  repo, so this degrades gracefully rather than guessing wrong.
+- `activitySentence(event)` — a fixed Dutch sentence per known `action`,
+  built **only** from the metadata keys documented in
+  `METADATA_ALLOWLIST` for that action. An unrecognised action (or metadata
+  that fails to build a sentence) falls back to a generic
+  "Er is een systeemactie geregistreerd." rather than rendering raw JSON or
+  throwing.
+- `activityBucket(event, roster)` — Familie/Zorgteam/Systeem classification
+  is done **client-side**, cross-referencing `actor_user_id` against the
+  roster already fetched for the "Mensen en toegang" section
+  (`buildRosterLookup`). `ma_activity_events` has no stored actor-role
+  column by design (roles change over time; the event shouldn't). This is
+  UI-convenience filtering only, not a security boundary — the owner already
+  sees every row regardless of filter.
+
+**Privacy contract (audit metadata).** Every event that a browser mutation
+can trigger is written by the `ma_trg_*` SECURITY DEFINER trigger functions
+in migration 007, which hard-code the metadata shape per action — the app
+never freely writes to `ma_activity_events.metadata`. `metadata` may only
+ever contain: counts, dates, statuses, audience/kind labels, and opaque
+object ids. It must **never** contain: post/comment title or body text,
+tags, filenames or storage paths, calendar event details, briefing text,
+mail content, driver names, clock times, device labels, URLs, or emails.
+`trusted_device_activated`/`trusted_device_revoked` metadata is hard-coded
+`{}` — the pairing code, link token, device token hash, cookie, and device
+label are **never** logged or audited, only the opaque device id as
+`object_id`. `METADATA_ALLOWLIST` in `admin-activity.js` documents this
+contract on the read side too, and a unit test
+(`admin-activity.test.mjs`) asserts every known action's metadata keys are
+covered by it and that the trusted-device actions' allowlists are empty.
+
+**Meaningful-action triggers** (migration 007, all `after` triggers, all
+gated on `auth.uid() is not null` so the service-role sync job's own
+reporting is never duplicated):
+
+| Table | Trigger | Actions recorded |
+|---|---|---|
+| `ma_posts` | `ma_posts_activity_trg` | `logboek_created`, `logboek_updated`, `logboek_audience_changed`, `logboek_deleted` |
+| `ma_comments` | `ma_comments_activity_trg` | `comment_added` |
+| `ma_attachments` | `ma_attachments_activity_trg` | `attachment_added`, `attachment_removed` |
+| `ma_briefings` | `ma_briefings_activity_trg` | `briefing_marked_sent`, `briefing_reopened` |
+| `ma_ride_notices` | `ma_ride_notices_activity_trg` | `ride_notice_dismissed` |
+| `ma_care_team_members` | `ma_care_team_members_activity_trg` | `caregiver_access_granted`, `caregiver_access_revoked` (attributed via `created_by`/`revoked_by`, not the session — provisioning is a manual admin action with no browser insert policy, so there usually is no authenticated session to read) |
+
+`trusted_device_activated`/`trusted_device_revoked` come from the Netlify
+Functions directly (`recordActivity()` in `_ma-activity.js`), not a DB
+trigger, since those tables are default-deny to every browser role.
+
+**Follow-up note:** `membership_role_changed` is a known action label
+(`admin-activity.js` already renders it, and it was used for the one-time,
+manually-recorded promotion described below) but has **no** automatic
+`ma_family_members` trigger in this PR — role changes are not a
+self-service feature here (see "Follow-up risks"), so no trigger was built
+for a path the app doesn't otherwise expose.
+
+### Mensen en toegang
+
+`ma_admin_roster(family_id)` — a `SECURITY DEFINER`, `STABLE` RPC, `EXECUTE`
+granted only to `authenticated` — unions `ma_family_members` (owner/member)
+with `ma_care_team_members` (active **and** revoked caregivers stay visible
+to the owner) and left-joins `ma_profiles` for the display name, plus
+`ma_user_presence.last_seen_at` and a correlated max over
+`ma_activity_events.occurred_at` for "last meaningful action." It returns
+**nothing at all** for a non-owner caller — checked with
+`ma_is_family_owner()` before any other row is touched, so there is no
+partial-roster leak.
+
+### Apparaten
+
+A compact summary card (device count, most-recent activity) linking through
+to the existing **Apparaten** management view — this PR deliberately does
+**not** duplicate the setup/revoke UI here.
+
+### Presence
+
+`ma_touch_presence(family_id)` is a narrow SECURITY DEFINER RPC: it only
+ever upserts the **caller's own** row (`auth.uid()`, never an accepted
+parameter), only for an active family member or active caregiver of the
+target family, and only if the existing row is more than ~10 minutes old
+(the `ON CONFLICT ... DO UPDATE ... WHERE` clause is the database-layer
+throttle). The client (`src/lib/presence-heartbeat.js`, wired into
+`main.js`) adds its own lightweight throttle on top so a flurry of
+`visibilitychange` events doesn't fire pointless network calls, and touches
+once on sign-in, then every 15 minutes while the tab stays open. This is a
+single "last active" timestamp per person, overwritten in place — **not** an
+event stream, and no route/page/URL/title is ever recorded alongside it.
+
+### Authorization matrix
+
+Verified with live SQL RLS tests against synthetic data (same technique as
+the Logboek matrix above — rollback-wrapped transactions with
+`SET LOCAL ROLE authenticated; SET LOCAL request.jwt.claims = …` simulating
+each actor):
+
+| Actor | Read `ma_integration_runs` | Read `ma_activity_events` | Read `ma_user_presence` | `ma_admin_roster()` | `ma_touch_presence()` | Device admin endpoints |
+|---|---|---|---|---|---|---|
+| Family owner | yes | yes | yes | full roster | own row only | yes |
+| Family member | no | no | no | empty | own row only | no (403) |
+| Active caregiver | no | no | no | empty | own row only | no (403) |
+| Revoked caregiver | no | no | no | empty | no-op (not active) | no (403) |
+| Unrelated signed-in user | no | no | no | empty | no-op (not a member) | no (403) |
+| Anonymous | no | no | no | n/a (`authenticated`-only grant) | n/a (`authenticated`-only grant) | no (401) |
+
+### Live-data note
+
+As part of shipping this PR, the family's second administrator was promoted
+from `member` to `owner` in production (`ma_family_members.role`), with one
+corresponding `membership_role_changed` activity event recorded manually for
+the audit trail. No name, email, user id, or family id from that operation
+appears anywhere in this repository, its history, or its fixtures — this
+README and the PR description refer to it only as "the second
+administrator."
 
 ---
 
@@ -531,18 +816,21 @@ above. The app resolves `accessType` (`owner` | `member` | `caregiver`) once
 at sign-in from those two tables (`fetchAccessContext` in `src/api.js`) and
 never infers it from the UI or an email address. A caregiver gets a
 deliberately reduced app: **Vandaag · Logboek** only — no Briefing, Agenda,
-Mensen, or Apparaten (device management), and Logboek shows only
-`care_team`-audience entries. This is enforced twice, independently: the
-route itself doesn't exist for a caregiver (`main.js`'s `CAREGIVER_ALLOWED_ROUTES`
-guard, even against a hand-typed hash), and the underlying data is RLS-gated
+Beheer, or Apparaten (device management), and Logboek shows only
+`care_team`-audience entries. **Beheer and Apparaten are further
+restricted to `owner` only** — a plain family `member` doesn't see them
+either, only a caregiver-vs-member distinction elsewhere. This is enforced
+twice, independently: the route itself doesn't exist for a disallowed
+`accessType` (`main.js`'s `ROUTE_ACCESS` map and `routeAllowedFor()` guard,
+even against a hand-typed hash), and the underlying data is RLS-gated
 regardless of what the UI shows.
 
 ---
 
-## Logboek — follow-up risks
+## Follow-up risks
 
-Deliberately deferred out of this PR's scope, tracked here rather than shipped
-as a half-finished feature:
+Deliberately deferred out of scope across the Logboek and Beheer PRs, tracked
+here rather than shipped as a half-finished feature:
 
 - **Care-team Agenda access.** The brief's suggested caregiver nav included
   Agenda, but `ma_calendar_events` has no care-team RLS policy in this PR —
@@ -555,6 +843,17 @@ as a half-finished feature:
   (see above) by design — a secure invite flow (token generation, expiry,
   claim endpoint) is a real feature in its own right and was judged out of
   scope rather than shipped half-secure.
+- **Self-service role editing.** Promoting/demoting a family member between
+  `member` and `owner` is a manual SQL step (see "Live-data note" under
+  "Beheer" above), not a Beheer UI action — the brief explicitly scoped role
+  editing out of this PR. `admin-activity.js` already knows how to render a
+  `membership_role_changed` event (used for that one manual promotion), but
+  no `ma_family_members` trigger auto-generates one, since the app has no
+  path that produces this action itself.
+- **Beheer doesn't duplicate device setup/revoke UI.** The Apparaten card is
+  a summary + link to the existing management view (see "Trusted devices"
+  above) — intentionally, per the brief, rather than a second implementation
+  of the same flow.
 - **One orphaned `storage.objects` test row.** The RLS test run below inserted
   synthetic rows directly via SQL (including one `storage.objects` metadata
   row) to exercise Storage policies without touching real family data.
@@ -576,8 +875,8 @@ as a half-finished feature:
 | Deploy                | Push to `main` → Netlify auto-deploys                |
 | Add env vars          | Netlify → Site settings → Environment variables      |
 | Apply DB migrations   | Supabase dashboard → SQL editor, or `supabase db push` |
-| Run tests             | `npm test` (state engine + device crypto/derive)    |
+| Run tests             | `npm test` (state engine, Beheer health rules, activity mapping, presence heartbeat, GA-absence, device crypto/derive, Netlify function handlers) |
 | State engine × TZ     | `npm run test:today-state` (UTC/NY/Amsterdam/Jakarta) |
-| Logboek RLS tests     | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in transactions/cleanup — see the PR description for the full authorization-matrix results) |
+| Logboek / Beheer RLS tests | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in transactions/cleanup — see the PR description for the full authorization-matrix results) |
 | Manual acceptance     | See `apps/ma/TRUSTED_DEVICES.md`                     |
 | Check errors          | Browser console; errors logged with `[ma/...]` prefix |

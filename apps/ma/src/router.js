@@ -6,8 +6,12 @@
  */
 
 // 'devices' (Apparaten) is a routable view reached from the top-bar menu, not the
-// bottom navigation — it is rarely needed and must not crowd the six core tabs.
-const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'people', 'compose', 'devices']);
+// bottom navigation — it is rarely needed and must not crowd the core tabs.
+// 'people' is a temporary legacy alias for the retired Mensen tab — main.js
+// redirects it to 'beheer' (owner) or 'today' (everyone else) rather than
+// mounting a view for it; kept recognized here so currentRoute() doesn't
+// collapse it to 'today' before that redirect logic ever sees it.
+const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'beheer', 'people', 'compose', 'devices']);
 
 const _listeners = new Set();
 

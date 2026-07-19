@@ -4,19 +4,27 @@
  * Renders the bottom tab bar into a container element.
  * Clicking a tab navigates via the router (hash change).
  *
- * The tab set depends on accessType: family (owner/member) get the full bar;
- * a caregiver gets a deliberately short one — no Briefing, Agenda, or Mensen
- * (see apps/ma/README.md for what care-team users must never see).
+ * The tab set depends on accessType: an owner gets Beheer instead of Mensen
+ * (which is retired entirely — see apps/ma/README.md); a plain member gets
+ * the same bar minus that slot; a caregiver gets a deliberately short one —
+ * no Briefing, Agenda, or Beheer (care-team users must never see those).
  */
 
 import { navigate } from '../router.js';
 
-const FAMILY_TABS = [
+const OWNER_TABS = [
   { id: 'today',    label: 'Vandaag',  icon: iconToday()    },
   { id: 'briefing', label: 'Briefing', icon: iconBriefing() },
   { id: 'logboek',  label: 'Logboek',  icon: iconLogboek()  },
   { id: 'calendar', label: 'Agenda',   icon: iconCalendar() },
-  { id: 'people',   label: 'Mensen',   icon: iconPeople()   },
+  { id: 'beheer',   label: 'Beheer',   icon: iconBeheer()   },
+];
+
+const MEMBER_TABS = [
+  { id: 'today',    label: 'Vandaag',  icon: iconToday()    },
+  { id: 'briefing', label: 'Briefing', icon: iconBriefing() },
+  { id: 'logboek',  label: 'Logboek',  icon: iconLogboek()  },
+  { id: 'calendar', label: 'Agenda',   icon: iconCalendar() },
 ];
 
 const CAREGIVER_TABS = [
@@ -24,13 +32,19 @@ const CAREGIVER_TABS = [
   { id: 'logboek', label: 'Logboek', icon: iconLogboek() },
 ];
 
+const TABS_BY_ACCESS = {
+  owner:     OWNER_TABS,
+  member:    MEMBER_TABS,
+  caregiver: CAREGIVER_TABS,
+};
+
 /**
  * @param {HTMLElement} container
  * @param {string} activeTab    — one of the tab ids above
  * @param {'owner'|'member'|'caregiver'|null} [accessType]
  */
 export function renderNav(container, activeTab, accessType = null) {
-  const tabs = accessType === 'caregiver' ? CAREGIVER_TABS : FAMILY_TABS;
+  const tabs = TABS_BY_ACCESS[accessType] ?? MEMBER_TABS;
 
   container.innerHTML = `
     <div class="nav-inner">
@@ -98,14 +112,10 @@ function iconCalendar() {
   </svg>`;
 }
 
-function iconPeople() {
+function iconBeheer() {
   return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M4 20a8 8 0 1 1 16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="12" y1="20" x2="15.5" y2="13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="20" r="1.4" fill="currentColor"/>
   </svg>`;
 }
