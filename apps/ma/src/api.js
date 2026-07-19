@@ -7,7 +7,7 @@
  * This layer is where caching, retries, and error surfacing would grow.
  *
  * Expected Supabase schema:
- *   ma_families, ma_profiles, ma_family_members,
+ *   ma_families, ma_profiles, ma_family_members, ma_care_team_members,
  *   ma_posts, ma_comments, ma_attachments,
  *   ma_calendar_sources, ma_calendar_events, ma_briefings
  *
@@ -17,12 +17,23 @@
  *   ma_attachments.post_id      → ma_posts.id
  *   ma_family_members.user_id   → ma_profiles.user_id
  *   ma_calendar_events.source_id → ma_calendar_sources.id
+ *
+ * Authorization is enforced by RLS (see supabase-migrations/006_ma_logboek_care_team.sql),
+ * not by anything in this file — every function here trusts the server to reject
+ * what the current user isn't allowed to read or write.
  */
 
 import { supabase } from './supabase.js';
 import { todayAms, startOfTodayAmsISO } from './lib/datetime.js';
 
-// ─── Profile & family membership ────────────────────────────────────────────
+const LOGBOEK_ENTRY_COLUMNS = `
+  id, title, body, kind, audience, tags, event_date, linked_event_uid,
+  pinned, created_at, updated_at, author_id,
+  ma_profiles!author_id ( display_name, relationship, avatar_url ),
+  ma_attachments ( id, object_path, mime_type )
+`;
+
+// ─── Profile & access ───────────────────────────────────────────────────────
 
 /**
  * Fetch the ma_profiles row for a given auth user id.
@@ -55,33 +66,68 @@ export async function createProfile({ userId, displayName }) {
 }
 
 /**
- * Fetch the family_id for a given auth user id.
- * Returns null if the user is not a member of any family.
+ * Resolve what kind of access the current user has, without ever inferring it
+ * from the UI or an email address: a family membership row wins (owner or
+ * member); otherwise an active (non-revoked) care-team membership makes them
+ * a caregiver; otherwise they have no access at all yet.
+ *
+ * @returns {Promise<{ accessType: 'owner'|'member'|'caregiver'|null, familyId: string|null }>}
  */
-export async function fetchFamilyId(userId) {
-  const { data, error } = await supabase
+export async function fetchAccessContext(userId) {
+  const { data: familyRow, error: familyErr } = await supabase
     .from('ma_family_members')
-    .select('family_id')
+    .select('family_id, role')
     .eq('user_id', userId)
     .maybeSingle();
-  if (error) throw error;
-  return data?.family_id ?? null;
+  if (familyErr) throw familyErr;
+
+  if (familyRow) {
+    return { accessType: familyRow.role === 'owner' ? 'owner' : 'member', familyId: familyRow.family_id };
+  }
+
+  const { data: careRow, error: careErr } = await supabase
+    .from('ma_care_team_members')
+    .select('family_id')
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+    .maybeSingle();
+  if (careErr) throw careErr;
+
+  if (careRow) {
+    return { accessType: 'caregiver', familyId: careRow.family_id };
+  }
+
+  return { accessType: null, familyId: null };
 }
 
-// ─── Posts ───────────────────────────────────────────────────────────────────
+// ─── Logboek entries (ma_posts) ─────────────────────────────────────────────
 
 /**
- * Fetch recent family posts, newest first.
+ * Fetch a page of Logboek entries, newest-created first.
+ *
+ * Family users see every entry for their family (RLS: `ma_is_family_member`);
+ * care-team users see only `audience = 'care_team'` entries regardless of what
+ * `audience` is passed here — RLS filters that server-side either way, this
+ * parameter just lets the family UI offer "Alleen familie" / "Met zorgteam"
+ * chips without a second code path.
+ *
+ * @param {string} familyId
+ * @param {object} [opts]
+ * @param {number} [opts.limit=20]
+ * @param {number} [opts.offset=0]
+ * @param {string|null} [opts.kind]     — filter to one entry type, or null for all
+ * @param {string|null} [opts.audience] — filter to 'family' | 'care_team', or null for all
  */
-export async function fetchPosts(familyId, { limit = 20, offset = 0 } = {}) {
-  const { data, error } = await supabase
+export async function fetchLogboekEntries(familyId, { limit = 20, offset = 0, kind = null, audience = null } = {}) {
+  let query = supabase
     .from('ma_posts')
-    .select(`
-      id, title, body, kind, event_date, pinned, created_at, author_id,
-      ma_profiles!author_id ( display_name, relationship, avatar_url ),
-      ma_attachments ( id, object_path, mime_type )
-    `)
-    .eq('family_id', familyId)
+    .select(LOGBOEK_ENTRY_COLUMNS)
+    .eq('family_id', familyId);
+
+  if (kind) query = query.eq('kind', kind);
+  if (audience) query = query.eq('audience', audience);
+
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
@@ -89,18 +135,19 @@ export async function fetchPosts(familyId, { limit = 20, offset = 0 } = {}) {
 }
 
 /**
- * Fetch pinned posts for the Today view.
+ * Fetch a small, bounded set of the most recent entries — used for the Today
+ * tab's "added today" indicator (family: count of today's care-team entries;
+ * caregiver: a short today-only list). Never grows into a feed; callers cap
+ * what they render.
  */
-export async function fetchPinnedPosts(familyId, { limit = 3 } = {}) {
-  const { data, error } = await supabase
+export async function fetchRecentLogboekEntries(familyId, { limit = 15, audience = null } = {}) {
+  let query = supabase
     .from('ma_posts')
-    .select(`
-      id, title, body, kind, pinned, created_at, author_id,
-      ma_profiles!author_id ( display_name, relationship, avatar_url ),
-      ma_attachments ( id, object_path, mime_type )
-    `)
-    .eq('family_id', familyId)
-    .eq('pinned', true)
+    .select(LOGBOEK_ENTRY_COLUMNS)
+    .eq('family_id', familyId);
+  if (audience) query = query.eq('audience', audience);
+
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -108,22 +155,48 @@ export async function fetchPinnedPosts(familyId, { limit = 3 } = {}) {
 }
 
 /**
- * Create a new post. Returns the inserted row.
+ * Create a new Logboek entry. `audience` defaults to 'family' — family-only
+ * is always the safe default; callers must opt into 'care_team' explicitly.
+ * Returns the inserted row.
  */
-export async function createPost({ familyId, authorId, kind = 'note', title = null, body = null }) {
+export async function createLogboekEntry({
+  familyId, authorId, kind, title = null, body = null,
+  eventDate = null, audience = 'family', tags = [], linkedEventUid = null,
+}) {
   const { data, error } = await supabase
     .from('ma_posts')
-    .insert({ family_id: familyId, author_id: authorId, kind, title, body })
-    .select()
+    .insert({
+      family_id: familyId,
+      author_id: authorId,
+      kind,
+      title,
+      body,
+      event_date: eventDate,
+      audience,
+      tags,
+      linked_event_uid: linkedEventUid,
+    })
+    .select(LOGBOEK_ENTRY_COLUMNS)
     .single();
   if (error) throw error;
   return data;
 }
 
+/**
+ * Delete a Logboek entry (RLS: author or family owner for a family entry;
+ * author only for a care_team entry). Used to recover from a failed compose
+ * (e.g. the entry saved but its attachment never did) rather than leaving a
+ * misleading half-finished post behind.
+ */
+export async function deleteLogboekEntry(id) {
+  const { error } = await supabase.from('ma_posts').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 /**
- * Fetch all comments for a post, oldest first.
+ * Fetch all comments for an entry, oldest first.
  */
 export async function fetchComments(postId) {
   const { data, error } = await supabase
@@ -139,7 +212,10 @@ export async function fetchComments(postId) {
 }
 
 /**
- * Add a comment to a post. Returns the inserted row.
+ * Add a comment to an entry. Returns the inserted row.
+ * RLS pins the comment's family_id to the parent entry's own family_id and
+ * requires the parent to be readable under the same audience rules — a
+ * mismatched familyId here is rejected server-side, not just ignored.
  */
 export async function addComment(postId, familyId, authorId, body) {
   const { data, error } = await supabase
@@ -172,40 +248,16 @@ export async function createAttachment({ postId, familyId, uploaderId, objectPat
   return data;
 }
 
-// ─── Photos ──────────────────────────────────────────────────────────────────
-
-/**
- * Fetch photo posts (kind = 'photo') with their attachments.
- * Returns a flat list of attachment objects, each with a ma_posts property.
- */
-export async function fetchPhotos(familyId, { limit = 60, offset = 0 } = {}) {
-  const { data, error } = await supabase
-    .from('ma_posts')
-    .select(`
-      id, body, title, author_id, created_at,
-      ma_profiles!author_id ( display_name ),
-      ma_attachments ( id, object_path, mime_type )
-    `)
-    .eq('family_id', familyId)
-    .eq('kind', 'photo')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-  if (error) throw error;
-
-  // Flatten: one entry per image attachment
-  return (data ?? []).flatMap(post =>
-    (post.ma_attachments ?? [])
-      .filter(a => a.mime_type?.startsWith('image/'))
-      .map(a => ({ ...a, ma_posts: post }))
-  );
-}
-
 // ─── Calendar events ─────────────────────────────────────────────────────────
 
 /**
  * Fetch upcoming calendar events from the mirrored ma_calendar_events table.
  * Events are read-only; the source of truth is the family iCloud calendar,
  * synced separately into this table.
+ *
+ * Family-only: RLS has no care-team policy on ma_calendar_events (deliberately
+ * out of scope for this PR — see apps/ma/README.md "Follow-up risks"), so a
+ * caregiver's request here always returns an empty list, never an error.
  *
  * The default lower bound is the start of *today in Amsterdam*, not "now", so
  * that today's already-started events and all-day rows (stored at Amsterdam
@@ -340,7 +392,8 @@ export async function dismissRideNotice(id, userId) {
 // ─── People ──────────────────────────────────────────────────────────────────
 
 /**
- * Fetch family member profiles.
+ * Fetch family member profiles. Family-only (RLS: ma_is_family_member) — a
+ * caregiver's request here always returns an empty list, never an error.
  */
 export async function fetchPeople(familyId) {
   const { data, error } = await supabase

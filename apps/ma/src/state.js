@@ -10,8 +10,10 @@ const _state = {
   user:     null,
   /** @type {{ display_name: string, relationship: string, avatar_url: string }|null} */
   profile:  null,
-  /** @type {string|null} UUID of the family this user belongs to */
+  /** @type {string|null} UUID of the family this user belongs to (or serves, for a caregiver) */
   familyId: null,
+  /** @type {'owner'|'member'|'caregiver'|null} Resolved once at sign-in — never inferred from UI or email. */
+  accessType: null,
 };
 
 const _listeners = new Set();

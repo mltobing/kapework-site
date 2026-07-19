@@ -208,3 +208,22 @@ export function formatRelative(iso) {
   if (diffDay <  7)  return `${diffDay} days ago`;
   return `${dayNumberAms(iso)} ${monthShortAms(iso)}`;
 }
+
+/**
+ * Dutch equivalent of formatRelative(), for the Logboek timeline/comments.
+ * Kept separate from formatRelative() rather than translating it in place —
+ * that function still backs the (untouched, English) Briefing view.
+ */
+export function formatRelativeNl(iso) {
+  const diffMs  = Date.now() - toDate(iso).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffHr  = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffMin < 1)   return 'Zojuist';
+  if (diffMin < 60)  return `${diffMin} min geleden`;
+  if (diffHr  < 24)  return `${diffHr} u geleden`;
+  if (diffDay === 1) return 'Gisteren';
+  if (diffDay <  7)  return `${diffDay} dagen geleden`;
+  return `${dayNumberAms(iso)} ${monthShortAms(iso)}`;
+}

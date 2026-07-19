@@ -3,27 +3,38 @@
  *
  * Renders the bottom tab bar into a container element.
  * Clicking a tab navigates via the router (hash change).
+ *
+ * The tab set depends on accessType: family (owner/member) get the full bar;
+ * a caregiver gets a deliberately short one — no Briefing, Agenda, or Mensen
+ * (see apps/ma/README.md for what care-team users must never see).
  */
 
 import { navigate } from '../router.js';
 
-const TABS = [
-  { id: 'today',    label: 'Today',    icon: iconToday()    },
+const FAMILY_TABS = [
+  { id: 'today',    label: 'Vandaag',  icon: iconToday()    },
   { id: 'briefing', label: 'Briefing', icon: iconBriefing() },
-  { id: 'family',   label: 'Family',   icon: iconFamily()   },
-  { id: 'photos',   label: 'Photos',   icon: iconPhotos()   },
-  { id: 'calendar', label: 'Calendar', icon: iconCalendar() },
-  { id: 'people',   label: 'People',   icon: iconPeople()   },
+  { id: 'logboek',  label: 'Logboek',  icon: iconLogboek()  },
+  { id: 'calendar', label: 'Agenda',   icon: iconCalendar() },
+  { id: 'people',   label: 'Mensen',   icon: iconPeople()   },
+];
+
+const CAREGIVER_TABS = [
+  { id: 'today',   label: 'Vandaag', icon: iconToday()   },
+  { id: 'logboek', label: 'Logboek', icon: iconLogboek() },
 ];
 
 /**
  * @param {HTMLElement} container
- * @param {string} activeTab  — one of the tab ids above
+ * @param {string} activeTab    — one of the tab ids above
+ * @param {'owner'|'member'|'caregiver'|null} [accessType]
  */
-export function renderNav(container, activeTab) {
+export function renderNav(container, activeTab, accessType = null) {
+  const tabs = accessType === 'caregiver' ? CAREGIVER_TABS : FAMILY_TABS;
+
   container.innerHTML = `
     <div class="nav-inner">
-      ${TABS.map(tab => `
+      ${tabs.map(tab => `
         <button
           class="nav-tab ${activeTab === tab.id ? 'nav-tab--active' : ''}"
           data-tab="${tab.id}"
@@ -68,19 +79,13 @@ function iconBriefing() {
   </svg>`;
 }
 
-function iconFamily() {
+function iconLogboek() {
   return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-}
-
-function iconPhotos() {
-  return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
-    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-    <polyline points="21,15 16,10 5,21"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="9" y1="7" x2="15" y2="7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="9" y1="11" x2="15" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
   </svg>`;
 }
 
