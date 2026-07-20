@@ -15,6 +15,7 @@
 import {
   fetchLatestIntegrationRun, fetchCalendarSourceAdminStatus, fetchTomorrowBriefingAdminStatus,
   fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster, fetchTrashedLogboekCount,
+  fetchSyncRequestStatus, fetchIntegrationRunById,
 } from '../api.js';
 import { listDevices } from '../lib/devices-api.js';
 import { triggerManualSync } from '../lib/sync-api.js';
@@ -122,9 +123,11 @@ function healthBadge(level, text) {
 // honest, clearly-approximate "next scheduled sync" time (this repo doesn't
 // own the schedule itself; see supabase-migrations/009_ma_calendar_manual_sync.sql).
 const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 60_000;
-// How long to poll ma_integration_runs after a manual request before giving
-// up and showing a "this can take a few minutes" message instead of a result.
-const SYNC_POLL_TIMEOUT_MS = 90_000;
+// How long to poll after a manual request before giving up and showing a
+// "this can take a few minutes" message instead of a result. The workflow
+// itself can queue on GitHub's runners for a while before it even starts, so
+// this is generous (3-5 minutes per the brief) rather than the old 90s.
+const SYNC_POLL_TIMEOUT_MS = 4 * 60_000;
 const SYNC_POLL_INTERVAL_MS = 4000;
 const SYNC_COOLDOWN_TICK_MS = 1000;
 
@@ -172,7 +175,7 @@ function renderAgendaCard(el, familyId, run, source) {
     ? `<p class="beheer-card-line beheer-card-line--muted">${isFailure ? 'Laatst betrouwbare gegevens' : 'Laatst succesvol bijgewerkt'}: ${escapeHtml(formatDayHeader(lastSyncedAt))} om ${escapeHtml(formatTime(lastSyncedAt))}</p>`
     : '';
   const lastAttemptLine = run?.started_at
-    ? `<p class="beheer-card-line beheer-card-line--muted">Laatste synchronisatiepoging: ${escapeHtml(formatDayHeader(run.started_at))} om ${escapeHtml(formatTime(run.started_at))}</p>`
+    ? `<p class="beheer-card-line beheer-card-line--muted">Laatste synchronisatiepoging: ${escapeHtml(formatDayHeader(run.started_at))} om ${escapeHtml(formatTime(run.started_at))}${run.trigger_source === 'manual' ? ' (handmatig gestart)' : ''}</p>`
     : '';
   const nextSyncLine = lastSyncedAt
     ? `<p class="beheer-card-line beheer-card-line--muted">Volgende automatische synchronisatie rond ${escapeHtml(formatTime(new Date(new Date(lastSyncedAt).getTime() + AUTO_SYNC_INTERVAL_MS)))}</p>`
@@ -223,7 +226,10 @@ function wireSyncTrigger(el, familyId, { alreadyRunning }) {
   if (alreadyRunning) {
     btn.disabled = true;
     btn.textContent = 'Bezig met bijwerken…';
-    pollForCompletion(el, familyId, new Date());
+    // No request id to correlate here — this is a page load observing a run
+    // already in progress from an earlier click, so fall back to the
+    // timestamp-based poll (see pollForRunByTimestamp below).
+    pollForRunByTimestamp(el, familyId, new Date());
     return;
   }
 
@@ -240,7 +246,7 @@ function wireSyncTrigger(el, familyId, { alreadyRunning }) {
       console.error('[ma/beheer] Manual sync trigger failed:', err);
       btn.disabled = false;
       btn.textContent = 'Agenda nu bijwerken';
-      showStatus('Kon niet bijwerken. Probeer het opnieuw.');
+      showStatus('Kon de synchronisatie niet starten. Probeer het opnieuw.');
       return;
     }
 
@@ -250,9 +256,15 @@ function wireSyncTrigger(el, familyId, { alreadyRunning }) {
       return;
     }
 
-    if (result.status === 'already_running' || result.status === 'queued') {
-      showStatus('Bezig met bijwerken…');
-      pollForCompletion(el, familyId, requestedAt);
+    if (result.status === 'already_running') {
+      showStatus('Agenda wordt bijgewerkt…');
+      pollForRunByTimestamp(el, familyId, requestedAt);
+      return;
+    }
+
+    if (result.status === 'queued' && result.requestId) {
+      showStatus('Synchronisatie gestart…');
+      pollForRunByRequest(el, familyId, result.requestId);
       return;
     }
   });
@@ -275,49 +287,130 @@ function startCooldownCountdown(btn, seconds) {
 }
 
 /**
- * Polls the family's latest integration run until one that started at/after
- * `requestedAt` finishes, or SYNC_POLL_TIMEOUT_MS elapses. Re-renders the
- * whole card on completion so status/badge/counts/next-sync all update
- * without a full page refresh. Never throws — a poll failure just stops
- * polling silently (the card still updates next time Beheer loads).
+ * The final Dutch status line for a finished run, distinguishing a genuine
+ * calendar failure from a merely-partial AutoMaatje problem — a partial run
+ * must never read as if the calendar itself failed to update (brief §B3).
  */
-function pollForCompletion(el, familyId, requestedAt) {
-  const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
+function summaryForRun(run) {
+  if (run.status === 'failed') {
+    return 'De synchronisatie is mislukt. Probeer het opnieuw.';
+  }
+  if (run.status === 'partial') {
+    return 'Agenda is bijgewerkt, maar de AutoMaatje-controle vraagt aandacht.';
+  }
+  const total = (run.events_created || 0) + (run.events_updated || 0) + (run.events_cancelled || 0);
+  return total === 0
+    ? 'Agenda is al actueel.'
+    : `Agenda bijgewerkt: ${[
+        run.events_updated ? `${run.events_updated} gewijzigd` : null,
+        run.events_created ? `${run.events_created} toegevoegd` : null,
+        run.events_cancelled ? `${run.events_cancelled} geannuleerd` : null,
+      ].filter(Boolean).join(', ')}.`;
+}
+
+/** Re-renders the whole Agenda card with a finished run's real outcome. */
+async function finishSyncCard(el, familyId, run) {
+  const summary = summaryForRun(run);
+  let source = null;
+  try { source = await fetchCalendarSourceAdminStatus(familyId); } catch { /* card still renders without it */ }
+  renderAgendaCard(el, familyId, run, source);
+  const freshStatus = el.querySelector('#sync-trigger-status');
+  if (freshStatus) { freshStatus.textContent = summary; freshStatus.hidden = false; }
+}
+
+function showSyncTimeout(el) {
   const status = el.querySelector('#sync-trigger-status');
+  if (status) {
+    status.textContent = 'De synchronisatie is gestart en loopt mogelijk nog. Kijk over enkele minuten opnieuw.';
+    status.hidden = false;
+  }
+  const btn = el.querySelector('#sync-trigger-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Agenda nu bijwerken'; }
+}
+
+/**
+ * Polls by the exact request → run correlation (brief §B3): first waits for
+ * `ma_sync_requests.run_id` to appear (set by the private irma-sync job once
+ * it claims the request), then polls that exact `ma_integration_runs` row
+ * until it finishes. Preferred over pollForRunByTimestamp whenever a
+ * requestId is available — it can never attach to the wrong run. Never
+ * throws — a poll failure just retries on the next tick (the card still
+ * updates next time Beheer loads).
+ */
+function pollForRunByRequest(el, familyId, requestId) {
+  const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
+  let announcedRunning = false;
 
   async function tick() {
     if (!el.isConnected) return; // view was left — stop polling
-    if (Date.now() > deadline) {
-      if (status) { status.textContent = 'Verzoek verzonden. Dit kan een paar minuten duren.'; status.hidden = false; }
-      const btn = el.querySelector('#sync-trigger-btn');
-      if (btn) { btn.disabled = false; btn.textContent = 'Agenda nu bijwerken'; }
+    if (Date.now() > deadline) { showSyncTimeout(el); return; }
+
+    let request = null;
+    try {
+      request = await fetchSyncRequestStatus(requestId);
+    } catch (err) {
+      console.error('[ma/beheer] Poll for request status failed:', err);
+      setTimeout(tick, SYNC_POLL_INTERVAL_MS);
       return;
     }
+
+    if (!request?.run_id) {
+      setTimeout(tick, SYNC_POLL_INTERVAL_MS);
+      return;
+    }
+
+    if (!announcedRunning) {
+      announcedRunning = true;
+      const status = el.querySelector('#sync-trigger-status');
+      if (status) { status.textContent = 'Agenda wordt bijgewerkt…'; status.hidden = false; }
+    }
+
+    let run = null;
+    try {
+      run = await fetchIntegrationRunById(request.run_id);
+    } catch (err) {
+      console.error('[ma/beheer] Poll for run failed:', err);
+      setTimeout(tick, SYNC_POLL_INTERVAL_MS);
+      return;
+    }
+
+    if (run?.finished_at) {
+      await finishSyncCard(el, familyId, run);
+      return;
+    }
+
+    setTimeout(tick, SYNC_POLL_INTERVAL_MS);
+  }
+
+  setTimeout(tick, SYNC_POLL_INTERVAL_MS);
+}
+
+/**
+ * Fallback poll used only when there is no specific request to correlate to
+ * — reattaching, on page load, to a run that was already `running` before
+ * this session ever clicked the button. Polls the family's latest integration
+ * run until one that started at/after `requestedAt` finishes, or
+ * SYNC_POLL_TIMEOUT_MS elapses.
+ */
+function pollForRunByTimestamp(el, familyId, requestedAt) {
+  const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
+
+  async function tick() {
+    if (!el.isConnected) return; // view was left — stop polling
+    if (Date.now() > deadline) { showSyncTimeout(el); return; }
 
     let run = null;
     try {
       run = await fetchLatestIntegrationRun(familyId);
     } catch (err) {
       console.error('[ma/beheer] Poll for sync completion failed:', err);
+      setTimeout(tick, SYNC_POLL_INTERVAL_MS);
       return;
     }
 
     const startedAfterRequest = run?.started_at && new Date(run.started_at) >= requestedAt;
     if (startedAfterRequest && run.finished_at) {
-      const total = (run.events_created || 0) + (run.events_updated || 0) + (run.events_cancelled || 0);
-      const summary = total === 0
-        ? 'Agenda is al actueel.'
-        : `Agenda bijgewerkt: ${[
-            run.events_updated ? `${run.events_updated} gewijzigd` : null,
-            run.events_created ? `${run.events_created} toegevoegd` : null,
-            run.events_cancelled ? `${run.events_cancelled} geannuleerd` : null,
-          ].filter(Boolean).join(', ')}.`;
-
-      let source = null;
-      try { source = await fetchCalendarSourceAdminStatus(familyId); } catch { /* card still renders without it */ }
-      renderAgendaCard(el, familyId, run, source);
-      const freshStatus = el.querySelector('#sync-trigger-status');
-      if (freshStatus) { freshStatus.textContent = summary; freshStatus.hidden = false; }
+      await finishSyncCard(el, familyId, run);
       return;
     }
 

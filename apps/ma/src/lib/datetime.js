@@ -180,6 +180,22 @@ export function startOfTodayAmsISO() {
 }
 
 /**
+ * A timestamptz upper bound (UTC ISO), `months` calendar months from now,
+ * for bounding the Agenda view's query to the private irma-sync job's mirror
+ * horizon (`CALENDAR_LOOKAHEAD_MONTHS` there) instead of fetching an
+ * unbounded lifetime history. Only ever an upper *fetch* boundary — day-exact
+ * precision doesn't matter here the way it does for the mirror job itself
+ * (a day either side just means one extra/fewer day of query range, not a
+ * user-facing guarantee), so this uses `Date#setMonth`'s normal JS rollover
+ * rather than duplicating the job's exact calendar-month clamping.
+ */
+export function monthsAheadISO(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString();
+}
+
+/**
  * True if the instant has already passed (now, as an absolute instant).
  * Instant comparison is timezone-independent, so no TZ is needed here.
  */

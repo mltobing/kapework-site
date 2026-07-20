@@ -26,6 +26,7 @@ function makeQueryBuilder(table, tableHandlers) {
     insert(payload){ state.op = 'insert'; state.payload = payload; return builder; },
     update(payload){ state.op = 'update'; state.payload = payload; return builder; },
     eq(col, val)   { state.filters.push({ type: 'eq', col, val }); return builder; },
+    neq(col, val)  { state.filters.push({ type: 'neq', col, val }); return builder; },
     is(col, val)   { state.filters.push({ type: 'is', col, val }); return builder; },
     gt(col, val)   { state.filters.push({ type: 'gt', col, val }); return builder; },
     order(col, opts) { state.order = { col, opts }; return builder; },
