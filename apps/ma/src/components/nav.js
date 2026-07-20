@@ -32,7 +32,10 @@ const CAREGIVER_TABS = [
   { id: 'logboek', label: 'Logboek', icon: iconLogboek() },
 ];
 
-const TABS_BY_ACCESS = {
+// Exported so components/topbar.js's "Ga naar" menu can offer exactly the
+// same destinations as the bottom nav for the signed-in user's accessType —
+// one hand-maintained list, not two that could drift apart.
+export const TABS_BY_ACCESS = {
   owner:     OWNER_TABS,
   member:    MEMBER_TABS,
   caregiver: CAREGIVER_TABS,

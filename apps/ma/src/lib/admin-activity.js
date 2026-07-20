@@ -21,6 +21,8 @@ export const METADATA_ALLOWLIST = {
   logboek_created:          ['kind', 'audience', 'tag_count'],
   logboek_updated:          ['kind', 'audience', 'tag_count'],
   logboek_deleted:          ['kind', 'audience'],
+  logboek_trashed:          ['kind', 'audience'],
+  logboek_restored:         ['kind', 'audience'],
   logboek_audience_changed: ['kind', 'from_audience', 'to_audience'],
   comment_added:            [],
   attachment_added:         ['media_type'],
@@ -33,6 +35,7 @@ export const METADATA_ALLOWLIST = {
   membership_role_changed:  ['from_role', 'to_role'],
   trusted_device_activated: [],
   trusted_device_revoked:   [],
+  manual_sync_requested:    [],
 };
 
 const MEDIA_TYPE_LABELS = { image: 'foto', document: 'document' };
@@ -50,6 +53,8 @@ const SENTENCE_BUILDERS = {
   },
   logboek_updated: (m) => `Heeft een ${kindLabel(m.kind).toLowerCase()} bijgewerkt.`,
   logboek_deleted: (m) => `Heeft een ${kindLabel(m.kind).toLowerCase()} verwijderd.`,
+  logboek_trashed: (m) => `Heeft een ${kindLabel(m.kind).toLowerCase()} naar de prullenbak verplaatst.`,
+  logboek_restored: (m) => `Heeft een ${kindLabel(m.kind).toLowerCase()} teruggezet uit de prullenbak.`,
   logboek_audience_changed: (m) =>
     `Heeft de zichtbaarheid van een ${kindLabel(m.kind).toLowerCase()} gewijzigd naar ${audienceLabel(m.to_audience)}.`,
   comment_added: () => 'Heeft gereageerd op een logboekregel.',
@@ -68,6 +73,7 @@ const SENTENCE_BUILDERS = {
       : 'Heeft de rol van een familielid gewijzigd.',
   trusted_device_activated: () => 'Heeft een vertrouwd apparaat gekoppeld.',
   trusted_device_revoked:   () => 'Heeft een vertrouwd apparaat ingetrokken.',
+  manual_sync_requested:    () => 'Heeft een directe agenda-synchronisatie aangevraagd.',
 };
 
 const FALLBACK_SENTENCE = 'Er is een systeemactie geregistreerd.';
@@ -75,6 +81,7 @@ const FALLBACK_SENTENCE = 'Er is een systeemactie geregistreerd.';
 /** Icon category per action — several actions share one category/icon. */
 const ICON_CATEGORY = {
   logboek_created: 'logboek', logboek_updated: 'logboek', logboek_deleted: 'logboek',
+  logboek_trashed: 'logboek', logboek_restored: 'logboek',
   logboek_audience_changed: 'logboek',
   comment_added: 'comment',
   attachment_added: 'attachment', attachment_removed: 'attachment',
@@ -83,6 +90,7 @@ const ICON_CATEGORY = {
   caregiver_access_granted: 'care_team', caregiver_access_revoked: 'care_team',
   membership_role_changed: 'membership',
   trusted_device_activated: 'device', trusted_device_revoked: 'device',
+  manual_sync_requested: 'system',
 };
 
 function iconWrap(inner) {

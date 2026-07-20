@@ -64,30 +64,50 @@ apps/ma/
       devices-api.js        Client wrappers for the trusted-device Functions
       logboek-types.js      Entry-type / audience labels, icons, and filter chip definitions
       admin-activity.js     Beheer: action→Dutch-sentence/icon/actor/bucket mapping (pure; unit-tested)
-      beheer-health.js      Beheer: Systeemstatus green/amber/red/neutral rules (pure; unit-tested)
+      beheer-health.js      Beheer: Systeemstatus green/amber/red/neutral rules, incl. a
+                             "running" state for an in-progress sync (pure; unit-tested)
       presence-heartbeat.js Beheer: dependency-injected presence-touch scheduler (pure; unit-tested)
+      sync-api.js            Client wrapper for the owner-only manual-sync-request Function
 
     views/
       today.js          Today tab: Nu card + today's events + urgent notices + Vanavond
                          + quick "Notitie of foto toevoegen" action. Caregivers get a
                          reduced Today (no calendar — see "Follow-up risks" below).
       briefing.js       Briefing tab: paste-ready Caren + WhatsApp texts (family/member only)
-      logboek.js        Logboek tab: chronological, filterable timeline + compose FAB
-      calendar.js       Calendar tab: read-only event agenda (family/member only)
-      beheer.js         Beheer tab: Systeemstatus, Recente activiteit, Mensen en toegang,
-                         Apparaten summary (owner only — see "Beheer" below)
+      logboek.js        Logboek tab: chronological, filterable timeline (search, author,
+                         date-range filters) + compose FAB. Author edit/trash and owner
+                         trash-any live in an entry's overflow menu — see "Logboek" below.
+      calendar.js       Calendar tab: read-only event agenda (family/member only) + a
+                         small "Laatst bijgewerkt" freshness line for every viewer
+      beheer.js         Beheer tab: Systeemstatus (incl. Agenda-synchronisatie's
+                         owner-only manual refresh), Recente activiteit, Mensen en
+                         toegang, Apparaten summary, Prullenbak summary (owner only)
+      prullenbak.js     Beheer → Prullenbak: owner-only trashed-Logboek-entry
+                         management (Herstellen / Definitief verwijderen)
+      uitleg.js         /uitleg — static "Uitleg & veelgestelde vragen" help page,
+                         reachable from the top-right menu, no private data
       compose.js        Logboek compose flow: type, title, body, date, photos/PDF,
                          tags, linked event (family only), visibility
       devices.js        Apparaten: set up / list / revoke trusted devices (owner only)
 
     components/
-      topbar.js         Top app bar with menu (Apparaten shown owner-only / sign out)
+      topbar.js         Top app bar with a three-section menu — Ga naar (every
+                         destination the signed-in accessType can reach, mirroring
+                         nav.js's TABS_BY_ACCESS), Hulp (Uitleg), Account (Apparaten
+                         owner-only, Uitloggen)
       nav.js            Bottom tab bar — owner: Vandaag · Briefing · Logboek · Agenda · Beheer;
                          member: Vandaag · Briefing · Logboek · Agenda (no Beheer);
-                         caregiver: Vandaag · Logboek only
+                         caregiver: Vandaag · Logboek only. Exports TABS_BY_ACCESS,
+                         reused by topbar.js so the two never drift apart.
       ride-notices.js   Ride-reconciliation strip
-      logboek-entry.js  Entry card: type/audience badges, photos, documents, tags, comments
+      logboek-entry.js  Entry card: type/audience badges, photos, documents, tags,
+                         comments, and (for an eligible viewer) a compact "⋯"
+                         overflow menu — Bewerken (own entry only) / Verwijderen
+                         (own entry, or any entry for the owner)
       logboek-comments.js Comment thread + reply input (Dutch)
+      logboek-edit-modal.js "Bewerken" — a focused modal for title/body/date/tags
+      toast.js          A temporary snackbar with one optional action button —
+                         backs the Logboek "moved to trash, Ongedaan maken" undo
       event-card.js     Calendar event card
       modal.js          Full-screen photo lightbox
 ```
@@ -96,7 +116,10 @@ Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
 `ma-device-activate`, `ma-today`, `ma-devices-list`, `ma-device-revoke`, plus
 shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js` /
 `_ma-activity.js` — the last records Beheer activity events from the
-device-activation/revocation endpoints).
+device-activation/revocation endpoints). `ma-sync-trigger` (owner-only manual
+calendar refresh) lives alongside them and reuses the same `_ma-devices.js`
+`verifyOwner()`/`serviceClient()` helpers — see "Agenda-synchronisatie —
+manual refresh" below.
 
 ---
 
@@ -188,7 +211,10 @@ ma_posts (
                                   -- the ma_ride_notices.matched_event_uid precedent)
   pinned            boolean default false,
   created_at        timestamptz default now(),
-  updated_at        timestamptz not null default now()  -- kept current by a BEFORE UPDATE trigger
+  updated_at        timestamptz not null default now(), -- kept current by a BEFORE UPDATE trigger
+  updated_by        uuid references ma_profiles(user_id),  -- set by editLogboekEntry-style edits
+  deleted_at        timestamptz,   -- null = active; set = soft-deleted ("Prullenbak" — see below)
+  deleted_by        uuid references ma_profiles(user_id)
 )
 
 -- Care-team membership — deliberately a SEPARATE table from ma_family_members so
@@ -325,7 +351,26 @@ ma_integration_runs (
                                                            --   mail_dropped_no_excerpt
   error_stage              text,
   created_at               timestamptz not null default now(),
+  trigger_source           text not null default 'schedule',  -- 'schedule' | 'manual'
+  triggered_by_request_id  uuid references ma_sync_requests(id),  -- set once the job
+                            -- correlates a run to a manual request — see below
   unique (family_id, run_key)
+)
+
+-- One row per owner-initiated "run the sync now" request (migration 009).
+-- Written only by the ma-sync-trigger Netlify Function (service role); no
+-- browser INSERT/UPDATE/DELETE policy at all. This table does not itself
+-- trigger anything — see "Agenda-synchronisatie — manual refresh" below for
+-- why, and what still needs to happen outside this repo for it to take
+-- effect faster than the normal schedule.
+ma_sync_requests (
+  id            uuid primary key default gen_random_uuid(),
+  family_id     uuid not null references ma_families(id) on delete cascade,
+  requested_by  uuid not null references ma_profiles(user_id),
+  requested_at  timestamptz not null default now(),
+  claimed_at    timestamptz,               -- set by the job once it picks up the request
+  run_id        uuid references ma_integration_runs(id),  -- set by the job once known
+  created_at    timestamptz not null default now()
 )
 
 -- Append-only owner-visible activity timeline. Single write path is
@@ -378,7 +423,24 @@ All tables should have RLS enabled.  At minimum:
 - `ma_care_team_members`: a user can read their own membership row; a family
   member can read the full roster for their family. No insert/update/delete
   policy — provisioning is a manual step (see "Care team" below).
-- `ma_posts`, `ma_comments`, `ma_attachments`: see the audience matrix below
+- `ma_posts`, `ma_comments`, `ma_attachments`: see the audience matrix below.
+  As of migration 008, a trashed row (`deleted_at is not null`) is readable
+  only by the family owner — a plain member/caregiver's SELECT never returns
+  it, not just "the UI hides it." Trash/restore/permanent-delete go through
+  three narrowly-scoped SECURITY DEFINER RPCs (`ma_trash_logboek_entry()`,
+  `ma_restore_logboek_entry()`, `ma_permanently_delete_logboek_entry()`),
+  each re-checking author-or-owner internally, rather than a raw
+  `.update()`/`.delete()` against a table policy — see the migration's
+  header comment for why a plain client UPDATE can't do this for a
+  non-owner author (PostgreSQL requires the row to still satisfy the
+  table's SELECT policy immediately after the write, even with no
+  `.select()` chained, which the owner-only-trash policy would deny).
+  Editing ordinary content (title/body/date/tags) is unaffected — that
+  still goes through a plain `.update()`, since it never touches
+  `deleted_at`.
+- `ma_sync_requests`: owner-only SELECT, no browser INSERT/UPDATE/DELETE
+  policy — written only by the `ma-sync-trigger` Netlify Function (service
+  role), mirroring `ma_integration_runs`/`ma_activity_events`.
 - `ma_calendar_events`, `ma_calendar_sources`: read-only for family members
   (not extended to care team in this PR — see "Follow-up risks")
 - `ma_briefings`: members read all family rows and may update only the status /
@@ -432,6 +494,44 @@ data — see "Tests" below):
 | Unrelated signed-in user | no | no | no | no | no | no |
 | Anonymous | no | no | no | no | no | no |
 | Trusted `/vandaag` device | no — has no Supabase session at all | | | | | |
+
+### Logboek — edit, trash & search
+
+An entry's own author may edit its text (title/body/date/tags — never
+attachments, kind, or audience in this UI) and move it to the trash
+("Verwijderen" in the compact "⋯" overflow menu on `components/logboek-entry.js`).
+The family owner may additionally trash — but not edit — any entry, and is the
+only one who can restore a trashed entry or permanently delete it, from
+Beheer → Prullenbak (`views/prullenbak.js`).
+
+**Soft delete.** Trashing sets `deleted_at`/`deleted_by` rather than removing
+the row. The Logboek feed shows a temporary "Ongedaan maken" toast right
+after deleting (`components/toast.js`) which restores it in place; once that
+toast is gone, only an owner can bring it back, from Prullenbak, for about 30
+days (`ma_cleanup_trashed_logboek_entries()`, not wired to any cron in this
+repo — run it from a scheduled job the same way as `ma_cleanup_device_rows()`,
+see migration 005).
+
+**Why three RPCs instead of a plain `.update()`/`.delete()`.** This tripped
+up the first draft of migration 008 in exactly the way migration 006's
+`ma_shares_family_context()` comment warns about for a different table: a
+non-owner author's own `UPDATE ... SET deleted_at = now()` was rejected
+outright with "new row violates row-level security policy," not silently
+hidden afterward as expected. PostgreSQL requires the *post-update* row to
+still satisfy the table's SELECT policy for the executing role — even with no
+`RETURNING`/`.select()` — and the owner-only-trash SELECT policy denies
+exactly that for the row the author just trashed. `ma_trash_logboek_entry()`,
+`ma_restore_logboek_entry()`, and `ma_permanently_delete_logboek_entry()`
+(all SECURITY DEFINER, all re-checking author-or-owner internally before
+touching the row) sidestep this the same way `ma_touch_presence()` already
+does for a different problem — see migration 008 for the full write-up and
+the live RLS verification transcript in this PR's description.
+
+**Search & filters.** Free-text search (title/body via `ilike`), author, and
+an `event_date` range, layered on top of the existing kind/audience chips —
+`api.fetchLogboekEntries()`/`fetchLogboekAuthors()`. Deleted entries are
+excluded from every one of these, both by an explicit `deleted_at is null`
+filter in the query *and* independently by RLS.
 
 ### Care team — provisioning & revocation
 
@@ -504,9 +604,16 @@ single PDF, max 15 MB per file — see `apps/ma/src/storage.js`. Object names us
 5. **Migrations** — apply DB migrations **before** the deploy that ships code
    depending on them, in order. Trusted devices need `005_ma_trusted_devices.sql`;
    Logboek + care team need `006_ma_logboek_care_team.sql` applied on top of it.
-   (As of this PR both have been applied to the live project — `005` had been
-   merged into `main` but never actually applied, which was caught and fixed
-   as part of shipping `006`; see "Follow-up risks".)
+   Logboek edit/trash and Beheer's manual sync request need
+   `008_ma_logboek_trash.sql` and `009_ma_calendar_manual_sync.sql` on top of
+   `007_ma_admin_dashboard.sql`.
+   (As of this PR, all of 005–009 have been applied to the live project —
+   `005` had been merged into `main` but never actually applied, which was
+   caught and fixed as part of shipping `006`; see "Follow-up risks". `008`
+   was applied once, found to reject a non-owner author's own soft-delete
+   due to a PostgreSQL RLS/UPDATE interaction, and corrected in place with a
+   follow-up RPC-adding statement before this PR was opened — see the
+   migration's own header comment.)
 
 The subdomain edge function (`netlify/edge-functions/subdomain-router.ts`) will automatically
 route `ma.kapework.com/*` → `/apps/ma/*` (including `/vandaag` and
@@ -638,11 +745,15 @@ surveillance feed — see "Why no Google Analytics?" above. It never records
 route views, scrolls, photo opens, or keystrokes; only the handful of
 meaningful mutations listed below.
 
-**Access:** `beheer` and `devices` are `owner`-only routes
+**Access:** `beheer`, `devices`, and `prullenbak` are `owner`-only routes
 (`ROUTE_ACCESS` in `src/main.js`); a member or caregiver who hand-types the
 hash is redirected before any data fetch runs, and every underlying query is
 independently RLS-gated regardless of what the UI shows (see the matrix
-below). The legacy `#people` hash still resolves — to `#beheer` for an
+below). `uitleg` is reachable by every signed-in `accessType` (it holds no
+private data). The top-right menu's "Ga naar" section only ever lists routes
+the current `accessType` can reach (`nav.js`'s `TABS_BY_ACCESS`, reused by
+`topbar.js`) — Beheer never appears there for a non-owner, on top of the
+route guard itself. The legacy `#people` hash still resolves — to `#beheer` for an
 owner, `#today` for anyone else — so no old bookmark breaks.
 
 ### Systeemstatus
@@ -655,18 +766,57 @@ device's local time):
 
 | Card | Source | Rule (summary) |
 |---|---|---|
-| Agenda & synchronisatie | `ma_integration_runs` (latest run) + `ma_calendar_sources.last_synced_at` | green ≤6h old; amber 6–12h; red >12h; red if the latest run reports `calendar_status = 'failed'` (amber instead if the source still looks fresh — the two disagreeing is itself worth flagging, not silently resolved either way) |
+| Agenda-synchronisatie | `ma_integration_runs` (latest run) + `ma_calendar_sources.last_synced_at` | **running** (neutral, "Bezig met bijwerken…") if the latest run has `status = 'running'` and no `finished_at`; else green ≤6h old; amber 6–12h; red >12h; red if the latest run reports `calendar_status = 'failed'` (amber instead if the source still looks fresh — the two disagreeing is itself worth flagging, not silently resolved either way) |
 | Briefings | tomorrow's `ma_briefings` row | neutral before 17:00 with nothing yet; amber if still missing after 17:00; green once `sent`; amber if `ready` but not sent after 18:00; red if `changed_after_sent` |
 | AutoMaatje | latest run's `notices_status` + open `ma_ride_notices` count | neutral if disabled/no data; red on `failed`/`misconfigured`; green if `success` with zero open discrepancies; amber if `success` with open discrepancies |
 
 `ma_integration_runs` is written only by the private irma-sync job (out of
-scope for this repo) — this dashboard only ever reads it.
+scope for this repo) — this dashboard only ever reads it, and (see below)
+can only ever *ask* that job to run sooner, never invoke it directly.
 
 **Legacy note:** an older `ma_calendar_sync_runs` table predates
 `ma_integration_runs` and is untouched by migration 007 — confirmed **empty**
 on the live project before this migration was written. It is not the
 contract Beheer reads from, is not dropped or renamed, and nothing here
 depends on it. Left for a later cleanup PR.
+
+**Agenda-synchronisatie — manual refresh.** The same card carries an
+owner-only **"Agenda nu bijwerken"** button (`views/beheer.js`, backed by the
+`ma-sync-trigger` Netlify Function and `lib/sync-api.js`). Read this before
+assuming it does what the button label implies:
+
+> The calendar/briefing/AutoMaatje pipeline (the private irma-sync job) runs
+> **entirely outside this repository** — confirmed via the Supabase MCP
+> tooling: no Edge Function is deployed for it, and there is no
+> webhook/trigger URL configured anywhere in this project. This repo has no
+> code path that can invoke that job directly, and re-implementing
+> calendar/briefing fetching here to make the button "really" instant would
+> be exactly the "separate competing implementation" the original brief for
+> this feature said not to build.
+>
+> So `ma-sync-trigger` only records a *signal*: an owner-only, single-flight,
+> 60-second-cooldown, fully audited row in `ma_sync_requests` (migration
+> 009). **A corresponding change outside this repo is required for the
+> button to actually shorten the wait** — the irma-sync job needs to poll
+> `ma_sync_requests` for an unclaimed row at the start of each cycle, run
+> immediately if one exists instead of waiting out its interval, then set
+> `claimed_at`/`run_id` on the request and stamp the run it produces with
+> `trigger_source = 'manual'` and `triggered_by_request_id`. Until that
+> ships, a click is recorded and fully audited (who, when) but is only ever
+> picked up on the job's own schedule — the button's own copy is
+> deliberately honest about this ("Dit kan een paar minuten duren" rather
+> than a false-instant promise), and the Beheer UI polls
+> `ma_integration_runs` for up to 90 seconds afterward to show a real result
+> summary if one lands within that window.
+
+Server-side: owner-only (`verifyOwner()`, reused from `_ma-devices.js`);
+refuses a duplicate request while a run is actively `running` (a run stuck
+in that state for >20 minutes is treated as stale, not a permanent block);
+enforces the 60-second cooldown against both the latest finished run and any
+still-fresh unclaimed request; records one `manual_sync_requested` activity
+event per accepted request (empty metadata — nothing about the calendar
+itself). See `netlify/functions/ma-sync-trigger.js` and
+`netlify/functions-tests/ma-sync-trigger.test.js`.
 
 ### Recente activiteit
 
@@ -751,6 +901,16 @@ A compact summary card (device count, most-recent activity) linking through
 to the existing **Apparaten** management view — this PR deliberately does
 **not** duplicate the setup/revoke UI here.
 
+### Prullenbak
+
+A summary card (trashed-entry count) linking through to `views/prullenbak.js`
+— the owner-only trash for soft-deleted Logboek entries: a compact preview,
+original author, deletion date, and who deleted it, with **Herstellen** and
+**Definitief verwijderen** (a second explicit confirmation) per row, and its
+own simple text search. RLS (migration 008) returns nothing here for anyone
+but the owner regardless of what the route itself shows — see "Logboek —
+edit, trash & search" above for the full permission model.
+
 ### Presence
 
 `ma_touch_presence(family_id)` is a narrow SECURITY DEFINER RPC: it only
@@ -832,6 +992,13 @@ regardless of what the UI shows.
 Deliberately deferred out of scope across the Logboek and Beheer PRs, tracked
 here rather than shipped as a half-finished feature:
 
+- **The irma-sync job doesn't consume `ma_sync_requests` yet.** Required for
+  Beheer's "Agenda nu bijwerken" to actually shorten the wait, not just
+  record and audit the request — see "Agenda-synchronisatie — manual
+  refresh" above for the exact contract the job needs to implement
+  (poll for an unclaimed row, run immediately, stamp `claimed_at`/`run_id`
+  and the resulting run's `trigger_source`/`triggered_by_request_id`). This
+  is a change to a different, private codebase, out of scope for this repo.
 - **Care-team Agenda access.** The brief's suggested caregiver nav included
   Agenda, but `ma_calendar_events` has no care-team RLS policy in this PR —
   calendar entries can carry travel/administrative detail the brief also lists
@@ -875,8 +1042,8 @@ here rather than shipped as a half-finished feature:
 | Deploy                | Push to `main` → Netlify auto-deploys                |
 | Add env vars          | Netlify → Site settings → Environment variables      |
 | Apply DB migrations   | Supabase dashboard → SQL editor, or `supabase db push` |
-| Run tests             | `npm test` (state engine, Beheer health rules, activity mapping, presence heartbeat, GA-absence, device crypto/derive, Netlify function handlers) |
+| Run tests             | `npm test` (state engine, Beheer health rules, activity mapping, presence heartbeat, GA-absence, device crypto/derive, Netlify function handlers incl. `ma-sync-trigger`) |
 | State engine × TZ     | `npm run test:today-state` (UTC/NY/Amsterdam/Jakarta) |
-| Logboek / Beheer RLS tests | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in transactions/cleanup — see the PR description for the full authorization-matrix results) |
+| Logboek / Beheer RLS tests | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in a single rollback-wrapped transaction — see the PR description for the full authorization-matrix results, including the Logboek trash RPCs added in this PR) |
 | Manual acceptance     | See `apps/ma/TRUSTED_DEVICES.md`                     |
 | Check errors          | Browser console; errors logged with `[ma/...]` prefix |

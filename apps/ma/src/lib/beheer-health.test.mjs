@@ -103,6 +103,29 @@ test('agenda: run failed with no source at all → red/run_failed', () => {
   assert.deepEqual(h, { level: 'red', reason: 'run_failed' });
 });
 
+test('agenda: a run in progress → neutral/running, even with a very stale source', () => {
+  const h = computeAgendaHealth(
+    { status: 'running', finished_at: null, calendar_status: 'pending' },
+    { last_synced_at: hoursAgo(30) },
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'neutral', reason: 'running' });
+});
+
+test('agenda: a run in progress → neutral/running, even with no source at all', () => {
+  const h = computeAgendaHealth({ status: 'running', finished_at: null }, null, NOW);
+  assert.deepEqual(h, { level: 'neutral', reason: 'running' });
+});
+
+test('agenda: a finished run with status="running" left over (finished_at set) is not treated as running', () => {
+  const h = computeAgendaHealth(
+    { status: 'running', finished_at: hoursAgo(1), calendar_status: 'success' },
+    { last_synced_at: hoursAgo(1) },
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'green', reason: 'fresh' });
+});
+
 // ─── computeBriefingHealth ──────────────────────────────────────────────────
 
 test('briefing: missing, before 17:00 → neutral/not_yet_due', () => {

@@ -104,6 +104,25 @@ test('ride_notice_dismissed / caregiver_access_* / trusted_device_* are fixed se
   assert.equal(activitySentence(event({ action: 'trusted_device_revoked', metadata: {} })), 'Heeft een vertrouwd apparaat ingetrokken.');
 });
 
+test('logboek_trashed / logboek_restored use the kind label, lowercased', () => {
+  assert.equal(
+    activitySentence(event({ action: 'logboek_trashed', metadata: { kind: 'note' } })),
+    'Heeft een notitie naar de prullenbak verplaatst.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'logboek_restored', metadata: { kind: 'note' } })),
+    'Heeft een notitie teruggezet uit de prullenbak.',
+  );
+});
+
+test('manual_sync_requested is a fixed sentence and carries no metadata', () => {
+  assert.equal(
+    activitySentence(event({ action: 'manual_sync_requested', metadata: {} })),
+    'Heeft een directe agenda-synchronisatie aangevraagd.',
+  );
+  assert.deepEqual(METADATA_ALLOWLIST.manual_sync_requested, []);
+});
+
 test('membership_role_changed distinguishes promotion to owner from any other role change', () => {
   assert.equal(
     activitySentence(event({ action: 'membership_role_changed', metadata: { from_role: 'member', to_role: 'owner' } })),
@@ -135,11 +154,12 @@ test('every action with a sentence builder is documented in METADATA_ALLOWLIST',
   // drift apart — every action activitySentence() knows about must also be
   // in the allowlist, so the privacy contract stays self-documenting.
   const knownActions = [
-    'logboek_created', 'logboek_updated', 'logboek_deleted', 'logboek_audience_changed',
+    'logboek_created', 'logboek_updated', 'logboek_deleted',
+    'logboek_trashed', 'logboek_restored', 'logboek_audience_changed',
     'comment_added', 'attachment_added', 'attachment_removed',
     'briefing_marked_sent', 'briefing_reopened', 'ride_notice_dismissed',
     'caregiver_access_granted', 'caregiver_access_revoked', 'membership_role_changed',
-    'trusted_device_activated', 'trusted_device_revoked',
+    'trusted_device_activated', 'trusted_device_revoked', 'manual_sync_requested',
   ];
   for (const action of knownActions) {
     assert.ok(Object.prototype.hasOwnProperty.call(METADATA_ALLOWLIST, action), `missing allowlist entry for ${action}`);

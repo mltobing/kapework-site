@@ -8,9 +8,9 @@
  * No editing — Apple Calendar remains the source of truth.
  */
 
-import { fetchEvents }     from '../api.js';
+import { fetchEvents, fetchCalendarLastSyncedAt } from '../api.js';
 import { renderEventCard } from '../components/event-card.js';
-import { amsDateKey, todayAms, addDaysKey } from '../lib/datetime.js';
+import { amsDateKey, todayAms, addDaysKey, formatDayHeader, formatTime } from '../lib/datetime.js';
 
 /**
  * @param {HTMLElement} container
@@ -22,6 +22,7 @@ export async function mount(container, { familyId }) {
       <div class="view-header">
         <h1>Calendar</h1>
       </div>
+      <p class="calendar-sync-line" id="calendar-sync-line" hidden></p>
       <div id="calendar-content">
         <div class="section-loading">Loading events\u2026</div>
       </div>
@@ -29,11 +30,23 @@ export async function mount(container, { familyId }) {
   `;
 
   const contentEl = container.querySelector('#calendar-content');
+  const syncLineEl = container.querySelector('#calendar-sync-line');
 
   if (!familyId) {
     contentEl.innerHTML = '<p class="empty-state">Family not found.</p>';
     return;
   }
+
+  // Small, nontechnical freshness cue for every authenticated user \u2014 not an
+  // admin dashboard, just "is this roughly current." Full sync health/history
+  // and the manual-refresh action live in Beheer (owner-only).
+  fetchCalendarLastSyncedAt(familyId)
+    .then(lastSyncedAt => {
+      if (!lastSyncedAt) return;
+      syncLineEl.textContent = `Laatst bijgewerkt: ${formatDayHeader(lastSyncedAt)} om ${formatTime(lastSyncedAt)}`;
+      syncLineEl.hidden = false;
+    })
+    .catch(err => console.error('[ma/calendar] Failed to load last-synced time:', err));
 
   try {
     const events = await fetchEvents(familyId, { limit: 60 });

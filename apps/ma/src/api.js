@@ -33,6 +33,29 @@ const LOGBOEK_ENTRY_COLUMNS = `
   ma_attachments ( id, object_path, mime_type )
 `;
 
+// Compact columns for the owner-only Prullenbak (trash) view — a preview, not
+// the full entry (no attachments/comments; see views/prullenbak.js). Both
+// embeds target ma_profiles, so each needs an explicit alias — otherwise
+// PostgREST returns them under the same `ma_profiles` key and one clobbers
+// the other.
+const LOGBOEK_TRASH_COLUMNS = `
+  id, title, body, kind, audience, event_date, created_at, author_id,
+  deleted_at, deleted_by,
+  author:ma_profiles!author_id ( display_name ),
+  deleter:ma_profiles!deleted_by ( display_name )
+`;
+
+/**
+ * Escapes a free-text search term for safe interpolation into a PostgREST
+ * `.or()`/`.ilike()` filter string: strips characters that are structurally
+ * significant to the filter grammar (comma separates conditions, parens
+ * group them) so a stray "," or "(" in what someone typed can't break the
+ * query or be misread as a second condition.
+ */
+function escapeSearchTerm(term) {
+  return String(term).replace(/[,()%]/g, ' ').trim();
+}
+
 // ─── Profile & access ───────────────────────────────────────────────────────
 
 /**
@@ -103,7 +126,9 @@ export async function fetchAccessContext(userId) {
 // ─── Logboek entries (ma_posts) ─────────────────────────────────────────────
 
 /**
- * Fetch a page of Logboek entries, newest-created first.
+ * Fetch a page of Logboek entries, newest-created first. Trashed entries
+ * (deleted_at set) are always excluded — this is the normal feed, not the
+ * owner-only Prullenbak (see fetchTrashedLogboekEntries).
  *
  * Family users see every entry for their family (RLS: `ma_is_family_member`);
  * care-team users see only `audience = 'care_team'` entries regardless of what
@@ -115,23 +140,63 @@ export async function fetchAccessContext(userId) {
  * @param {object} [opts]
  * @param {number} [opts.limit=20]
  * @param {number} [opts.offset=0]
- * @param {string|null} [opts.kind]     — filter to one entry type, or null for all
- * @param {string|null} [opts.audience] — filter to 'family' | 'care_team', or null for all
+ * @param {string|null} [opts.kind]      — filter to one entry type, or null for all
+ * @param {string|null} [opts.audience]  — filter to 'family' | 'care_team', or null for all
+ * @param {string|null} [opts.authorId]  — filter to one author, or null for all
+ * @param {string|null} [opts.search]    — free-text match against title/body
+ * @param {string|null} [opts.dateFrom]  — YYYY-MM-DD, inclusive lower bound on event_date
+ * @param {string|null} [opts.dateTo]    — YYYY-MM-DD, inclusive upper bound on event_date
  */
-export async function fetchLogboekEntries(familyId, { limit = 20, offset = 0, kind = null, audience = null } = {}) {
+export async function fetchLogboekEntries(familyId, {
+  limit = 20, offset = 0, kind = null, audience = null,
+  authorId = null, search = null, dateFrom = null, dateTo = null,
+} = {}) {
   let query = supabase
     .from('ma_posts')
     .select(LOGBOEK_ENTRY_COLUMNS)
-    .eq('family_id', familyId);
+    .eq('family_id', familyId)
+    .is('deleted_at', null);
 
-  if (kind) query = query.eq('kind', kind);
+  if (kind)     query = query.eq('kind', kind);
   if (audience) query = query.eq('audience', audience);
+  if (authorId) query = query.eq('author_id', authorId);
+  if (dateFrom) query = query.gte('event_date', dateFrom);
+  if (dateTo)   query = query.lte('event_date', dateTo);
+  if (search && search.trim()) {
+    const term = escapeSearchTerm(search);
+    if (term) query = query.or(`title.ilike.%${term}%,body.ilike.%${term}%`);
+  }
 
   const { data, error } = await query
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Distinct authors who have a (non-trashed) Logboek entry in this family, for
+ * the "Filter by author" control — a small, bounded lookup rather than a new
+ * roster RPC, since a member (not just the owner) needs this list too.
+ * @param {string} familyId
+ * @returns {Promise<Array<{ id: string, displayName: string }>>}
+ */
+export async function fetchLogboekAuthors(familyId) {
+  const { data, error } = await supabase
+    .from('ma_posts')
+    .select('author_id, ma_profiles!author_id ( display_name )')
+    .eq('family_id', familyId)
+    .is('deleted_at', null)
+    .limit(500);
+  if (error) throw error;
+
+  const seen = new Map();
+  for (const row of data ?? []) {
+    if (!row.author_id || seen.has(row.author_id)) continue;
+    seen.set(row.author_id, row.ma_profiles?.display_name || 'Onbekend');
+  }
+  return Array.from(seen, ([id, displayName]) => ({ id, displayName }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 /**
@@ -144,7 +209,8 @@ export async function fetchRecentLogboekEntries(familyId, { limit = 15, audience
   let query = supabase
     .from('ma_posts')
     .select(LOGBOEK_ENTRY_COLUMNS)
-    .eq('family_id', familyId);
+    .eq('family_id', familyId)
+    .is('deleted_at', null);
   if (audience) query = query.eq('audience', audience);
 
   const { data, error } = await query
@@ -191,6 +257,115 @@ export async function createLogboekEntry({
 export async function deleteLogboekEntry(id) {
   const { error } = await supabase.from('ma_posts').delete().eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * Edit the content of a Logboek entry — title, body, the date it concerns, and
+ * tags. RLS (author-own or owner-any) is the real permission boundary; the UI
+ * only ever offers "Bewerken" to an entry's own author (see logboek-entry.js).
+ * Never touches audience/kind/attachments — out of scope for this edit form.
+ * Returns the updated row.
+ */
+export async function updateLogboekEntry(id, { title, body, eventDate, tags }, userId) {
+  const { data, error } = await supabase
+    .from('ma_posts')
+    .update({
+      title: title || null,
+      body: body || null,
+      event_date: eventDate || null,
+      tags: tags ?? [],
+      updated_by: userId,
+    })
+    .eq('id', id)
+    .select(LOGBOEK_ENTRY_COLUMNS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Move an entry to the trash (Prullenbak) — the entry's own author or the
+ * family owner. Goes through the ma_trash_logboek_entry() RPC rather than a
+ * plain `.update()`: PostgreSQL requires a row to still satisfy the table's
+ * SELECT policy after an UPDATE, even without .select() chained, and the
+ * owner-only-trash SELECT policy (migration 008) would deny exactly that for
+ * a non-owner author soft-deleting their own entry. The SECURITY DEFINER RPC
+ * bypasses that entirely while enforcing the identical author-or-owner rule
+ * itself — see the migration's comments for the full explanation.
+ *
+ * Resolves to `false` (not a throw) if the entry doesn't exist, is already
+ * trashed, or the caller isn't permitted — throws only on a genuine
+ * network/server error.
+ */
+export async function softDeleteLogboekEntry(id) {
+  const { data, error } = await supabase.rpc('ma_trash_logboek_entry', { p_post_id: id });
+  if (error) throw error;
+  return data === true;
+}
+
+/**
+ * Restore a trashed entry — the immediate "Ongedaan maken" undo, or an
+ * owner's Herstellen action from Prullenbak. Same RPC-based reasoning as
+ * softDeleteLogboekEntry(). Resolves to `false` if nothing was restored.
+ */
+export async function restoreLogboekEntry(id) {
+  const { data, error } = await supabase.rpc('ma_restore_logboek_entry', { p_post_id: id });
+  if (error) throw error;
+  return data === true;
+}
+
+/**
+ * Permanently delete an entry — owner-only once trashed; an author may still
+ * permanently delete their own not-yet-trashed entry directly (preserves
+ * compose.js's failed-upload cleanup). Same RPC-based reasoning as above.
+ * Resolves to `false` if nothing was deleted.
+ */
+export async function permanentlyDeleteLogboekEntry(id) {
+  const { data, error } = await supabase.rpc('ma_permanently_delete_logboek_entry', { p_post_id: id });
+  if (error) throw error;
+  return data === true;
+}
+
+/**
+ * Owner-only: count of trashed Logboek entries, for the Beheer summary card.
+ * RLS (migration 008) returns 0 for a non-owner rather than an error.
+ */
+export async function fetchTrashedLogboekCount(familyId) {
+  const { count, error } = await supabase
+    .from('ma_posts')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .not('deleted_at', 'is', null);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Owner-only: fetch a page of trashed Logboek entries for the Prullenbak view,
+ * newest-deleted first. RLS (migration 008) returns nothing for a non-owner.
+ * @param {string} familyId
+ * @param {object} [opts]
+ * @param {number} [opts.limit=20]
+ * @param {number} [opts.offset=0]
+ * @param {string|null} [opts.search] — free-text match against title/body
+ */
+export async function fetchTrashedLogboekEntries(familyId, { limit = 20, offset = 0, search = null } = {}) {
+  let query = supabase
+    .from('ma_posts')
+    .select(LOGBOEK_TRASH_COLUMNS)
+    .eq('family_id', familyId)
+    .not('deleted_at', 'is', null);
+
+  if (search && search.trim()) {
+    const term = escapeSearchTerm(search);
+    if (term) query = query.or(`title.ilike.%${term}%,body.ilike.%${term}%`);
+  }
+
+  const { data, error } = await query
+    .order('deleted_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data ?? [];
 }
 
 // ─── Comments ────────────────────────────────────────────────────────────────
@@ -416,7 +591,7 @@ export async function fetchLatestIntegrationRun(familyId) {
   const { data, error } = await supabase
     .from('ma_integration_runs')
     .select(`
-      id, run_key, started_at, finished_at, status,
+      id, run_key, started_at, finished_at, status, trigger_source,
       calendar_status, briefing_status, notices_status,
       events_seen, events_created, events_updated, events_unchanged, events_cancelled,
       briefings_updated, briefings_unchanged, briefings_failed,
@@ -440,7 +615,7 @@ export async function fetchLatestIntegrationRun(familyId) {
 export async function fetchCalendarSourceAdminStatus(familyId) {
   const { data, error } = await supabase
     .from('ma_calendar_sources')
-    .select('last_synced_at')
+    .select('label, last_synced_at')
     .eq('family_id', familyId)
     .order('last_synced_at', { ascending: false })
     .limit(1)

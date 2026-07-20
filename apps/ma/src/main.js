@@ -32,15 +32,19 @@ import { mount as mountCalendar }               from './views/calendar.js';
 import { mount as mountBeheer }                 from './views/beheer.js';
 import { mount as mountCompose }                from './views/compose.js';
 import { mount as mountDevices }                from './views/devices.js';
+import { mount as mountPrullenbak }             from './views/prullenbak.js';
+import { mount as mountUitleg }                 from './views/uitleg.js';
 
 const VIEWS = {
-  today:    mountToday,
-  briefing: mountBriefing,
-  logboek:  mountLogboek,
-  calendar: mountCalendar,
-  beheer:   mountBeheer,
-  compose:  mountCompose,
-  devices:  mountDevices,
+  today:       mountToday,
+  briefing:    mountBriefing,
+  logboek:     mountLogboek,
+  calendar:    mountCalendar,
+  beheer:      mountBeheer,
+  compose:     mountCompose,
+  devices:     mountDevices,
+  prullenbak:  mountPrullenbak,
+  uitleg:      mountUitleg,
 };
 
 // Explicit per-route allowlist by accessType — RLS/functions are the real
@@ -48,13 +52,15 @@ const VIEWS = {
 // even exist for a role that shouldn't see it. 'people' is handled separately
 // below (legacy alias, never mounts a view of its own).
 const ROUTE_ACCESS = {
-  today:    ['owner', 'member', 'caregiver'],
-  briefing: ['owner', 'member'],
-  logboek:  ['owner', 'member', 'caregiver'],
-  calendar: ['owner', 'member'],
-  compose:  ['owner', 'member', 'caregiver'],
-  beheer:   ['owner'],
-  devices:  ['owner'],
+  today:       ['owner', 'member', 'caregiver'],
+  briefing:    ['owner', 'member'],
+  logboek:     ['owner', 'member', 'caregiver'],
+  calendar:    ['owner', 'member'],
+  compose:     ['owner', 'member', 'caregiver'],
+  beheer:      ['owner'],
+  devices:     ['owner'],
+  prullenbak:  ['owner'],
+  uitleg:      ['owner', 'member', 'caregiver'],
 };
 
 function routeAllowedFor(route, accessType) {
@@ -449,7 +455,8 @@ function renderShell(appEl, user, profile, familyId, accessType) {
   renderTopbar(topbarEl, {
     onSignOut: handleSignOut,
     onDevices: () => navigate('devices'),
-    showDevices: accessType === 'owner',
+    onNavigate: (route) => navigate(route),
+    accessType,
   });
 
   const initial = resolveRoute(currentRoute(), accessType);
