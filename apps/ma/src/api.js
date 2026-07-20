@@ -438,16 +438,23 @@ export async function createAttachment({ postId, familyId, uploaderId, objectPat
  * that today's already-started events and all-day rows (stored at Amsterdam
  * midnight) are included rather than dropped as "past" — the schedule belongs
  * to the person in Amsterdam, not to the viewer's clock.
+ *
+ * `to` (exclusive) and `offset` exist for the Agenda view's bounded, paginated
+ * six-month window (see views/calendar.js) — Today/Briefing/compose keep
+ * calling this with neither, so their narrow, task-focused windows are
+ * unaffected.
  */
-export async function fetchEvents(familyId, { from, limit = 40 } = {}) {
+export async function fetchEvents(familyId, { from, to, limit = 40, offset = 0 } = {}) {
   const fromDate = from ?? startOfTodayAmsISO();
-  const { data, error } = await supabase
+  let query = supabase
     .from('ma_calendar_events')
     .select('id, external_event_uid, title, starts_at, ends_at, all_day, location, notes, external_url, status')
     .eq('family_id', familyId)
-    .gte('starts_at', fromDate)
+    .gte('starts_at', fromDate);
+  if (to) query = query.lt('starts_at', to);
+  const { data, error } = await query
     .order('starts_at', { ascending: true })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
   if (error) throw error;
   return data ?? [];
 }
@@ -582,6 +589,19 @@ export async function touchPresence(familyId) {
 // supabase-migrations/007_ma_admin_dashboard.sql) — a non-owner request
 // returns an empty result, never an error, and never a leak.
 
+// Shared column list for both "latest run" and "one exact run" lookups (see
+// fetchIntegrationRunById below, used by the request/run-correlated poll in
+// views/beheer.js).
+const INTEGRATION_RUN_COLUMNS = `
+  id, run_key, started_at, finished_at, status, trigger_source,
+  calendar_status, briefing_status, notices_status,
+  events_seen, events_created, events_updated, events_unchanged, events_cancelled,
+  briefings_updated, briefings_unchanged, briefings_failed,
+  mail_messages_seen, mail_extract_calls, notice_rows_written,
+  notices_superseded, notices_auto_resolved, mail_parse_failures,
+  mail_dropped_non_ride, mail_dropped_no_excerpt, error_stage
+`;
+
 /**
  * Most recent private irma-sync pipeline run for this family, or null if none
  * has ever reported in yet (rendered as a calm "no data yet" state, not a
@@ -590,18 +610,44 @@ export async function touchPresence(familyId) {
 export async function fetchLatestIntegrationRun(familyId) {
   const { data, error } = await supabase
     .from('ma_integration_runs')
-    .select(`
-      id, run_key, started_at, finished_at, status, trigger_source,
-      calendar_status, briefing_status, notices_status,
-      events_seen, events_created, events_updated, events_unchanged, events_cancelled,
-      briefings_updated, briefings_unchanged, briefings_failed,
-      mail_messages_seen, mail_extract_calls, notice_rows_written,
-      notices_superseded, notices_auto_resolved, mail_parse_failures,
-      mail_dropped_non_ride, mail_dropped_no_excerpt, error_stage
-    `)
+    .select(INTEGRATION_RUN_COLUMNS)
     .eq('family_id', familyId)
     .order('started_at', { ascending: false })
     .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * One exact integration run by id — used once a manual sync request's
+ * `run_id` is known, so Beheer can poll the precise run it caused instead of
+ * inferring it from "whatever's newest" (see fetchSyncRequestStatus below and
+ * views/beheer.js's pollForRunByRequest). Returns null if the id doesn't
+ * exist or isn't readable (RLS still applies — owner-only, as above).
+ */
+export async function fetchIntegrationRunById(runId) {
+  const { data, error } = await supabase
+    .from('ma_integration_runs')
+    .select(INTEGRATION_RUN_COLUMNS)
+    .eq('id', runId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Status of one owner-triggered manual sync request — polled after
+ * triggerManualSync() returns a requestId, until `run_id` appears (set by the
+ * private irma-sync job once it claims the request; see irma-sync's
+ * classify_trigger()/ma_claim_sync_request()). Owner-only SELECT (migration
+ * 009); returns null if the request doesn't exist or isn't the caller's.
+ */
+export async function fetchSyncRequestStatus(requestId) {
+  const { data, error } = await supabase
+    .from('ma_sync_requests')
+    .select('id, run_id, claimed_at, dispatch_status')
+    .eq('id', requestId)
     .maybeSingle();
   if (error) throw error;
   return data;

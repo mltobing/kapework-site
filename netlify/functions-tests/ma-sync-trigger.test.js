@@ -13,7 +13,7 @@
  * Run: node --test netlify/functions-tests/ma-sync-trigger.test.js
  */
 
-const { test } = require('node:test');
+const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { installFakeSupabase, setFixture } = require('./_fake-supabase');
@@ -22,8 +22,27 @@ installFakeSupabase();
 process.env.SUPABASE_URL = 'https://fake.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key';
 process.env.MA_DEVICE_TOKEN_PEPPER = 'fake-pepper';
+process.env.MA_SYNC_GITHUB_TOKEN = 'fake-gh-token';
 
 const handler = require('../functions/ma-sync-trigger').handler;
+
+// ─── GitHub dispatch fetch mock ─────────────────────────────────────────────
+// Every test gets a default 204-success mock via beforeEach; a test that
+// cares about a different GitHub response overrides global.fetch itself.
+
+let lastFetchCall = null;
+
+function mockGithubDispatch(status, jsonBody = null) {
+  global.fetch = async (url, opts) => {
+    lastFetchCall = { url, opts };
+    return { status, json: async () => jsonBody };
+  };
+}
+
+beforeEach(() => {
+  mockGithubDispatch(204);
+  lastFetchCall = null;
+});
 
 const FAMILY_ID = 'family-syn-0001';
 const OWNER_ID     = 'user-owner-0001';
@@ -76,7 +95,7 @@ function membershipTableHandler() {
  * @param {object|null} [opts.activityError]
  */
 function buildFixture({ userId, latestRun = null, pendingRequest = null, insertedRequest = { id: 'req-1', requested_at: new Date().toISOString() }, activityError = null }) {
-  const calls = { syncRequestInserts: [], activityInserts: [] };
+  const calls = { syncRequestInserts: [], syncRequestUpdates: [], activityInserts: [], pendingLookupFilters: null };
   const fixture = {
     auth: authFixture(userId),
     tables: {
@@ -87,6 +106,11 @@ function buildFixture({ userId, latestRun = null, pendingRequest = null, inserte
           calls.syncRequestInserts.push(state.payload);
           return { data: insertedRequest, error: null };
         }
+        if (state.op === 'update') {
+          calls.syncRequestUpdates.push(state.payload);
+          return { data: null, error: null };
+        }
+        calls.pendingLookupFilters = state.filters;
         return { data: pendingRequest, error: null };
       },
       ma_activity_events: (state) => {
@@ -102,7 +126,7 @@ function buildFixture({ userId, latestRun = null, pendingRequest = null, inserte
 
 // ─── Authorization ──────────────────────────────────────────────────────────
 
-test('owner with no prior run/request → 200 queued, exactly one audited request', async () => {
+test('owner with no prior run/request → 200 queued, exactly one audited request, workflow dispatched', async () => {
   const { fixture, calls } = buildFixture({ userId: OWNER_ID });
   setFixture(fixture);
   const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
@@ -121,6 +145,15 @@ test('owner with no prior run/request → 200 queued, exactly one audited reques
   assert.equal(activity.action, 'manual_sync_requested');
   assert.equal(activity.actor_user_id, OWNER_ID);
   assert.deepEqual(activity.metadata, {});
+
+  assert.ok(lastFetchCall.url.includes('/repos/mltobing/irma-sync/actions/workflows/sync.yml/dispatches'));
+  assert.equal(lastFetchCall.opts.headers.Authorization, 'Bearer fake-gh-token');
+  const dispatchBody = JSON.parse(lastFetchCall.opts.body);
+  assert.equal(dispatchBody.ref, 'main');
+  assert.equal(dispatchBody.inputs.manual_request_id, 'req-1');
+
+  assert.equal(calls.syncRequestUpdates.length, 1);
+  assert.equal(calls.syncRequestUpdates[0].dispatch_status, 'dispatched');
 });
 
 test('member is refused with 403 and no request is created', async () => {
@@ -273,4 +306,83 @@ test('a failed audit write surfaces as 500, even though the request row was alre
   const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
   assert.equal(res.statusCode, 500);
   assert.equal(calls.syncRequestInserts.length, 1); // the request row write did happen
+});
+
+// ─── GitHub workflow dispatch ───────────────────────────────────────────────
+
+test('missing GitHub dispatch configuration → 503, no request created, no dispatch attempted', async () => {
+  const originalToken = process.env.MA_SYNC_GITHUB_TOKEN;
+  delete process.env.MA_SYNC_GITHUB_TOKEN;
+  try {
+    const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+    setFixture(fixture);
+    const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+    assert.equal(res.statusCode, 503);
+    assert.equal(calls.syncRequestInserts.length, 0);
+    assert.equal(lastFetchCall, null);
+  } finally {
+    process.env.MA_SYNC_GITHUB_TOKEN = originalToken;
+  }
+});
+
+test('GitHub 200 response with a run id → queued, run id stored for correlation', async () => {
+  mockGithubDispatch(200, { id: 123456 });
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).status, 'queued');
+  assert.equal(calls.syncRequestUpdates[0].dispatch_status, 'dispatched');
+  assert.equal(calls.syncRequestUpdates[0].github_run_id, '123456');
+});
+
+test('GitHub 204 response (no body) → queued, no run id required', async () => {
+  mockGithubDispatch(204);
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.syncRequestUpdates[0].dispatch_status, 'dispatched');
+  assert.equal(calls.syncRequestUpdates[0].github_run_id, null);
+});
+
+test('GitHub 4xx response → 502, request marked dispatch_status=failed, response body never leaked', async () => {
+  mockGithubDispatch(422, { message: 'Unprocessable: some internal detail' });
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 502);
+  const parsed = JSON.parse(res.body);
+  assert.equal(parsed.error, 'dispatch_failed');
+  assert.ok(!JSON.stringify(parsed).includes('Unprocessable'));
+  assert.equal(calls.syncRequestUpdates[0].dispatch_status, 'failed');
+  assert.equal(calls.syncRequestUpdates[0].dispatch_error_code, 'github_client_error');
+});
+
+test('GitHub 5xx response → 502, dispatch_error_code=github_server_error', async () => {
+  mockGithubDispatch(503);
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 502);
+  assert.equal(calls.syncRequestUpdates[0].dispatch_error_code, 'github_server_error');
+});
+
+test('GitHub dispatch network failure → 502, dispatch_error_code=network_error', async () => {
+  global.fetch = async () => { throw new Error('fetch failed'); };
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 502);
+  assert.equal(calls.syncRequestUpdates[0].dispatch_error_code, 'network_error');
+});
+
+test('the pending-request lookup excludes dispatch_status=failed, so a failed dispatch never blocks a retry', async () => {
+  const { fixture, calls } = buildFixture({ userId: OWNER_ID, pendingRequest: null });
+  setFixture(fixture);
+  const res = await handler(makeEvent({ auth: OWNER_ID, body: { familyId: FAMILY_ID } }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(JSON.parse(res.body).status, 'queued');
+  assert.equal(calls.syncRequestInserts.length, 1); // proceeded to a fresh request + dispatch
+  assert.ok(calls.pendingLookupFilters.some(f => f.type === 'neq' && f.col === 'dispatch_status' && f.val === 'failed'));
 });

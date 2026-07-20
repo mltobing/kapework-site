@@ -357,20 +357,25 @@ ma_integration_runs (
   unique (family_id, run_key)
 )
 
--- One row per owner-initiated "run the sync now" request (migration 009).
--- Written only by the ma-sync-trigger Netlify Function (service role); no
--- browser INSERT/UPDATE/DELETE policy at all. This table does not itself
--- trigger anything — see "Agenda-synchronisatie — manual refresh" below for
--- why, and what still needs to happen outside this repo for it to take
--- effect faster than the normal schedule.
+-- One row per owner-initiated "run the sync now" request (migration 009,
+-- extended by migration 010 with dispatch-status fields). Written only by
+-- the ma-sync-trigger Netlify Function (service role); no browser
+-- INSERT/UPDATE/DELETE policy at all. ma-sync-trigger.js dispatches the
+-- private irma-sync workflow directly via the GitHub API right after
+-- inserting this row — see "Agenda-synchronisatie — manual refresh" below.
 ma_sync_requests (
-  id            uuid primary key default gen_random_uuid(),
-  family_id     uuid not null references ma_families(id) on delete cascade,
-  requested_by  uuid not null references ma_profiles(user_id),
-  requested_at  timestamptz not null default now(),
-  claimed_at    timestamptz,               -- set by the job once it picks up the request
-  run_id        uuid references ma_integration_runs(id),  -- set by the job once known
-  created_at    timestamptz not null default now()
+  id                     uuid primary key default gen_random_uuid(),
+  family_id              uuid not null references ma_families(id) on delete cascade,
+  requested_by           uuid not null references ma_profiles(user_id),
+  requested_at           timestamptz not null default now(),
+  claimed_at             timestamptz,               -- set by the job's ma_claim_sync_request() RPC
+  run_id                 uuid references ma_integration_runs(id),  -- set by the job once known
+  dispatch_status        text not null default 'pending',  -- 'pending' | 'dispatched' | 'failed'
+  dispatch_attempted_at  timestamptz,
+  dispatched_at          timestamptz,               -- set only on a successful GitHub dispatch
+  dispatch_error_code    text,   -- 'config_error'|'network_error'|'github_client_error'|'github_server_error'
+  github_run_id          text,  -- optional GitHub Actions run id, only when GitHub's 200 response includes one
+  created_at             timestamptz not null default now()
 )
 
 -- Append-only owner-visible activity timeline. Single write path is
@@ -655,11 +660,19 @@ a deliberate, permanent design decision, not a gap to fill in later.
 
 ## Calendar sync
 
-The app reads `ma_calendar_events` as a **read-only mirror**.
-Calendar editing happens entirely in Apple Calendar.
-To keep events current, set up a separate sync process (e.g. a Supabase edge function or
-cron job) that reads the family iCloud calendar's public ICS feed and upserts into
-`ma_calendar_events`.  This is outside the scope of this app.
+The app reads `ma_calendar_events` as a **read-only mirror**. Calendar editing
+happens entirely in Apple Calendar. The mirror itself is written by the
+private `irma-sync` GitHub Actions job (a separate, private repository) that
+reads the shared iCloud calendar "Met Irma" over CalDAV and upserts into
+`ma_calendar_events` — every 3 hours automatically, or immediately when an
+owner presses **Agenda nu bijwerken** in Beheer (see "Agenda-synchronisatie —
+manual refresh" below). That job mirrors appointments up to **six calendar
+months ahead**, while Caren/WhatsApp briefing text is only ever prepared for
+the **next 21 days** — a far-future appointment shows up in the Agenda long
+before it has (or needs) a briefing. The Agenda view (`views/calendar.js`)
+fetches events in paginated pages bounded to that same six-month horizon
+("Meer laden" loads further pages), rather than an unbounded lifetime
+history; Today/Briefing/compose keep their own narrow, task-focused windows.
 
 ---
 
@@ -782,41 +795,74 @@ depends on it. Left for a later cleanup PR.
 
 **Agenda-synchronisatie — manual refresh.** The same card carries an
 owner-only **"Agenda nu bijwerken"** button (`views/beheer.js`, backed by the
-`ma-sync-trigger` Netlify Function and `lib/sync-api.js`). Read this before
-assuming it does what the button label implies:
+`ma-sync-trigger` Netlify Function and `lib/sync-api.js`). Pressing it now
+**actually starts the private irma-sync workflow** — this used to only
+record a request the job would pick up on its own schedule; it now dispatches
+directly:
 
-> The calendar/briefing/AutoMaatje pipeline (the private irma-sync job) runs
-> **entirely outside this repository** — confirmed via the Supabase MCP
-> tooling: no Edge Function is deployed for it, and there is no
-> webhook/trigger URL configured anywhere in this project. This repo has no
-> code path that can invoke that job directly, and re-implementing
-> calendar/briefing fetching here to make the button "really" instant would
-> be exactly the "separate competing implementation" the original brief for
-> this feature said not to build.
+> `ma-sync-trigger` records the same owner-only, single-flight,
+> 60-second-cooldown, fully audited row in `ma_sync_requests` it always has
+> (migration 009) — and then, right after that insert, calls GitHub's
+> `workflow_dispatch` REST API for `mltobing/irma-sync`'s `sync.yml`,
+> passing the new row's id as the `manual_request_id` input. The private job
+> validates that id, atomically claims it (`ma_claim_sync_request()`,
+> migration 010 — a duplicate dispatch, a stale/already-claimed request, or
+> one for another family all safely fall back to an ordinary unlinked run
+> rather than blocking anything), and stamps the run it produces with
+> `trigger_source = 'manual'` and `triggered_by_request_id`. **The pipeline
+> this repo has never been able to run itself — CalDAV, Claude, Gmail — still
+> runs entirely in that private repository**; this repo only ever asks
+> GitHub to start it, never re-implements it (the "separate competing
+> implementation" the original brief said not to build).
 >
-> So `ma-sync-trigger` only records a *signal*: an owner-only, single-flight,
-> 60-second-cooldown, fully audited row in `ma_sync_requests` (migration
-> 009). **A corresponding change outside this repo is required for the
-> button to actually shorten the wait** — the irma-sync job needs to poll
-> `ma_sync_requests` for an unclaimed row at the start of each cycle, run
-> immediately if one exists instead of waiting out its interval, then set
-> `claimed_at`/`run_id` on the request and stamp the run it produces with
-> `trigger_source = 'manual'` and `triggered_by_request_id`. Until that
-> ships, a click is recorded and fully audited (who, when) but is only ever
-> picked up on the job's own schedule — the button's own copy is
-> deliberately honest about this ("Dit kan een paar minuten duren" rather
-> than a false-instant promise), and the Beheer UI polls
-> `ma_integration_runs` for up to 90 seconds afterward to show a real result
-> summary if one lands within that window.
+> A failed dispatch (GitHub rejects the call, or is unreachable) marks the
+> request `dispatch_status = 'failed'` rather than leaving a request stuck
+> `pending` for 20 minutes — the owner sees a plain retry message and the
+> very next click tries again immediately, it is not blocked behind the
+> usual "still fresh" dedup window. `ma_sync_requests.dispatch_status`
+> distinguishes `pending` (inserted, not yet dispatched — should never be
+> visible for long), `dispatched` (GitHub accepted it), and `failed`.
+>
+> The Beheer UI now polls by the exact request → run correlation instead of
+> guessing from the newest timestamp: once `ma_sync_requests.run_id` appears
+> (set by the job after it claims the request), Beheer polls that exact
+> `ma_integration_runs` row for up to ~4 minutes. States shown along the way:
+> "Synchronisatie gestart…" (dispatched, run not yet observed), "Agenda wordt
+> bijgewerkt…" (the run has started), then a real outcome — "Agenda is
+> bijgewerkt." on success, "Agenda is bijgewerkt, maar de
+> AutoMaatje-controle vraagt aandacht." on a `partial` run (the calendar
+> itself is fine; only the mail check needs a look), or "De synchronisatie is
+> mislukt. Probeer het opnieuw." on `failed`. If nothing lands within the
+> timeout: "De synchronisatie is gestart en loopt mogelijk nog. Kijk over
+> enkele minuten opnieuw." — never a false negative for a run that's simply
+> still queued on GitHub's runners.
 
 Server-side: owner-only (`verifyOwner()`, reused from `_ma-devices.js`);
-refuses a duplicate request while a run is actively `running` (a run stuck
-in that state for >20 minutes is treated as stale, not a permanent block);
-enforces the 60-second cooldown against both the latest finished run and any
-still-fresh unclaimed request; records one `manual_sync_requested` activity
-event per accepted request (empty metadata — nothing about the calendar
-itself). See `netlify/functions/ma-sync-trigger.js` and
+requires the fine-grained GitHub token/repo/workflow/ref to be configured at
+all (fails safely with a generic 503 before writing anything if not); refuses
+a duplicate request while a run is actively `running` (a run stuck in that
+state for >20 minutes is treated as stale, not a permanent block); enforces
+the 60-second cooldown against both the latest finished run and any
+still-fresh, not-already-failed unclaimed request; records one
+`manual_sync_requested` activity event per accepted request (empty metadata —
+nothing about the calendar itself); never logs the GitHub token, the
+Authorization header, or a GitHub response body. See
+`netlify/functions/ma-sync-trigger.js` and
 `netlify/functions-tests/ma-sync-trigger.test.js`.
+
+**Configuration (server-only Netlify environment variables — never in the
+browser bundle):**
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `MA_SYNC_GITHUB_TOKEN` | yes, secret | Fine-grained GitHub PAT, scoped to **only** `mltobing/irma-sync`, repository permission **Actions: Read and write**, **Metadata: Read-only** — no broader classic `repo` token. |
+| `MA_SYNC_GITHUB_REPOSITORY` | no — defaults to `mltobing/irma-sync` | Target repository for the dispatch. |
+| `MA_SYNC_GITHUB_WORKFLOW` | no — defaults to `sync.yml` | Workflow file to dispatch. |
+| `MA_SYNC_GITHUB_REF` | no — defaults to `main` | Branch/ref the workflow dispatches from. |
+
+Only the token is secret, but none of the four belongs in client-side code —
+they're read only inside the Netlify Function. See the PR description for
+exact steps to create the token and set these in the Netlify dashboard.
 
 ### Recente activiteit
 
@@ -992,13 +1038,11 @@ regardless of what the UI shows.
 Deliberately deferred out of scope across the Logboek and Beheer PRs, tracked
 here rather than shipped as a half-finished feature:
 
-- **The irma-sync job doesn't consume `ma_sync_requests` yet.** Required for
-  Beheer's "Agenda nu bijwerken" to actually shorten the wait, not just
-  record and audit the request — see "Agenda-synchronisatie — manual
-  refresh" above for the exact contract the job needs to implement
-  (poll for an unclaimed row, run immediately, stamp `claimed_at`/`run_id`
-  and the resulting run's `trigger_source`/`triggered_by_request_id`). This
-  is a change to a different, private codebase, out of scope for this repo.
+- ~~The irma-sync job doesn't consume `ma_sync_requests` yet.~~ **Resolved:**
+  `ma-sync-trigger.js` now dispatches the private irma-sync workflow directly
+  via the GitHub API, and that job (a separate, private codebase) claims the
+  request and stamps `trigger_source`/`triggered_by_request_id` on the run it
+  produces — see "Agenda-synchronisatie — manual refresh" above.
 - **Care-team Agenda access.** The brief's suggested caregiver nav included
   Agenda, but `ma_calendar_events` has no care-team RLS policy in this PR —
   calendar entries can carry travel/administrative detail the brief also lists

@@ -10,7 +10,15 @@
 
 import { fetchEvents, fetchCalendarLastSyncedAt } from '../api.js';
 import { renderEventCard } from '../components/event-card.js';
-import { amsDateKey, todayAms, addDaysKey, formatDayHeader, formatTime } from '../lib/datetime.js';
+import { amsDateKey, todayAms, addDaysKey, formatDayHeader, formatTime, monthsAheadISO } from '../lib/datetime.js';
+
+// Matches the private irma-sync job's CALENDAR_LOOKAHEAD_MONTHS \u2014 the Agenda
+// view is the one place in this app that needs the wide mirror horizon;
+// Today/Briefing/compose keep their narrow, task-focused windows untouched
+// (brief \u00a7B4). A bounded date range + real pagination, not an unbounded
+// lifetime history or a single oversized limit.
+const CALENDAR_LOOKAHEAD_MONTHS = 6;
+const PAGE_SIZE = 60;
 
 /**
  * @param {HTMLElement} container
@@ -26,11 +34,16 @@ export async function mount(container, { familyId }) {
       <div id="calendar-content">
         <div class="section-loading">Loading events\u2026</div>
       </div>
+      <div class="feed-more" id="calendar-more" hidden>
+        <button class="btn-ghost" id="calendar-more-btn">Meer laden</button>
+      </div>
     </div>
   `;
 
   const contentEl = container.querySelector('#calendar-content');
   const syncLineEl = container.querySelector('#calendar-sync-line');
+  const moreEl = container.querySelector('#calendar-more');
+  const moreBtn = container.querySelector('#calendar-more-btn');
 
   if (!familyId) {
     contentEl.innerHTML = '<p class="empty-state">Family not found.</p>';
@@ -48,16 +61,49 @@ export async function mount(container, { familyId }) {
     })
     .catch(err => console.error('[ma/calendar] Failed to load last-synced time:', err));
 
+  const to = monthsAheadISO(CALENDAR_LOOKAHEAD_MONTHS);
+  let allEvents = [];
+  let offset = 0;
+
+  async function loadPage() {
+    const page = await fetchEvents(familyId, { to, limit: PAGE_SIZE, offset });
+    allEvents = allEvents.concat(page);
+    offset += page.length;
+    moreEl.hidden = page.length < PAGE_SIZE;
+  }
+
   try {
-    const events = await fetchEvents(familyId, { limit: 60 });
+    await loadPage();
+    render();
+  } catch (err) {
+    console.error('[ma/calendar] Failed to load events:', err);
+    contentEl.innerHTML = '<p class="empty-state">Could not load events. Please try again.</p>';
+    return;
+  }
+
+  moreBtn.addEventListener('click', async () => {
+    moreBtn.disabled = true;
+    moreBtn.textContent = 'Laden\u2026';
+    try {
+      await loadPage();
+      render();
+    } catch (err) {
+      console.error('[ma/calendar] Failed to load more events:', err);
+    } finally {
+      moreBtn.disabled = false;
+      moreBtn.textContent = 'Meer laden';
+    }
+  });
+
+  function render() {
     contentEl.innerHTML = '';
 
-    if (!events.length) {
+    if (!allEvents.length) {
       contentEl.innerHTML = '<p class="empty-state">No upcoming events.</p>';
       return;
     }
 
-    const groups = groupByTime(events);
+    const groups = groupByTime(allEvents);
 
     for (const [label, groupEvents] of groups) {
       if (!groupEvents.length) continue;
@@ -77,9 +123,6 @@ export async function mount(container, { familyId }) {
     if (!contentEl.children.length) {
       contentEl.innerHTML = '<p class="empty-state">No upcoming events.</p>';
     }
-  } catch (err) {
-    console.error('[ma/calendar] Failed to load events:', err);
-    contentEl.innerHTML = '<p class="empty-state">Could not load events. Please try again.</p>';
   }
 }
 
