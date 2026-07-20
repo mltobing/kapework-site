@@ -14,9 +14,10 @@
 
 import {
   fetchLatestIntegrationRun, fetchCalendarSourceAdminStatus, fetchTomorrowBriefingAdminStatus,
-  fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster,
+  fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster, fetchTrashedLogboekCount,
 } from '../api.js';
 import { listDevices } from '../lib/devices-api.js';
+import { triggerManualSync } from '../lib/sync-api.js';
 import { escapeHtml, getInitial } from '../utils.js';
 import { formatDayHeader, formatTime, formatRelativeNl } from '../lib/datetime.js';
 import {
@@ -75,6 +76,11 @@ export async function mount(container, { familyId, accessType }) {
         <h2 class="section-title">Apparaten</h2>
         <div id="devices-summary"><div class="section-loading">Laden…</div></div>
       </section>
+
+      <section class="beheer-section">
+        <h2 class="section-title">Prullenbak</h2>
+        <div id="prullenbak-summary"><div class="section-loading">Laden…</div></div>
+      </section>
     </div>
   `;
 
@@ -102,6 +108,7 @@ export async function mount(container, { familyId, accessType }) {
   mountDevicesSummary(container.querySelector('#devices-summary'), devices);
   mountActivityTimeline(container, familyId);
   mountRoster(container.querySelector('#roster-list'), familyId);
+  mountPrullenbakSummary(container.querySelector('#prullenbak-summary'), familyId);
 }
 
 // ─── Health helpers ──────────────────────────────────────────────────────────
@@ -110,10 +117,23 @@ function healthBadge(level, text) {
   return `<span class="beheer-health beheer-health--${level}">${escapeHtml(text)}</span>`;
 }
 
-// ─── Card: Agenda & synchronisatie ────────────────────────────────────────────
+// ─── Card: Agenda-synchronisatie (status + owner-only manual refresh) ────────
+// Approximately how often the automatic cycle runs — used only to show an
+// honest, clearly-approximate "next scheduled sync" time (this repo doesn't
+// own the schedule itself; see supabase-migrations/009_ma_calendar_manual_sync.sql).
+const AUTO_SYNC_INTERVAL_MS = 3 * 60 * 60_000;
+// How long to poll ma_integration_runs after a manual request before giving
+// up and showing a "this can take a few minutes" message instead of a result.
+const SYNC_POLL_TIMEOUT_MS = 90_000;
+const SYNC_POLL_INTERVAL_MS = 4000;
+const SYNC_COOLDOWN_TICK_MS = 1000;
 
 async function mountAgendaCard(el, familyId) {
-  el.innerHTML = '<h3 class="beheer-card-title">Agenda &amp; synchronisatie</h3><div class="section-loading">Laden…</div>';
+  el.innerHTML = '<h3 class="beheer-card-title">Agenda-synchronisatie</h3><div class="section-loading">Laden…</div>';
+  await refreshAgendaCard(el, familyId);
+}
+
+async function refreshAgendaCard(el, familyId) {
   let run = null;
   let source = null;
   try {
@@ -123,31 +143,62 @@ async function mountAgendaCard(el, familyId) {
     ]);
   } catch (err) {
     console.error('[ma/beheer] Agenda card failed:', err);
-    el.innerHTML = '<h3 class="beheer-card-title">Agenda &amp; synchronisatie</h3><p class="empty-state">Kon dit niet laden.</p>';
+    el.innerHTML = '<h3 class="beheer-card-title">Agenda-synchronisatie</h3><p class="empty-state">Kon dit niet laden.</p>';
     return;
   }
+  renderAgendaCard(el, familyId, run, source);
+}
 
+function renderAgendaCard(el, familyId, run, source) {
   const lastSyncedAt = source?.last_synced_at ?? null;
   const { level, reason } = computeAgendaHealth(run, source);
 
+  const LEVEL_LABEL = { neutral: reason === 'running' ? 'Bezig' : 'Geen gegevens', green: 'In orde', amber: 'Controleren', red: 'Aandacht nodig' };
   const AGENDA_TEXT = {
     no_data:      'Nog geen gegevens.',
+    running:      'Bezig met bijwerken…',
     disagreement: 'Controleren — bronnen spreken elkaar tegen.',
-    run_failed:   'Synchronisatie mislukt.',
-    fresh:        `Agenda bijgewerkt ${formatRelativeNl(lastSyncedAt)}`,
-    stale:        `Agenda bijgewerkt ${formatRelativeNl(lastSyncedAt)}`,
-    very_stale:   `Agenda bijgewerkt ${formatRelativeNl(lastSyncedAt)}`,
+    run_failed:   'De agenda kon niet worden bijgewerkt.',
+    fresh:        'Agenda is bijgewerkt.',
+    stale:        'Agenda is bijgewerkt.',
+    very_stale:   'De agenda kon niet worden bijgewerkt.',
   };
   const statusText = AGENDA_TEXT[reason];
+  const isFailure = reason === 'run_failed' || reason === 'very_stale';
 
+  const sourceLine = source?.label
+    ? `<p class="beheer-card-line beheer-card-line--muted">Bron: ${escapeHtml(source.label)}</p>` : '';
+  const lastSuccessLine = lastSyncedAt
+    ? `<p class="beheer-card-line beheer-card-line--muted">${isFailure ? 'Laatst betrouwbare gegevens' : 'Laatst succesvol bijgewerkt'}: ${escapeHtml(formatDayHeader(lastSyncedAt))} om ${escapeHtml(formatTime(lastSyncedAt))}</p>`
+    : '';
+  const lastAttemptLine = run?.started_at
+    ? `<p class="beheer-card-line beheer-card-line--muted">Laatste synchronisatiepoging: ${escapeHtml(formatDayHeader(run.started_at))} om ${escapeHtml(formatTime(run.started_at))}</p>`
+    : '';
+  const nextSyncLine = lastSyncedAt
+    ? `<p class="beheer-card-line beheer-card-line--muted">Volgende automatische synchronisatie rond ${escapeHtml(formatTime(new Date(new Date(lastSyncedAt).getTime() + AUTO_SYNC_INTERVAL_MS)))}</p>`
+    : '';
+  const errorLine = (run?.calendar_status === 'failed' && run?.error_stage)
+    ? `<p class="beheer-card-line beheer-card-line--muted">Foutmelding: ${escapeHtml(run.error_stage)}</p>` : '';
   const countsLine = run ? countsLineHtml(run) : '';
 
   el.innerHTML = `
-    <h3 class="beheer-card-title">Agenda &amp; synchronisatie</h3>
-    ${healthBadge(level, level === 'neutral' ? 'Geen gegevens' : level === 'green' ? 'In orde' : level === 'amber' ? 'Controleren' : 'Aandacht nodig')}
+    <h3 class="beheer-card-title">Agenda-synchronisatie</h3>
+    ${healthBadge(level, LEVEL_LABEL[level] ?? level)}
     <p class="beheer-card-line">${escapeHtml(statusText)}</p>
+    ${sourceLine}
+    ${lastSuccessLine}
+    ${lastAttemptLine}
+    ${reason !== 'running' ? nextSyncLine : ''}
+    ${errorLine}
     ${countsLine}
+    <div class="sync-actions">
+      <button type="button" class="btn-primary" id="sync-trigger-btn">Agenda nu bijwerken</button>
+      <p class="sync-trigger-help">Haalt de nieuwste afspraken op uit de gekoppelde kalender. De automatische synchronisatie blijft actief.</p>
+      <p class="sync-trigger-status" id="sync-trigger-status" hidden></p>
+    </div>
   `;
+
+  wireSyncTrigger(el, familyId, { alreadyRunning: reason === 'running' });
 }
 
 function countsLineHtml(run) {
@@ -156,6 +207,124 @@ function countsLineHtml(run) {
   if (run.events_updated)   parts.push(`${run.events_updated} gewijzigd`);
   if (run.events_cancelled) parts.push(`${run.events_cancelled} geannuleerd`);
   return `<p class="beheer-card-line beheer-card-line--muted">${escapeHtml(parts.join(' · '))}</p>`;
+}
+
+// ─── Owner-only manual sync trigger ────────────────────────────────────────
+
+function wireSyncTrigger(el, familyId, { alreadyRunning }) {
+  const btn    = el.querySelector('#sync-trigger-btn');
+  const status = el.querySelector('#sync-trigger-status');
+
+  function showStatus(text) {
+    status.textContent = text;
+    status.hidden = false;
+  }
+
+  if (alreadyRunning) {
+    btn.disabled = true;
+    btn.textContent = 'Bezig met bijwerken…';
+    pollForCompletion(el, familyId, new Date());
+    return;
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Bezig met bijwerken…';
+    status.hidden = true;
+
+    const requestedAt = new Date();
+    let result;
+    try {
+      result = await triggerManualSync(familyId);
+    } catch (err) {
+      console.error('[ma/beheer] Manual sync trigger failed:', err);
+      btn.disabled = false;
+      btn.textContent = 'Agenda nu bijwerken';
+      showStatus('Kon niet bijwerken. Probeer het opnieuw.');
+      return;
+    }
+
+    if (result.status === 'cooldown') {
+      showStatus('Net bijgewerkt.');
+      startCooldownCountdown(btn, result.retryAfterSeconds || 60);
+      return;
+    }
+
+    if (result.status === 'already_running' || result.status === 'queued') {
+      showStatus('Bezig met bijwerken…');
+      pollForCompletion(el, familyId, requestedAt);
+      return;
+    }
+  });
+}
+
+function startCooldownCountdown(btn, seconds) {
+  let remaining = seconds;
+  btn.textContent = `Opnieuw over ${remaining}s`;
+  const timer = setInterval(() => {
+    if (!btn.isConnected) { clearInterval(timer); return; }
+    remaining -= 1;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = 'Agenda nu bijwerken';
+    } else {
+      btn.textContent = `Opnieuw over ${remaining}s`;
+    }
+  }, SYNC_COOLDOWN_TICK_MS);
+}
+
+/**
+ * Polls the family's latest integration run until one that started at/after
+ * `requestedAt` finishes, or SYNC_POLL_TIMEOUT_MS elapses. Re-renders the
+ * whole card on completion so status/badge/counts/next-sync all update
+ * without a full page refresh. Never throws — a poll failure just stops
+ * polling silently (the card still updates next time Beheer loads).
+ */
+function pollForCompletion(el, familyId, requestedAt) {
+  const deadline = Date.now() + SYNC_POLL_TIMEOUT_MS;
+  const status = el.querySelector('#sync-trigger-status');
+
+  async function tick() {
+    if (!el.isConnected) return; // view was left — stop polling
+    if (Date.now() > deadline) {
+      if (status) { status.textContent = 'Verzoek verzonden. Dit kan een paar minuten duren.'; status.hidden = false; }
+      const btn = el.querySelector('#sync-trigger-btn');
+      if (btn) { btn.disabled = false; btn.textContent = 'Agenda nu bijwerken'; }
+      return;
+    }
+
+    let run = null;
+    try {
+      run = await fetchLatestIntegrationRun(familyId);
+    } catch (err) {
+      console.error('[ma/beheer] Poll for sync completion failed:', err);
+      return;
+    }
+
+    const startedAfterRequest = run?.started_at && new Date(run.started_at) >= requestedAt;
+    if (startedAfterRequest && run.finished_at) {
+      const total = (run.events_created || 0) + (run.events_updated || 0) + (run.events_cancelled || 0);
+      const summary = total === 0
+        ? 'Agenda is al actueel.'
+        : `Agenda bijgewerkt: ${[
+            run.events_updated ? `${run.events_updated} gewijzigd` : null,
+            run.events_created ? `${run.events_created} toegevoegd` : null,
+            run.events_cancelled ? `${run.events_cancelled} geannuleerd` : null,
+          ].filter(Boolean).join(', ')}.`;
+
+      let source = null;
+      try { source = await fetchCalendarSourceAdminStatus(familyId); } catch { /* card still renders without it */ }
+      renderAgendaCard(el, familyId, run, source);
+      const freshStatus = el.querySelector('#sync-trigger-status');
+      if (freshStatus) { freshStatus.textContent = summary; freshStatus.hidden = false; }
+      return;
+    }
+
+    setTimeout(tick, SYNC_POLL_INTERVAL_MS);
+  }
+
+  setTimeout(tick, SYNC_POLL_INTERVAL_MS);
 }
 
 // ─── Card: Briefings ───────────────────────────────────────────────────────────
@@ -286,6 +455,27 @@ function mountDevicesSummary(el, devices) {
     <button class="btn-primary" id="devices-summary-link">Apparaten beheren</button>
   `;
   el.querySelector('#devices-summary-link').addEventListener('click', () => navigate('devices'));
+}
+
+// ─── Prullenbak (Logboek trash) ─────────────────────────────────────────────────
+
+async function mountPrullenbakSummary(el, familyId) {
+  let count = 0;
+  try {
+    count = await fetchTrashedLogboekCount(familyId);
+  } catch (err) {
+    console.error('[ma/beheer] Failed to load trash count:', err);
+    el.innerHTML = '<p class="empty-state">Kon dit niet laden.</p>';
+    return;
+  }
+
+  el.innerHTML = `
+    <p class="beheer-card-line">
+      ${count === 0 ? 'De prullenbak is leeg.' : `${count} verwijderde ${count === 1 ? 'logboekregel' : 'logboekregels'}.`}
+    </p>
+    <button class="btn-primary" id="prullenbak-summary-link">Prullenbak beheren</button>
+  `;
+  el.querySelector('#prullenbak-summary-link').addEventListener('click', () => navigate('prullenbak'));
 }
 
 // ─── Recente activiteit ────────────────────────────────────────────────────────

@@ -21,14 +21,24 @@ import { kindLabel, kindIcon, AUDIENCE_LABELS } from '../lib/logboek-types.js';
  * @param {object}  entry           — row from ma_posts with nested profile + attachments
  * @param {object}  [opts]
  * @param {boolean} [opts.showAudienceBadge=true] — care-team viewers already know it's care_team
+ * @param {string|null} [opts.currentUserId] — signed-in user, to decide "Bewerken" (author-only)
+ * @param {boolean} [opts.isOwner=false]     — family owner may "Verwijderen" any entry, not just their own
+ * @param {(entry: object) => void} [opts.onEdit]
+ * @param {(entry: object) => void} [opts.onDelete]
  * @returns {HTMLElement}
  */
-export function renderLogboekEntry(entry, { showAudienceBadge = true } = {}) {
+export function renderLogboekEntry(entry, {
+  showAudienceBadge = true, currentUserId = null, isOwner = false, onEdit, onDelete,
+} = {}) {
   const profile     = entry.ma_profiles ?? {};
   const attachments = entry.ma_attachments ?? [];
   const images      = attachments.filter(a => a.mime_type?.startsWith('image/'));
   const documents    = attachments.filter(a => !a.mime_type?.startsWith('image/'));
   const tags        = entry.tags ?? [];
+
+  const isAuthor  = Boolean(currentUserId) && entry.author_id === currentUserId;
+  const canEdit   = isAuthor && typeof onEdit === 'function';
+  const canDelete = (isAuthor || isOwner) && typeof onDelete === 'function';
 
   const entryDateLabel = entry.event_date
     ? formatDateKeyHeader(entry.event_date)
@@ -36,6 +46,7 @@ export function renderLogboekEntry(entry, { showAudienceBadge = true } = {}) {
 
   const card = document.createElement('article');
   card.className = 'entry-card';
+  card.dataset.entryId = entry.id;
 
   card.innerHTML = `
     <div class="entry-header">
@@ -48,6 +59,21 @@ export function renderLogboekEntry(entry, { showAudienceBadge = true } = {}) {
         <span class="post-time">${escapeHtml(entryDateLabel)} · ${formatRelativeNl(entry.created_at)}</span>
       </div>
       <span class="entry-type-badge">${kindIcon(entry.kind)}${escapeHtml(kindLabel(entry.kind))}</span>
+      ${(canEdit || canDelete) ? `
+        <div class="entry-menu">
+          <button type="button" class="entry-menu-btn" aria-label="Meer opties" aria-haspopup="menu" aria-expanded="false">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="10" cy="4"  r="1.6" fill="currentColor"/>
+              <circle cx="10" cy="10" r="1.6" fill="currentColor"/>
+              <circle cx="10" cy="16" r="1.6" fill="currentColor"/>
+            </svg>
+          </button>
+          <div class="entry-menu-dropdown" role="menu" hidden>
+            ${canEdit   ? '<button type="button" class="entry-menu-item" role="menuitem" data-action="edit">Bewerken</button>' : ''}
+            ${canDelete ? '<button type="button" class="entry-menu-item entry-menu-item--danger" role="menuitem" data-action="delete">Verwijderen</button>' : ''}
+          </div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="entry-badges">
@@ -87,7 +113,46 @@ export function renderLogboekEntry(entry, { showAudienceBadge = true } = {}) {
   const commentsEl = card.querySelector(`#post-comments-${entry.id}`);
   renderLogboekComments(commentsEl, entry.id);
 
+  if (canEdit || canDelete) wireEntryMenu(card, entry, { onEdit, onDelete });
+
   return card;
+}
+
+/** Wires the compact "⋯" overflow menu: open/close, outside click, Escape, actions. */
+function wireEntryMenu(card, entry, { onEdit, onDelete }) {
+  const menuBtn  = card.querySelector('.entry-menu-btn');
+  const dropdown = card.querySelector('.entry-menu-dropdown');
+
+  function closeMenu() {
+    dropdown.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
+  function openMenu() {
+    dropdown.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+    dropdown.querySelector('.entry-menu-item')?.focus();
+  }
+
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.hidden ? openMenu() : closeMenu();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!card.contains(e.target)) closeMenu();
+  });
+  dropdown.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeMenu(); menuBtn.focus(); }
+  });
+
+  dropdown.querySelector('[data-action="edit"]')?.addEventListener('click', () => {
+    closeMenu();
+    onEdit(entry);
+  });
+  dropdown.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
+    closeMenu();
+    onDelete(entry);
+  });
 }
 
 function mountPhoto(container, attachment) {

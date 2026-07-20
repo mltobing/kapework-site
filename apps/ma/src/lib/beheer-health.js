@@ -15,7 +15,7 @@ const HOUR_MS = 3600_000;
 
 /**
  * Agenda & synchronisatie card.
- * @param {{ calendar_status?: string }|null} run — latest ma_integration_runs row
+ * @param {{ calendar_status?: string, status?: string, finished_at?: string|null }|null} run — latest ma_integration_runs row
  * @param {{ last_synced_at?: string }|null} source — fetchCalendarSourceAdminStatus()
  * @param {Date} [now]
  * @returns {{ level: 'neutral'|'green'|'amber'|'red', reason: string }}
@@ -23,8 +23,13 @@ const HOUR_MS = 3600_000;
 export function computeAgendaHealth(run, source, now = new Date()) {
   const lastSyncedAt = source?.last_synced_at ?? null;
   const runFailed = run?.calendar_status === 'failed';
+  const isRunning = run?.status === 'running' && !run?.finished_at;
   const ageMs = lastSyncedAt ? now.getTime() - new Date(lastSyncedAt).getTime() : null;
 
+  // A run in progress (scheduled or manual) is the most relevant thing to show
+  // right now, regardless of how stale the last successful sync looks —
+  // that's exactly the situation a running sync is about to resolve.
+  if (isRunning) return { level: 'neutral', reason: 'running' };
   if (!run && !lastSyncedAt) return { level: 'neutral', reason: 'no_data' };
   // Source says recently synced, but the latest run reports failure — the two
   // disagree, so say so rather than guess which one is right.

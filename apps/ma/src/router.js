@@ -11,7 +11,7 @@
 // redirects it to 'beheer' (owner) or 'today' (everyone else) rather than
 // mounting a view for it; kept recognized here so currentRoute() doesn't
 // collapse it to 'today' before that redirect logic ever sees it.
-const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'beheer', 'people', 'compose', 'devices']);
+const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'beheer', 'people', 'compose', 'devices', 'prullenbak', 'uitleg']);
 
 const _listeners = new Set();
 
