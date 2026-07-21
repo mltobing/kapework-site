@@ -123,6 +123,118 @@ test('manual_sync_requested is a fixed sentence and carries no metadata', () => 
   assert.deepEqual(METADATA_ALLOWLIST.manual_sync_requested, []);
 });
 
+// ─── calendar_changed / briefings_generated / ride_notices_changed / pipeline_attention ──
+
+test('calendar_changed allowlist is exactly created/updated/cancelled', () => {
+  assert.deepEqual(METADATA_ALLOWLIST.calendar_changed, ['created', 'updated', 'cancelled']);
+});
+
+test('calendar_changed builds a natural Dutch sentence with only non-zero parts, correct singular/plural', () => {
+  assert.equal(
+    activitySentence(event({ action: 'calendar_changed', metadata: { created: 1, updated: 2, cancelled: 1 } })),
+    'Heeft de agenda bijgewerkt: 1 afspraak toegevoegd, 2 afspraken gewijzigd en 1 afspraak geannuleerd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_changed', metadata: { created: 1, updated: 0, cancelled: 0 } })),
+    'Heeft de agenda bijgewerkt: 1 afspraak toegevoegd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_changed', metadata: { created: 2, updated: 3, cancelled: 0 } })),
+    'Heeft de agenda bijgewerkt: 2 afspraken toegevoegd en 3 afspraken gewijzigd.',
+  );
+});
+
+test('calendar_changed with every count zero falls back to a calm "checked, nothing changed" sentence', () => {
+  assert.equal(
+    activitySentence(event({ action: 'calendar_changed', metadata: { created: 0, updated: 0, cancelled: 0 } })),
+    'Heeft de agenda gecontroleerd; geen wijzigingen gevonden.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_changed', metadata: {} })),
+    'Heeft de agenda gecontroleerd; geen wijzigingen gevonden.',
+  );
+});
+
+test('briefings_generated: singular, plural, and zero/malformed fallback', () => {
+  assert.equal(
+    activitySentence(event({ action: 'briefings_generated', metadata: { updated: 1 } })),
+    'Heeft 1 briefing bijgewerkt.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'briefings_generated', metadata: { updated: 3 } })),
+    'Heeft 3 briefings bijgewerkt.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'briefings_generated', metadata: { updated: 0 } })),
+    'Heeft de briefings gecontroleerd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'briefings_generated', metadata: {} })),
+    'Heeft de briefings gecontroleerd.',
+  );
+});
+
+test('ride_notices_changed builds a natural Dutch sentence with only non-zero parts, correct singular/plural', () => {
+  assert.equal(
+    activitySentence(event({ action: 'ride_notices_changed', metadata: { written: 1, superseded: 2, auto_resolved: 1 } })),
+    'Heeft AutoMaatje bijgewerkt: 1 melding toegevoegd, 2 meldingen vervangen en 1 melding automatisch opgelost.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'ride_notices_changed', metadata: { written: 1 } })),
+    'Heeft AutoMaatje bijgewerkt: 1 melding toegevoegd.',
+  );
+});
+
+test('ride_notices_changed with every count zero falls back to a calm "checked" sentence', () => {
+  assert.equal(
+    activitySentence(event({ action: 'ride_notices_changed', metadata: {} })),
+    'Heeft AutoMaatje gecontroleerd.',
+  );
+});
+
+test('pipeline_attention maps every required status/error_stage combination to safe Dutch copy, never the raw stage', () => {
+  assert.equal(
+    activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'partial', error_stage: 'notices' } })),
+    'De agenda en briefings zijn bijgewerkt, maar de AutoMaatje-controle vraagt aandacht.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'partial', error_stage: 'something_unrecognised' } })),
+    'De synchronisatie is gedeeltelijk voltooid en vraagt aandacht.',
+  );
+  for (const stage of ['fetch', 'mirror', 'touch_source']) {
+    assert.equal(
+      activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'failed', error_stage: stage } })),
+      'De agenda-synchronisatie is mislukt.',
+    );
+  }
+  for (const stage of ['load_briefings', 'briefings']) {
+    assert.equal(
+      activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'failed', error_stage: stage } })),
+      'De briefing-synchronisatie is mislukt.',
+    );
+  }
+  assert.equal(
+    activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'failed', error_stage: 'notices' } })),
+    'De AutoMaatje-controle is mislukt.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'failed', error_stage: 'something_unrecognised' } })),
+    'De synchronisatie is mislukt.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'pipeline_attention', metadata: { status: 'unknown_status' } })),
+    'De synchronisatie is mislukt.',
+  );
+});
+
+test('pipeline_attention never renders the raw error_stage value in its output', () => {
+  const s = activitySentence(event({
+    action: 'pipeline_attention',
+    metadata: { status: 'partial', error_stage: 'some_raw_internal_stage_name' },
+  }));
+  assert.ok(!s.includes('some_raw_internal_stage_name'));
+});
+
 test('membership_role_changed distinguishes promotion to owner from any other role change', () => {
   assert.equal(
     activitySentence(event({ action: 'membership_role_changed', metadata: { from_role: 'member', to_role: 'owner' } })),
@@ -160,6 +272,7 @@ test('every action with a sentence builder is documented in METADATA_ALLOWLIST',
     'briefing_marked_sent', 'briefing_reopened', 'ride_notice_dismissed',
     'caregiver_access_granted', 'caregiver_access_revoked', 'membership_role_changed',
     'trusted_device_activated', 'trusted_device_revoked', 'manual_sync_requested',
+    'calendar_changed', 'briefings_generated', 'ride_notices_changed', 'pipeline_attention',
   ];
   for (const action of knownActions) {
     assert.ok(Object.prototype.hasOwnProperty.call(METADATA_ALLOWLIST, action), `missing allowlist entry for ${action}`);

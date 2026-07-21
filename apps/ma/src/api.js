@@ -469,7 +469,8 @@ export async function fetchCalendarLastSyncedAt(familyId) {
     .from('ma_calendar_sources')
     .select('last_synced_at')
     .eq('family_id', familyId)
-    .order('last_synced_at', { ascending: false })
+    .not('last_synced_at', 'is', null)
+    .order('last_synced_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -620,6 +621,29 @@ export async function fetchLatestIntegrationRun(familyId) {
 }
 
 /**
+ * Most recent private irma-sync run of one specific trigger type ('schedule'
+ * or 'manual') for this family — lets Beheer show the latest automatic run
+ * and the latest manual run as two separate, persistent lines instead of one
+ * ambiguous "last attempt" (see views/beheer.js). Returns null if that
+ * trigger type has never run yet for this family.
+ */
+export async function fetchLatestIntegrationRunByTrigger(familyId, triggerSource) {
+  if (triggerSource !== 'schedule' && triggerSource !== 'manual') {
+    throw new Error(`fetchLatestIntegrationRunByTrigger: triggerSource must be 'schedule' or 'manual', got ${JSON.stringify(triggerSource)}`);
+  }
+  const { data, error } = await supabase
+    .from('ma_integration_runs')
+    .select(INTEGRATION_RUN_COLUMNS)
+    .eq('family_id', familyId)
+    .eq('trigger_source', triggerSource)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * One exact integration run by id — used once a manual sync request's
  * `run_id` is known, so Beheer can poll the precise run it caused instead of
  * inferring it from "whatever's newest" (see fetchSyncRequestStatus below and
@@ -663,7 +687,8 @@ export async function fetchCalendarSourceAdminStatus(familyId) {
     .from('ma_calendar_sources')
     .select('label, last_synced_at')
     .eq('family_id', familyId)
-    .order('last_synced_at', { ascending: false })
+    .not('last_synced_at', 'is', null)
+    .order('last_synced_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;

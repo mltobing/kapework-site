@@ -13,9 +13,9 @@
  */
 
 import {
-  fetchLatestIntegrationRun, fetchCalendarSourceAdminStatus, fetchTomorrowBriefingAdminStatus,
-  fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster, fetchTrashedLogboekCount,
-  fetchSyncRequestStatus, fetchIntegrationRunById,
+  fetchLatestIntegrationRun, fetchLatestIntegrationRunByTrigger, fetchCalendarSourceAdminStatus,
+  fetchTomorrowBriefingAdminStatus, fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster,
+  fetchTrashedLogboekCount, fetchSyncRequestStatus, fetchIntegrationRunById,
 } from '../api.js';
 import { listDevices } from '../lib/devices-api.js';
 import { triggerManualSync } from '../lib/sync-api.js';
@@ -24,7 +24,9 @@ import { formatDayHeader, formatTime, formatRelativeNl } from '../lib/datetime.j
 import {
   actorLabel, activitySentence, activityIcon, activityBucket, buildRosterLookup,
 } from '../lib/admin-activity.js';
-import { computeAgendaHealth, computeBriefingHealth, computeNoticesHealth } from '../lib/beheer-health.js';
+import {
+  computeAgendaHealth, computeBriefingHealth, computeNoticesHealth, agendaFreshnessAt,
+} from '../lib/beheer-health.js';
 import { navigate } from '../router.js';
 
 const ACTIVITY_PAGE_SIZE = 30;
@@ -139,22 +141,41 @@ async function mountAgendaCard(el, familyId) {
 async function refreshAgendaCard(el, familyId) {
   let run = null;
   let source = null;
+  let scheduledRun = null;
+  let manualRun = null;
   try {
-    [run, source] = await Promise.all([
+    [run, source, scheduledRun, manualRun] = await Promise.all([
       fetchLatestIntegrationRun(familyId),
       fetchCalendarSourceAdminStatus(familyId),
+      fetchLatestIntegrationRunByTrigger(familyId, 'schedule'),
+      fetchLatestIntegrationRunByTrigger(familyId, 'manual'),
     ]);
   } catch (err) {
     console.error('[ma/beheer] Agenda card failed:', err);
     el.innerHTML = '<h3 class="beheer-card-title">Agenda-synchronisatie</h3><p class="empty-state">Kon dit niet laden.</p>';
     return;
   }
-  renderAgendaCard(el, familyId, run, source);
+  renderAgendaCard(el, familyId, { run, source, scheduledRun, manualRun });
 }
 
-function renderAgendaCard(el, familyId, run, source) {
-  const lastSyncedAt = source?.last_synced_at ?? null;
+/** Dutch label for a run's outcome — 'bezig' only while genuinely unfinished. */
+function runStatusLabel(run) {
+  if (run.status === 'running' && !run.finished_at) return 'bezig';
+  if (run.status === 'success') return 'geslaagd';
+  if (run.status === 'partial') return 'gedeeltelijk geslaagd';
+  if (run.status === 'failed') return 'mislukt';
+  return 'onbekend';
+}
+
+/** One persistent "latest <trigger type> sync" line, or '' when it has never run. */
+function runLineHtml(label, run) {
+  if (!run?.started_at) return '';
+  return `<p class="beheer-card-line beheer-card-line--muted">${escapeHtml(label)}: ${escapeHtml(formatDayHeader(run.started_at))} om ${escapeHtml(formatTime(run.started_at))} · ${escapeHtml(runStatusLabel(run))}</p>`;
+}
+
+function renderAgendaCard(el, familyId, { run, source, scheduledRun, manualRun }) {
   const { level, reason } = computeAgendaHealth(run, source);
+  const freshnessAt = agendaFreshnessAt(run, source);
 
   const LEVEL_LABEL = { neutral: reason === 'running' ? 'Bezig' : 'Geen gegevens', green: 'In orde', amber: 'Controleren', red: 'Aandacht nodig' };
   const AGENDA_TEXT = {
@@ -171,14 +192,13 @@ function renderAgendaCard(el, familyId, run, source) {
 
   const sourceLine = source?.label
     ? `<p class="beheer-card-line beheer-card-line--muted">Bron: ${escapeHtml(source.label)}</p>` : '';
-  const lastSuccessLine = lastSyncedAt
-    ? `<p class="beheer-card-line beheer-card-line--muted">${isFailure ? 'Laatst betrouwbare gegevens' : 'Laatst succesvol bijgewerkt'}: ${escapeHtml(formatDayHeader(lastSyncedAt))} om ${escapeHtml(formatTime(lastSyncedAt))}</p>`
+  const lastSuccessLine = freshnessAt
+    ? `<p class="beheer-card-line beheer-card-line--muted">${isFailure ? 'Laatst betrouwbare gegevens' : 'Laatst succesvol bijgewerkt'}: ${escapeHtml(formatDayHeader(freshnessAt))} om ${escapeHtml(formatTime(freshnessAt))}</p>`
     : '';
-  const lastAttemptLine = run?.started_at
-    ? `<p class="beheer-card-line beheer-card-line--muted">Laatste synchronisatiepoging: ${escapeHtml(formatDayHeader(run.started_at))} om ${escapeHtml(formatTime(run.started_at))}${run.trigger_source === 'manual' ? ' (handmatig gestart)' : ''}</p>`
-    : '';
-  const nextSyncLine = lastSyncedAt
-    ? `<p class="beheer-card-line beheer-card-line--muted">Volgende automatische synchronisatie rond ${escapeHtml(formatTime(new Date(new Date(lastSyncedAt).getTime() + AUTO_SYNC_INTERVAL_MS)))}</p>`
+  const autoRunLine = runLineHtml('Laatste automatische synchronisatie', scheduledRun);
+  const manualRunLine = runLineHtml('Laatste handmatige synchronisatie', manualRun);
+  const nextSyncLine = scheduledRun?.started_at
+    ? `<p class="beheer-card-line beheer-card-line--muted">Volgende automatische synchronisatie gepland rond ${escapeHtml(formatTime(new Date(new Date(scheduledRun.started_at).getTime() + AUTO_SYNC_INTERVAL_MS)))}</p>`
     : '';
   const errorLine = (run?.calendar_status === 'failed' && run?.error_stage)
     ? `<p class="beheer-card-line beheer-card-line--muted">Foutmelding: ${escapeHtml(run.error_stage)}</p>` : '';
@@ -190,7 +210,8 @@ function renderAgendaCard(el, familyId, run, source) {
     <p class="beheer-card-line">${escapeHtml(statusText)}</p>
     ${sourceLine}
     ${lastSuccessLine}
-    ${lastAttemptLine}
+    ${autoRunLine}
+    ${manualRunLine}
     ${reason !== 'running' ? nextSyncLine : ''}
     ${errorLine}
     ${countsLine}
@@ -311,9 +332,15 @@ function summaryForRun(run) {
 /** Re-renders the whole Agenda card with a finished run's real outcome. */
 async function finishSyncCard(el, familyId, run) {
   const summary = summaryForRun(run);
-  let source = null;
-  try { source = await fetchCalendarSourceAdminStatus(familyId); } catch { /* card still renders without it */ }
-  renderAgendaCard(el, familyId, run, source);
+  const [sourceResult, scheduledResult, manualResult] = await Promise.allSettled([
+    fetchCalendarSourceAdminStatus(familyId),
+    fetchLatestIntegrationRunByTrigger(familyId, 'schedule'),
+    fetchLatestIntegrationRunByTrigger(familyId, 'manual'),
+  ]);
+  const source       = sourceResult.status === 'fulfilled' ? sourceResult.value : null;
+  const scheduledRun = scheduledResult.status === 'fulfilled' ? scheduledResult.value : null;
+  const manualRun    = manualResult.status === 'fulfilled' ? manualResult.value : null;
+  renderAgendaCard(el, familyId, { run, source, scheduledRun, manualRun });
   const freshStatus = el.querySelector('#sync-trigger-status');
   if (freshStatus) { freshStatus.textContent = summary; freshStatus.hidden = false; }
 }

@@ -785,7 +785,31 @@ device's local time):
 
 `ma_integration_runs` is written only by the private irma-sync job (out of
 scope for this repo) — this dashboard only ever reads it, and (see below)
-can only ever *ask* that job to run sooner, never invoke it directly.
+can only ever *ask* that job to run sooner, never invoke it directly. It is
+the pipeline's **heartbeat**: every scheduled or manual run writes a row here
+regardless of whether anything actually changed, which is what lets
+Systeemstatus stay accurate even on a quiet run that produces no activity
+item (see "Recente activiteit" below).
+
+**Freshness fallback.** The Agenda card's "Laatst succesvol bijgewerkt" line
+normally uses `ma_calendar_sources.last_synced_at` — the source timestamp is
+authoritative whenever it exists. If that timestamp is unexpectedly
+unavailable (e.g. a family has more than one `ma_calendar_sources` row and
+the current one hasn't recorded a sync time), `agendaFreshnessAt()` in
+`beheer-health.js` falls back to the latest run's own `finished_at`, but only
+when that run's `calendar_status = 'success'` — a fallback that could never
+mask a `failed` calendar stage. Source-selection queries (`fetchCalendarLastSyncedAt()`,
+`fetchCalendarSourceAdminStatus()` in `api.js`) are also null-safe: a source
+row with no `last_synced_at` yet is never picked over one that has actually
+synced.
+
+**Automatic vs. manual runs.** The card shows the latest **automatic**
+(`trigger_source = 'schedule'`) and latest **manual** (`trigger_source =
+'manual'`) run as two separate, persistent lines (`fetchLatestIntegrationRunByTrigger()`
+in `api.js`), each hidden until that trigger type has run at least once. This
+replaces one ambiguous "last synchronisation attempt" line that didn't say
+whether the most recent attempt was the automatic cycle or an owner-pressed
+manual refresh.
 
 **Legacy note:** an older `ma_calendar_sync_runs` table predates
 `ma_integration_runs` and is untouched by migration 007 — confirmed **empty**
@@ -921,6 +945,26 @@ reporting is never duplicated):
 `trusted_device_activated`/`trusted_device_revoked` come from the Netlify
 Functions directly (`recordActivity()` in `_ma-activity.js`), not a DB
 trigger, since those tables are default-deny to every browser role.
+
+**The private irma-sync job's own activity rows.** Four further actions —
+`calendar_changed`, `briefings_generated`, `ride_notices_changed`, and
+`pipeline_attention` — are written by the private irma-sync job itself
+(service role) when a run actually changes something or needs attention.
+`admin-activity.js` renders each with a specific Dutch sentence built only
+from its allowlisted counts/status (e.g. "Heeft de agenda bijgewerkt: 1
+afspraak toegevoegd, 2 afspraken gewijzigd en 1 afspraak geannuleerd.")
+instead of the generic "Er is een systeemactie geregistreerd." fallback.
+`pipeline_attention`'s `error_stage` is never rendered raw — it is mapped to
+a small set of calm, non-technical Dutch sentences.
+
+**Quiet runs stay quiet, by design.** A scheduled run that completes
+successfully with nothing to report does **not** write a row here — the
+activity feed is not a heartbeat, `ma_integration_runs` is (see
+"Systeemstatus" above). This means Beheer can correctly show a healthy,
+recent automatic run in Systeemstatus with no corresponding new item in
+Recente activiteit, and that is the expected, quiet-success case — not a
+gap. The sync schedule itself remains every three hours; nothing here
+implies every run produces an activity item.
 
 **Follow-up note:** `membership_role_changed` is a known action label
 (`admin-activity.js` already renders it, and it was used for the one-time,

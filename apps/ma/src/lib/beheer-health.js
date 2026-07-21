@@ -14,6 +14,23 @@ import { amsMinutesOfDay } from './datetime.js';
 const HOUR_MS = 3600_000;
 
 /**
+ * The instant the agenda was last known-good, for freshness/age purposes.
+ * The calendar-source timestamp is authoritative whenever it exists; a
+ * successful finished run is only a defensive fallback for the case where
+ * the source row is unexpectedly missing/null (e.g. a null-timestamp source
+ * row happened to be selected) — it never overrides a present source
+ * timestamp, and a failed/unfinished run never produces a fallback value.
+ * @param {{ calendar_status?: string, finished_at?: string|null }|null} run
+ * @param {{ last_synced_at?: string }|null} source
+ * @returns {string|null}
+ */
+export function agendaFreshnessAt(run, source) {
+  if (source?.last_synced_at) return source.last_synced_at;
+  if (run?.calendar_status === 'success' && run?.finished_at) return run.finished_at;
+  return null;
+}
+
+/**
  * Agenda & synchronisatie card.
  * @param {{ calendar_status?: string, status?: string, finished_at?: string|null }|null} run — latest ma_integration_runs row
  * @param {{ last_synced_at?: string }|null} source — fetchCalendarSourceAdminStatus()
@@ -24,7 +41,8 @@ export function computeAgendaHealth(run, source, now = new Date()) {
   const lastSyncedAt = source?.last_synced_at ?? null;
   const runFailed = run?.calendar_status === 'failed';
   const isRunning = run?.status === 'running' && !run?.finished_at;
-  const ageMs = lastSyncedAt ? now.getTime() - new Date(lastSyncedAt).getTime() : null;
+  const freshnessAt = agendaFreshnessAt(run, source);
+  const ageMs = freshnessAt ? now.getTime() - new Date(freshnessAt).getTime() : null;
 
   // A run in progress (scheduled or manual) is the most relevant thing to show
   // right now, regardless of how stale the last successful sync looks —
