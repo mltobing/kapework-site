@@ -12,6 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  agendaFreshnessAt,
   computeAgendaHealth,
   computeBriefingHealth,
   computeNoticesHealth,
@@ -124,6 +125,96 @@ test('agenda: a finished run with status="running" left over (finished_at set) i
     NOW,
   );
   assert.deepEqual(h, { level: 'green', reason: 'fresh' });
+});
+
+// ─── agendaFreshnessAt ───────────────────────────────────────────────────────
+
+test('agendaFreshnessAt: source timestamp present → used regardless of run', () => {
+  assert.equal(
+    agendaFreshnessAt({ calendar_status: 'failed' }, { last_synced_at: hoursAgo(5) }),
+    hoursAgo(5),
+  );
+});
+
+test('agendaFreshnessAt: no source, successful finished run → falls back to run.finished_at', () => {
+  assert.equal(
+    agendaFreshnessAt({ calendar_status: 'success', finished_at: hoursAgo(1) }, null),
+    hoursAgo(1),
+  );
+});
+
+test('agendaFreshnessAt: no source, successful run not yet finished → null', () => {
+  assert.equal(
+    agendaFreshnessAt({ calendar_status: 'success', finished_at: null }, null),
+    null,
+  );
+});
+
+test('agendaFreshnessAt: no source, failed run → null (never masks a failure)', () => {
+  assert.equal(
+    agendaFreshnessAt({ calendar_status: 'failed', finished_at: hoursAgo(1) }, null),
+    null,
+  );
+});
+
+test('agendaFreshnessAt: no source and no run → null', () => {
+  assert.equal(agendaFreshnessAt(null, null), null);
+});
+
+// ─── computeAgendaHealth: successful-run freshness fallback ────────────────
+
+test('agenda: successful finished run, no source, finished 1 hour ago → green/fresh', () => {
+  const h = computeAgendaHealth(
+    { calendar_status: 'success', finished_at: hoursAgo(1) },
+    null,
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'green', reason: 'fresh' });
+});
+
+test('agenda: successful finished run, no source, finished 7 hours ago → amber/stale', () => {
+  const h = computeAgendaHealth(
+    { calendar_status: 'success', finished_at: hoursAgo(7) },
+    null,
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'amber', reason: 'stale' });
+});
+
+test('agenda: successful finished run, no source, finished more than 12 hours ago → red/very_stale', () => {
+  const h = computeAgendaHealth(
+    { calendar_status: 'success', finished_at: hoursAgo(13) },
+    null,
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'red', reason: 'very_stale' });
+});
+
+test('agenda: failed run, no source → still red/run_failed (fallback never masks a failure)', () => {
+  const h = computeAgendaHealth(
+    { calendar_status: 'failed', finished_at: hoursAgo(1) },
+    null,
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'red', reason: 'run_failed' });
+});
+
+test('agenda: source timestamp present and older than the run → source takes precedence', () => {
+  const h = computeAgendaHealth(
+    { calendar_status: 'success', finished_at: hoursAgo(1) },
+    { last_synced_at: hoursAgo(10) },
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'amber', reason: 'stale' });
+});
+
+test('agenda: a run in progress with no source → still neutral/running, unaffected by the freshness fallback', () => {
+  const h = computeAgendaHealth(
+    { status: 'running', finished_at: null, calendar_status: 'pending' },
+    null,
+    NOW,
+  );
+  assert.deepEqual(h, { level: 'neutral', reason: 'running' });
 });
 
 // ─── computeBriefingHealth ──────────────────────────────────────────────────

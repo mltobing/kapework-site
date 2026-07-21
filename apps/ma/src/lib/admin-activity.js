@@ -36,6 +36,10 @@ export const METADATA_ALLOWLIST = {
   trusted_device_activated: [],
   trusted_device_revoked:   [],
   manual_sync_requested:    [],
+  calendar_changed:         ['created', 'updated', 'cancelled'],
+  briefings_generated:      ['updated'],
+  ride_notices_changed:     ['written', 'superseded', 'auto_resolved'],
+  pipeline_attention:       ['status', 'error_stage'],
 };
 
 const MEDIA_TYPE_LABELS = { image: 'foto', document: 'document' };
@@ -43,6 +47,17 @@ const AUDIENCE_LABELS   = { family: 'alleen familie', care_team: 'familie en zor
 
 function mediaTypeLabel(m) { return MEDIA_TYPE_LABELS[m] ?? 'bestand'; }
 function audienceLabel(a)  { return AUDIENCE_LABELS[a] ?? a; }
+
+/**
+ * Natural Dutch joining of pre-built count phrases: one alone, two joined by
+ * "en", three or more comma-separated with a final "en" — e.g.
+ * "1 afspraak toegevoegd, 2 afspraken gewijzigd en 1 afspraak geannuleerd".
+ */
+function joinDutchParts(parts) {
+  if (parts.length <= 1) return parts.join('');
+  if (parts.length === 2) return `${parts[0]} en ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')} en ${parts[parts.length - 1]}`;
+}
 
 // ─── Sentence builders — one per known action ────────────────────────────────
 
@@ -74,6 +89,42 @@ const SENTENCE_BUILDERS = {
   trusted_device_activated: () => 'Heeft een vertrouwd apparaat gekoppeld.',
   trusted_device_revoked:   () => 'Heeft een vertrouwd apparaat ingetrokken.',
   manual_sync_requested:    () => 'Heeft een directe agenda-synchronisatie aangevraagd.',
+  calendar_changed: (m) => {
+    const parts = [];
+    if (m.created)   parts.push(`${m.created} ${m.created === 1 ? 'afspraak' : 'afspraken'} toegevoegd`);
+    if (m.updated)   parts.push(`${m.updated} ${m.updated === 1 ? 'afspraak' : 'afspraken'} gewijzigd`);
+    if (m.cancelled) parts.push(`${m.cancelled} ${m.cancelled === 1 ? 'afspraak' : 'afspraken'} geannuleerd`);
+    if (!parts.length) return 'Heeft de agenda gecontroleerd; geen wijzigingen gevonden.';
+    return `Heeft de agenda bijgewerkt: ${joinDutchParts(parts)}.`;
+  },
+  briefings_generated: (m) => {
+    const n = Number(m.updated) || 0;
+    if (n <= 0) return 'Heeft de briefings gecontroleerd.';
+    return n === 1 ? 'Heeft 1 briefing bijgewerkt.' : `Heeft ${n} briefings bijgewerkt.`;
+  },
+  ride_notices_changed: (m) => {
+    const parts = [];
+    if (m.written)       parts.push(`${m.written} ${m.written === 1 ? 'melding' : 'meldingen'} toegevoegd`);
+    if (m.superseded)    parts.push(`${m.superseded} ${m.superseded === 1 ? 'melding' : 'meldingen'} vervangen`);
+    if (m.auto_resolved) parts.push(`${m.auto_resolved} ${m.auto_resolved === 1 ? 'melding' : 'meldingen'} automatisch opgelost`);
+    if (!parts.length) return 'Heeft AutoMaatje gecontroleerd.';
+    return `Heeft AutoMaatje bijgewerkt: ${joinDutchParts(parts)}.`;
+  },
+  pipeline_attention: (m) => {
+    const stage = m.error_stage;
+    if (m.status === 'partial') {
+      return stage === 'notices'
+        ? 'De agenda en briefings zijn bijgewerkt, maar de AutoMaatje-controle vraagt aandacht.'
+        : 'De synchronisatie is gedeeltelijk voltooid en vraagt aandacht.';
+    }
+    if (m.status === 'failed') {
+      if (stage === 'fetch' || stage === 'mirror' || stage === 'touch_source') return 'De agenda-synchronisatie is mislukt.';
+      if (stage === 'load_briefings' || stage === 'briefings') return 'De briefing-synchronisatie is mislukt.';
+      if (stage === 'notices') return 'De AutoMaatje-controle is mislukt.';
+      return 'De synchronisatie is mislukt.';
+    }
+    return 'De synchronisatie is mislukt.';
+  },
 };
 
 const FALLBACK_SENTENCE = 'Er is een systeemactie geregistreerd.';
@@ -91,6 +142,10 @@ const ICON_CATEGORY = {
   membership_role_changed: 'membership',
   trusted_device_activated: 'device', trusted_device_revoked: 'device',
   manual_sync_requested: 'system',
+  calendar_changed: 'system',
+  briefings_generated: 'briefing',
+  ride_notices_changed: 'ride',
+  pipeline_attention: 'system',
 };
 
 function iconWrap(inner) {
