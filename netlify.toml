@@ -51,3 +51,41 @@
   from   = "https://www.kapework.com/*"
   to     = "/:splat"
   status = 200
+
+# ── Cache control: Ma's app shell and ES modules ──────────────────────────────
+# These paths are served at stable, unhashed filenames (no content-hash in
+# the URL, unlike a bundled build), so there is nothing to bust a stale cache
+# on deploy — a browser (or an installed PWA, which can cache far more
+# aggressively) can otherwise keep serving an old copy of api.js/index.html
+# indefinitely after a fix has shipped. `no-cache` still lets the browser
+# cache the response; it just forces a conditional revalidation (an
+# If-None-Match round-trip, normally answered 304) on every load, so a fixed
+# bug can never sit in a stale cache. Paths are matched post-rewrite — see
+# netlify/edge-functions/subdomain-router.ts, which rewrites
+# ma.kapework.com/* to /apps/ma/* before this applies. Private API responses
+# (Supabase, Netlify Functions) are unaffected — they're already no-store at
+# that layer, not cached static files.
+[[headers]]
+  for = "/apps/ma/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/apps/ma/src/*"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/apps/ma/styles.css"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/apps/ma/vandaag/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/shared/config.js"
+  [headers.values]
+    Cache-Control = "no-cache"
