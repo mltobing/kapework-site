@@ -55,6 +55,8 @@ apps/ma/
     router.js           Hash-based tab router (+ non-nav 'devices' route)
     api.js              All Supabase table queries
     storage.js          Photo upload + signed-URL helpers
+    document-storage.js Document Inbox source upload + signed-URL helpers (separate
+                         `ma-imports` bucket — see "Document Inbox" below)
     utils.js            escapeHtml, getInitial
 
     lib/
@@ -68,6 +70,12 @@ apps/ma/
                              "running" state for an in-progress sync (pure; unit-tested)
       presence-heartbeat.js Beheer: dependency-injected presence-touch scheduler (pure; unit-tested)
       sync-api.js            Client wrapper for the owner-only manual-sync-request Function
+      route-parse.js         Pure hash-fragment parsing for router.js (pure; unit-tested —
+                              router.js itself can't be imported outside a browser)
+      document-inbox.js      Document Inbox: controlled error copy, status labels, polling
+                              stop condition, candidate-form normalization, Logboek sort-option
+                              validation, provenance-line formatting (pure; unit-tested)
+      document-process-api.js Client wrapper for the owner-only Document Inbox start/retry Function
 
     views/
       today.js          Today tab: Nu card + today's events + urgent notices + Vanavond
@@ -89,6 +97,12 @@ apps/ma/
       compose.js        Logboek compose flow: type, title, body, date, photos/PDF,
                          tags, linked event (family only), visibility
       devices.js        Apparaten: set up / list / revoke trusted devices (owner only)
+      documenten.js     Document-inbox: owner-only list of Document Inbox imports —
+                         see "Document Inbox" below
+      document-verwerken.js  Owner-only "Nieuw document verwerken" — source capture,
+                         consent, upload, and start-processing flow
+      document-beoordelen.js Owner-only review/progress screen: polls while queued/
+                         processing, then candidate edit/reject/restore/approve
 
     components/
       topbar.js         Top app bar with a three-section menu — Ga naar (every
@@ -119,7 +133,10 @@ shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js` /
 device-activation/revocation endpoints). `ma-sync-trigger` (owner-only manual
 calendar refresh) lives alongside them and reuses the same `_ma-devices.js`
 `verifyOwner()`/`serviceClient()` helpers — see "Agenda-synchronisatie —
-manual refresh" below.
+manual refresh" below. The Document Inbox's server code (`ma-document-process`,
+`ma-document-process-background`, `_ma-document-ai.js`, `_ma-document-processing.js`)
+lives alongside them too, reusing the same `verifyOwner()`/`serviceClient()`
+helpers — see "Document Inbox" below.
 
 ---
 
@@ -152,6 +169,10 @@ Or run the Netlify CLI (`netlify dev`) with the env vars set in a local `.env` f
 | `SUPABASE_ANON_KEY`          | Yes      | client       | Supabase public anon key (browser-safe)                     |
 | `SUPABASE_SERVICE_ROLE_KEY`  | Yes      | **fn only**  | Service role; used by Netlify Functions. **Never** exposed to the browser. |
 | `MA_DEVICE_TOKEN_PEPPER`     | Yes      | **fn only**  | Random server-only secret; peppers device-token/code hashes. Set as a Netlify **secret**. |
+| `ANTHROPIC_API_KEY`          | Only for Document Inbox | **fn only** | Server-only Claude API key. The only mandatory variable for the Document Inbox feature — see "Document Inbox" below. Set as a Netlify **secret**. |
+| `MA_DOCUMENT_MODEL`          | No       | **fn only**  | Overrides the Document Inbox's Claude model. Defaults to `claude-sonnet-4-6`. |
+| `MA_DOCUMENT_MAX_INPUT_TOKENS`  | No    | **fn only**  | Document Inbox input-token ceiling. Defaults to `100000`. |
+| `MA_DOCUMENT_MAX_OUTPUT_TOKENS` | No    | **fn only**  | Document Inbox output-token ceiling (`max_tokens` on the Messages call). Defaults to `12000`. |
 | `GA_MEASUREMENT_ID`          | No       | client       | Google Analytics — used by other Kapework apps; **Ma deliberately never loads `/shared/analytics.js`, so this has no effect here** (see "Why no Google Analytics?" below) |
 
 Only the three `client`-scoped values are written into `/shared/config.js` by
@@ -409,6 +430,91 @@ ma_user_presence (
   updated_at   timestamptz not null default now(),
   primary key (family_id, user_id)
 )
+
+-- Document Inbox (see supabase-migrations/011_ma_document_inbox.sql and
+-- "Document Inbox" below for the full write-up). Owner-only, full stop.
+ma_document_imports (
+  id                    uuid primary key default gen_random_uuid(),
+  family_id             uuid not null references ma_families(id) on delete cascade,
+  created_by            uuid not null references ma_profiles(user_id),
+  audience              text not null default 'family',   -- 'family' | 'care_team' — owner-selected default
+  source_type           text not null,                     -- 'pasted_text' | 'pdf' | 'images'
+  source_label          text not null,
+  document_date         date,                               -- trusted date OF THE DOCUMENT, not the event
+  status                text not null default 'draft',      -- draft|uploaded|queued|processing|ready|
+                                                              -- completed|failed|duplicate|cancelled
+  source_hash           text,                                -- lowercase sha256 hex of the ordered source bundle
+  duplicate_of          uuid references ma_document_imports(id) on delete set null,
+  document_summary      text,
+  document_warnings     text[] not null default '{}',
+  model                 text,
+  prompt_version        text,
+  input_tokens          integer,
+  output_tokens         integer,
+  candidate_count       integer not null default 0,
+  error_code            text,                                -- controlled vocabulary only — see below
+  processing_started_at timestamptz,
+  processed_at          timestamptz,
+  completed_at          timestamptz,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+)
+
+-- One row per uploaded source object (metadata only — bytes live in Storage).
+ma_document_import_files (
+  id                uuid primary key default gen_random_uuid(),
+  import_id         uuid not null references ma_document_imports(id) on delete cascade,
+  family_id         uuid not null references ma_families(id) on delete cascade,
+  uploaded_by       uuid not null references ma_profiles(user_id),
+  sequence_no       smallint not null,       -- 1..6, defines source order (also the fingerprint order)
+  object_path       text not null unique,    -- <family_id>/<import_id>/<random_uuid>.<ext> in `ma-imports`
+  mime_type         text not null,
+  size_bytes        bigint not null,
+  original_filename text,                     -- never logged — see "AI safety rules" below
+  created_at        timestamptz not null default now(),
+  unique (import_id, sequence_no)
+)
+
+-- Claude's proposed draft Logboek entries — never visible outside the owner,
+-- never written to ma_posts except through ma_approve_document_candidates().
+ma_document_candidates (
+  id              uuid primary key default gen_random_uuid(),
+  import_id       uuid not null references ma_document_imports(id) on delete cascade,
+  family_id       uuid not null references ma_families(id) on delete cascade,
+  sequence_no     integer not null,
+  status          text not null default 'pending',    -- pending | rejected | approved
+  event_date      date,                                 -- null when date_basis = 'unclear'
+  date_basis      text not null,                        -- explicit | relative_resolved | unclear
+  date_confidence text not null,                        -- high | medium | low
+  kind            text not null,                        -- note | document | observation | event_report
+  title           text,
+  body            text not null,
+  audience        text not null,                        -- inherited from the import; owner may change pre-approval
+  tags            text[] not null default '{}',
+  source_locator  text,                                  -- e.g. "p. 2" / "Afbeelding 1" — read-only in the UI
+  source_excerpt  text,                                  -- short verbatim excerpt — read-only in the UI
+  warnings        text[] not null default '{}',
+  follow_up       text,                                  -- a suggested question, never an auto-executed action
+  post_id         uuid references ma_posts(id) on delete set null,   -- set only on approval
+  updated_by      uuid references ma_profiles(user_id),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
+  unique (import_id, sequence_no)
+)
+
+-- Provenance only — never the source, never the AI's raw response. One row
+-- per approved candidate, 1:1 with the ma_posts row it produced.
+ma_post_sources (
+  id             uuid primary key default gen_random_uuid(),
+  family_id      uuid not null references ma_families(id) on delete cascade,
+  post_id        uuid not null unique references ma_posts(id) on delete cascade,
+  import_id      uuid not null references ma_document_imports(id) on delete restrict,
+  candidate_id   uuid not null unique references ma_document_candidates(id) on delete restrict,
+  source_label   text not null,
+  source_locator text,
+  approved_by    uuid not null references ma_profiles(user_id),
+  approved_at    timestamptz not null default now()
+)
 ```
 
 ### RLS policies (minimum viable)
@@ -466,6 +572,18 @@ All tables should have RLS enabled.  At minimum:
   caregiver, or unrelated user gets an empty result, never an error and never
   another family's data — see the RLS matrix under "Beheer" below.
 - `ma_families`: read for members
+- `ma_document_imports`, `ma_document_import_files`, `ma_document_candidates`:
+  **owner-only**, full stop — no care-team policy, no member policy. Imports
+  support owner SELECT/INSERT/UPDATE (browser DELETE revoked for MVP); files
+  support owner SELECT, INSERT only while the parent import is still `draft`,
+  DELETE only while it's still recoverable (`draft`/`uploaded`/`failed`), no
+  UPDATE at all; candidates support owner SELECT only — every edit, reject,
+  restore, and approval goes through the two SECURITY DEFINER RPCs below, never
+  a raw `.update()`/`.insert()`. See "Document Inbox" below.
+- `ma_post_sources`: readable by whoever can already read the resulting
+  `ma_posts` row (family for a `family` post, active care-team for a
+  `care_team` post) — never broader than the post itself. No browser
+  INSERT/UPDATE/DELETE; written only by `ma_approve_document_candidates()`.
 
 ### Logboek — audience & the care team
 
@@ -596,6 +714,11 @@ Client-side upload limits (also enforced by the bucket's own
 single PDF, max 15 MB per file — see `apps/ma/src/storage.js`. Object names use
 `crypto.randomUUID()`, never a timestamp alone.
 
+A second, separate private bucket, `ma-imports`, backs the Document Inbox —
+see "Document Inbox" below for its path shape, limits, and RLS. It is never
+overloaded onto the `ma-media` path structure, and ordinary Logboek
+attachment upload (`storage.js`) is completely unaffected by it.
+
 ---
 
 ## Deploying at ma.kapework.com
@@ -611,8 +734,12 @@ single PDF, max 15 MB per file — see `apps/ma/src/storage.js`. Object names us
    Logboek + care team need `006_ma_logboek_care_team.sql` applied on top of it.
    Logboek edit/trash and Beheer's manual sync request need
    `008_ma_logboek_trash.sql` and `009_ma_calendar_manual_sync.sql` on top of
-   `007_ma_admin_dashboard.sql`.
-   (As of this PR, all of 005–009 have been applied to the live project —
+   `007_ma_admin_dashboard.sql`. The Document Inbox needs
+   `011_ma_document_inbox.sql` on top of `010_ma_sync_manual_dispatch.sql` —
+   see "Document Inbox" → "Deployment order" below for its own full checklist
+   (this migration was **not** applied as part of preparing this PR; do that
+   as a deliberate, separate step).
+   (As of this PR, all of 005–010 have been applied to the live project —
    `005` had been merged into `main` but never actually applied, which was
    caught and fixed as part of shipping `006`; see "Follow-up risks". `008`
    was applied once, found to reject a non-owner author's own soft-delete
@@ -1043,6 +1170,337 @@ administrator."
 
 ---
 
+## Document Inbox
+
+**Owner-only.** Lets a family owner paste unstructured notes, upload one PDF,
+or upload up to six photos/scans of a document, send that source to the
+configured Claude API for structured extraction, review the AI's proposed
+draft Logboek entries, edit/reject/restore them, and explicitly approve
+selected ones into ordinary `ma_posts` rows. Claude is an organizing
+assistant here, never an author or an autonomous care decision-maker:
+
+> Capture unstructured information → Claude proposes structure → the owner
+> verifies it → approved items become normal Logboek entries.
+
+### Product flow
+
+```
+Owner creates an import row (draft)
+        ↓
+Browser uploads an immutable source snapshot to the private `ma-imports` bucket
+        ↓
+Browser marks the import 'uploaded'
+        ↓
+Owner presses "Verwerking starten"
+        ↓
+Synchronous start function (ma-document-process):
+  verifies owner → validates state/config → marks 'queued' → invokes the background function
+        ↓
+Netlify Background Function (ma-document-process-background):
+  verifies owner again → atomically claims 'queued'→'processing' →
+  downloads the source from Storage → validates size/type/count →
+  computes a SHA-256 duplicate fingerprint → calls the Anthropic token-count
+  endpoint → enforces the configured token ceiling → calls the Messages API
+  with structured JSON output → validates the output again locally →
+  writes draft candidates → marks the import 'ready'
+        ↓
+Owner review screen (document-beoordelen.js) polls status and renders drafts
+        ↓
+Owner edits/rejects/restores/selects candidates
+        ↓
+Transactional approval RPC creates ma_posts rows + provenance links
+        ↓
+Normal Logboek shows the approved entries at their correct historical position
+```
+
+Claude is never called from the browser, and the document is never processed
+inside the synchronous start function — a Netlify Background Function does
+the actual work so a longer PDF/image request never depends on a normal
+request's timeout.
+
+### Owner-only scope
+
+Every route (`documenten`, `document-verwerken`, `document-beoordelen`),
+every table, every Storage object, and every RPC in this feature is
+owner-only. A family member or active caregiver:
+
+- cannot see the Document Inbox routes at all (`ROUTE_ACCESS` in `main.js`
+  redirects before any data fetch runs);
+- cannot read an import, its source files, or its candidates (RLS denies it,
+  independent of the route guard);
+- **can** see an *approved* Logboek entry that came from an import, exactly
+  like any other Logboek entry, and (for a `care_team` entry) the short
+  provenance line — never the original source, never a candidate, never the
+  AI's summary/warnings/model/token counts.
+
+### Source types and limits (MVP)
+
+| Source | Limit |
+|---|---|
+| Pasted text | max 60,000 characters (`MAX_PASTED_TEXT_CHARS`) |
+| PDF | exactly one file, never mixed with anything else |
+| Photos/scans | 1–6 images (`MAX_IMPORT_IMAGES`), JPEG/PNG/WebP only — **no HEIC** |
+| Total upload size | max 12 MB (`MAX_IMPORT_TOTAL_BYTES`) |
+
+Enforced twice: client-side in `document-storage.js`'s `validateImportSource()`
+(fast feedback) and again server-side in `_ma-document-processing.js`'s
+`validateFileBundle()` (the actual authority — the client check is a
+convenience, never trusted). A Google Doc can be pasted as text or exported
+to PDF for this first version — see "Explicitly deferred" below.
+
+### Database tables
+
+Four new tables (`supabase-migrations/011_ma_document_inbox.sql`), documented
+in full under "Supabase schema" above:
+
+| Table | Purpose |
+|---|---|
+| `ma_document_imports` | One row per import: source type/label/date, owner-selected audience, processing status, duplicate pointer, summary/warnings, model/prompt version, actual token usage |
+| `ma_document_import_files` | Source object metadata (never the bytes) — up to 6 rows per import, `sequence_no` 1–6 |
+| `ma_document_candidates` | Claude's proposed draft entries — status `pending`/`rejected`/`approved`, every field the owner can review/edit |
+| `ma_post_sources` | Provenance only, 1:1 with the `ma_posts` row an approval produced — never the source, never the AI's raw response |
+
+### RLS matrix
+
+| Actor | Read import/files/candidates | Read/upload/delete `ma-imports` object | Edit a candidate | Approve candidates | Read provenance (`ma_post_sources`) |
+|---|---|---|---|---|---|
+| Family owner | yes | yes | yes (via RPC, pending/rejected only) | yes (via RPC) | yes, for their family's posts |
+| Family member | no | no | no | no | yes, for a `family` or `care_team` post in their family |
+| Active caregiver | no | no | no | no | yes, only for an approved `care_team` post |
+| Revoked caregiver | no | no | no | no | no |
+| Unrelated signed-in user | no | no | no | no | no |
+| Anonymous | no | no | no | no | no |
+
+Direct browser `INSERT`/`UPDATE`/`DELETE` against `ma_document_candidates` is
+impossible — RLS has no policy for any of those operations. Every mutation
+goes through one of the two SECURITY DEFINER RPCs below, each of which
+re-verifies family ownership internally before touching a row.
+
+### Private Storage bucket
+
+`ma-imports` — private, `file_size_limit` 15 MB per object, `allowed_mime_types`
+restricted to `text/plain`/`application/pdf`/`image/jpeg`/`image/png`/`image/webp`.
+Path: `<family_id>/<import_id>/<random_uuid>.<ext>` — deliberately **not** the
+`ma-media` path shape. Storage RLS resolves the path's `import_id` segment
+back to `ma_document_imports` (never a bare family-id prefix check), so a
+guessed path can't bypass ownership: read is owner-only; upload is owner-only
+**and only while the import is still `draft`**; delete is owner-only and only
+while the import is still recoverable (`draft`/`uploaded`/`failed`). Sources
+are never automatically deleted — see "Rollback" below.
+
+### AI safety rules (non-negotiable)
+
+1. **No AI output becomes a Logboek entry without an explicit owner approval
+   call.** There is no other write path from a candidate to `ma_posts`.
+2. **The AI never chooses visibility.** `DOCUMENT_OUTPUT_SCHEMA` in
+   `_ma-document-ai.js` has no `audience` field at all — the worker assigns
+   the import's owner-selected audience to every candidate; only the owner
+   may change a candidate's audience afterward, and only before approval.
+3. **The approving owner is always the Logboek author.** Claude is never
+   stored or displayed as an author — `ma_approve_document_candidates()` sets
+   `author_id = auth.uid()` of the calling owner.
+4. **The source is untrusted data, not instructions.** The system prompt
+   (`buildSystemPrompt()`, versioned as `DOCUMENT_PROMPT_VERSION`) says so
+   explicitly, and every content block that carries the source repeats it —
+   prompt-injection text inside a document is treated as document content,
+   never followed.
+5. **No inferred facts.** No diagnosis, no invented dates, no inferred
+   medication instructions, no claiming a task was completed unless the
+   source explicitly says so.
+6. **Ambiguous dates stay ambiguous.** `event_date` is `null` whenever the
+   date can't be safely established — enforced by the prompt, by
+   `validateStructuredResult()`, and by a table CHECK constraint
+   (`date_basis <> 'unclear' or event_date is null`).
+7. **No sensitive content in logs or activity metadata.** Neither
+   `_ma-document-processing.js` nor the two Netlify Functions ever
+   `console.log`/`console.error` source text, filenames, titles, dates,
+   people's names, medical facts, excerpts, locations, tags, hashes, Storage
+   paths, API payloads, or model responses — only opaque ids, stage, a
+   controlled error code, counts, token counts, and duration.
+8. **The Anthropic key stays server-side**, read only from
+   `process.env.ANTHROPIC_API_KEY` inside the two Netlify Functions, never
+   written to `/shared/config.js` or any client bundle.
+9. **Original import sources are owner-only.** Care-team users may see an
+   approved `care_team` Logboek entry and its short provenance label — never
+   the original source file, never a candidate.
+10. **No legal/HIPAA/BAA/ZDR claim.** The consent checkbox in
+    `document-verwerken.js` discloses only that the source is sent to the
+    configured Claude API for processing.
+11. **No Anthropic Files API.** The source is read from private Supabase
+    Storage and included directly (base64) in one Messages API request.
+
+### Date handling
+
+Three dates are kept conceptually separate everywhere in this feature:
+
+- **`document_date`** — an optional, owner-supplied *trusted* date for the
+  document itself (e.g. "this letter is dated 14 March").
+  - Only used to resolve an unambiguous relative date found in the source.
+- **`event_date`** (per candidate) — the date the entry actually concerns.
+  Explicit when the source states it; resolved from `document_date` only
+  when unambiguous; otherwise `null` with `date_basis = 'unclear'` and a
+  warning explaining why.
+- **Upload/created date** — when the import/candidate row itself was
+  created; never conflated with either of the above.
+
+`views/logboek.js` gained a `Sorteren:` control (default **Datum
+gebeurtenis**) so historical, imported entries land at the date they
+concern rather than at the bottom of the feed sorted by when they were
+added — see "Logboek sorting" below.
+
+### Approval RPC behavior
+
+`ma_approve_document_candidates(p_import_id, p_candidate_ids)` — one
+transaction, SECURITY DEFINER, owner-only:
+
+- rejects a null/empty selection, and de-duplicates the id array defensively;
+- every selected id must belong to the import; a **rejected** candidate in
+  the selection fails the *entire* call (nothing partially applies);
+- an already-**approved** candidate (with its post) is treated as an
+  idempotent double-submit — its existing `{candidate_id, post_id}` mapping
+  is returned, no second post is ever created;
+- for each newly-approved candidate: inserts one ordinary `ma_posts` row
+  (`author_id`/`updated_by` = the calling owner, `linked_event_uid = null`,
+  `pinned = false`), inserts one `ma_post_sources` row (only
+  `source_label`/`source_locator`, never the excerpt or the AI's response),
+  and marks the candidate `approved`;
+- recomputes the import's status afterward: `completed` once no `pending`
+  candidate remains, otherwise stays `ready`;
+- does **not** suppress `ma_posts`'s existing activity triggers — an approved
+  entry generates the same `logboek_created` Beheer activity row as any other
+  entry, attributed to the owner who approved it.
+
+`ma_save_document_candidate(...)` is the only way to edit a candidate's
+date/type/title/body/audience/tags or move it between `pending`↔`rejected` —
+it can never set `approved`, only allows editing while the candidate is
+`pending` or `rejected`, and applies every length/enum/cardinality rule the
+table itself enforces. It also recomputes the parent import's status the same
+way (e.g. rejecting the last pending candidate flips the import to
+`completed`).
+
+### Provenance
+
+An approved, imported Logboek entry renders one small, escaped line in
+`components/logboek-entry.js` (via `formatProvenance()` in
+`lib/document-inbox.js`):
+
+```
+Bron: <source_label> · <source_locator>
+```
+
+The locator is omitted when null. There is **no** link to the owner-only
+original source, no source excerpt, no model name, no token count, and no AI
+confidence badge on the normal Logboek card — a care-team user sees this line
+only when RLS already lets them read the parent `care_team` post. Editing an
+approved post later never alters its source snapshot or candidate; deleting
+or trashing a post never deletes its import source (`ma_post_sources.post_id`
+cascades only in the direction post→provenance, not the reverse).
+
+### Logboek sorting
+
+`fetchLogboekEntries(familyId, { sort })` accepts `'event_date'` (default in
+the UI) or `'created_at'`. For `'event_date'`: `event_date desc, nulls last`,
+then `created_at desc` as a tie-breaker — so an entry with no `event_date`
+(rare outside imports) still sorts predictably at the bottom rather than
+disappearing. `fetchRecentLogboekEntries` (Today's "added today" indicator)
+is untouched — it stays based on recently *added* entries, never the date an
+entry concerns. Every existing filter (kind/audience/author/search/date
+range), pagination, and RLS boundary is preserved regardless of sort.
+
+### Retry and duplicate behavior
+
+- **Duplicate detection** is a SHA-256 fingerprint over the ordered source
+  bundle (sequence number + mime type + byte length + raw bytes per file,
+  never just filenames) computed server-side after download — matching
+  another import in the same family that's `queued`/`processing`/`ready`/
+  `completed` marks the new one `duplicate` (`duplicate_of` set,
+  `error_code = 'duplicate_source'`) **without calling Anthropic at all**.
+  The review screen links straight to the original import; candidates are
+  never auto-copied.
+- **Retry** (`failed` → owner presses "Opnieuw proberen") clears only the
+  import's own **non-approved** candidates from the earlier attempt before
+  inserting the fresh batch — an already-approved candidate (and its post)
+  is never touched.
+- An import with **approved candidates** cannot be reprocessed from scratch —
+  the start function only accepts `uploaded`/`failed`; a `duplicate` import
+  cannot be retried at all (nothing about the source changed).
+
+### Environment variables
+
+See the table under "Environment variables (Netlify)" above.
+`ANTHROPIC_API_KEY` is the only mandatory one for this feature —
+`MA_DOCUMENT_MODEL`/`MA_DOCUMENT_MAX_INPUT_TOKENS`/`MA_DOCUMENT_MAX_OUTPUT_TOKENS`
+are optional overrides with sane defaults. None of the four belongs in the
+browser bundle, `netlify.toml`, screenshots, or logs.
+
+### Deployment order
+
+Claude Code did **not** perform any of the following — the owner reviews and
+applies each step separately:
+
+1. Review `supabase-migrations/011_ma_document_inbox.sql`.
+2. Confirm the organization's intended Anthropic privacy/commercial
+   configuration **before** processing real sensitive care records.
+3. Apply the migration to the Supabase project.
+4. Verify the `ma-imports` bucket and its RLS policies exist as expected.
+5. Create or select a dedicated Anthropic API key.
+6. Add `ANTHROPIC_API_KEY` to Netlify as a server-only, Functions-scope,
+   **secret**, Production-context variable.
+7. Optionally add `MA_DOCUMENT_MODEL` / `MA_DOCUMENT_MAX_INPUT_TOKENS` /
+   `MA_DOCUMENT_MAX_OUTPUT_TOKENS`.
+8. Deploy the app.
+9. Test with synthetic, non-sensitive material first.
+10. Only after the complete review workflow is verified with synthetic data
+    should real family/care material be processed.
+
+### Rollback
+
+- Reverting the application commit removes the UI/Functions; the four
+  additive tables and the `ma-imports` bucket may remain unused without
+  affecting any existing Ma behavior.
+- Do **not** drop the import tables if real approved provenance exists. Do
+  **not** drop `ma_post_sources` after imported posts have been created
+  unless provenance has been safely migrated elsewhere first.
+- Removing `ANTHROPIC_API_KEY` disables new processing but does not break any
+  existing Logboek entry — approved posts remain ordinary, fully
+  editable/trashable Logboek data after a feature rollback, exactly like a
+  hand-written entry.
+- Source snapshots in `ma-imports` are never automatically deleted by this
+  feature; cleaning them up (if ever desired) is a deliberate, separate
+  admin action, same posture as the trusted-device/Logboek-trash cleanup
+  helpers elsewhere in this file.
+
+### Explicitly deferred
+
+Out of scope for this PR, on purpose — not half-built, not silently dropped:
+Google OAuth, Google Picker, automatic Google Docs synchronization (paste as
+text or export to PDF instead), DOCX parsing, e-mail ingestion, automatic
+publication of AI output, automatic tasks, automatic calendar changes,
+automatic medical interpretation, automatic medication changes, OCR
+libraries, the Anthropic Files API, continuous source monitoring, automatic
+rewriting of previously-approved Logboek entries, a split/merge candidate UI,
+care-team access to the import inbox or original source document,
+trusted-device access to imports, and automatic source-file deletion.
+
+### Tests
+
+`_ma-document-ai.test.js` (schema shape, prompt safety language, local
+structured-output validation, Anthropic error classification),
+`_ma-document-processing.test.js` (file-bundle validation, deterministic
+fingerprinting, duplicate/token-ceiling short-circuits, success/failure
+outcomes, retry cleanup, log-safety), `ma-document-process.test.js` and
+`ma-document-process-background.test.js` (owner-only authorization, the
+draft/uploaded/failed→queued state machine, atomic single-claim, dispatch
+failure handling), plus pure browser-side helpers in
+`lib/document-inbox.test.mjs` and `lib/route-parse.test.mjs` — all part of
+`npm test`. The RLS/RPC authorization matrix above was **not** verified with
+live SQL against the project for this PR (unlike the Logboek/Beheer matrices
+elsewhere in this file) — see the PR description's manual acceptance
+checklist for what still needs a live run before real family data touches
+this feature.
+
+---
+
 ## Accounts
 
 Signup is **closed**: sign-in only works for accounts an admin has pre-created.
@@ -1119,6 +1577,13 @@ here rather than shipped as a half-finished feature:
   a family/post that no longer exists, so no current RLS policy can match it
   for any real user. Safe to delete via the Storage dashboard if you want a
   pristine bucket listing; harmless if left alone.
+- **Document Inbox RLS/RPC matrix not yet live-verified.** Unlike the
+  Logboek/Beheer authorization matrices above (verified with live,
+  rollback-wrapped SQL against the project), the Document Inbox's RLS matrix
+  (see "Document Inbox" → "RLS matrix") reflects the migration and Netlify
+  Function tests only. Run the manual acceptance checklist in the PR
+  description against a staging project before real family/care material
+  ever reaches this feature.
 
 ---
 
@@ -1130,7 +1595,7 @@ here rather than shipped as a half-finished feature:
 | Deploy                | Push to `main` → Netlify auto-deploys                |
 | Add env vars          | Netlify → Site settings → Environment variables      |
 | Apply DB migrations   | Supabase dashboard → SQL editor, or `supabase db push` |
-| Run tests             | `npm test` (state engine, Beheer health rules, activity mapping, presence heartbeat, GA-absence, device crypto/derive, Netlify function handlers incl. `ma-sync-trigger`) |
+| Run tests             | `npm test` (state engine, Beheer health rules, activity mapping, presence heartbeat, GA-absence, device crypto/derive, Netlify function handlers incl. `ma-sync-trigger` and the Document Inbox's `ma-document-process`/`-background`/`_ma-document-ai`/`_ma-document-processing`, route/document-inbox pure helpers) |
 | State engine × TZ     | `npm run test:today-state` (UTC/NY/Amsterdam/Jakarta) |
 | Logboek / Beheer RLS tests | No repo script (SQL run directly against the live project via Supabase MCP, using synthetic families/users wrapped in a single rollback-wrapped transaction — see the PR description for the full authorization-matrix results, including the Logboek trash RPCs added in this PR) |
 | Manual acceptance     | See `apps/ma/TRUSTED_DEVICES.md`                     |

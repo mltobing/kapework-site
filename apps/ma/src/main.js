@@ -34,6 +34,9 @@ import { mount as mountCompose }                from './views/compose.js';
 import { mount as mountDevices }                from './views/devices.js';
 import { mount as mountPrullenbak }             from './views/prullenbak.js';
 import { mount as mountUitleg }                 from './views/uitleg.js';
+import { mount as mountDocumenten }             from './views/documenten.js';
+import { mount as mountDocumentVerwerken }      from './views/document-verwerken.js';
+import { mount as mountDocumentBeoordelen }     from './views/document-beoordelen.js';
 
 const VIEWS = {
   today:       mountToday,
@@ -45,12 +48,19 @@ const VIEWS = {
   devices:     mountDevices,
   prullenbak:  mountPrullenbak,
   uitleg:      mountUitleg,
+  'documenten':           mountDocumenten,
+  'document-verwerken':   mountDocumentVerwerken,
+  'document-beoordelen':  mountDocumentBeoordelen,
 };
 
 // Explicit per-route allowlist by accessType — RLS/functions are the real
 // security boundary (see apps/ma/README.md), but the route itself must not
 // even exist for a role that shouldn't see it. 'people' is handled separately
-// below (legacy alias, never mounts a view of its own).
+// below (legacy alias, never mounts a view of its own). The three Document
+// Inbox routes are owner-only, same bar as Beheer/Apparaten/Prullenbak — a
+// member or caregiver who hand-types the hash is redirected before any data
+// fetch runs, and every underlying query/RPC is independently owner-gated
+// regardless of what the UI shows (see supabase-migrations/011_ma_document_inbox.sql).
 const ROUTE_ACCESS = {
   today:       ['owner', 'member', 'caregiver'],
   briefing:    ['owner', 'member'],
@@ -61,6 +71,9 @@ const ROUTE_ACCESS = {
   devices:     ['owner'],
   prullenbak:  ['owner'],
   uitleg:      ['owner', 'member', 'caregiver'],
+  'documenten':          ['owner'],
+  'document-verwerken':  ['owner'],
+  'document-beoordelen': ['owner'],
 };
 
 function routeAllowedFor(route, accessType) {

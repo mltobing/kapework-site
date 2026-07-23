@@ -20,6 +20,12 @@ import { openLogboekEditModal }  from '../components/logboek-edit-modal.js';
 import { showToast }             from '../components/toast.js';
 import { navigate }              from '../router.js';
 import { KIND_FILTERS, AUDIENCE_FILTERS } from '../lib/logboek-types.js';
+import { validateSortOption }    from '../lib/document-inbox.js';
+
+const SORT_OPTIONS = [
+  { sort: 'event_date', label: 'Datum gebeurtenis' },
+  { sort: 'created_at', label: 'Recent toegevoegd' },
+];
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -37,6 +43,12 @@ export async function mount(container, { familyId, accessType, user }) {
     <div class="view-logboek">
       <div class="view-header">
         <h1>Logboek</h1>
+        ${isOwner ? `
+          <div class="logboek-header-actions">
+            <button type="button" class="btn-ghost" id="logboek-documents-new">Documenten verwerken</button>
+            <button type="button" class="btn-ghost logboek-documents-link" id="logboek-documents-inbox">Document-inbox</button>
+          </div>
+        ` : ''}
       </div>
 
       <div class="logboek-search-row">
@@ -69,6 +81,11 @@ export async function mount(container, { familyId, accessType, user }) {
         <button type="button" class="btn-ghost" id="logboek-filters-reset">Wis filters</button>
       </div>
 
+      <div class="logboek-sort-row">
+        <span class="logboek-sort-label">Sorteren:</span>
+        <div class="filter-row" id="logboek-sort" role="tablist" aria-label="Sorteren"></div>
+      </div>
+
       <div class="filter-row" id="filter-kind" role="tablist" aria-label="Filter op type"></div>
       ${isCareTeam ? '' : '<div class="filter-row filter-row--chips" id="filter-audience" role="tablist" aria-label="Filter op zichtbaarheid"></div>'}
 
@@ -91,6 +108,13 @@ export async function mount(container, { familyId, accessType, user }) {
   container.querySelector('#compose-fab')
     .addEventListener('click', () => navigate('compose'));
 
+  if (isOwner) {
+    container.querySelector('#logboek-documents-new')
+      .addEventListener('click', () => navigate('document-verwerken'));
+    container.querySelector('#logboek-documents-inbox')
+      .addEventListener('click', () => navigate('documenten'));
+  }
+
   const feedEl  = container.querySelector('#logboek-feed');
   const moreEl  = container.querySelector('#logboek-more');
   const moreBtn = container.querySelector('#logboek-more-btn');
@@ -100,9 +124,17 @@ export async function mount(container, { familyId, accessType, user }) {
     return;
   }
 
-  const filterState = { kind: null, audience: null, authorId: null, search: null, dateFrom: null, dateTo: null };
+  const filterState = {
+    kind: null, audience: null, authorId: null, search: null, dateFrom: null, dateTo: null,
+    sort: validateSortOption('event_date'),
+  };
   let offset = 0;
   let loading = false;
+
+  renderSortChips(container.querySelector('#logboek-sort'), filterState.sort, (sort) => {
+    filterState.sort = validateSortOption(sort);
+    reload();
+  });
 
   renderKindChips(container.querySelector('#filter-kind'), filterState.kind, (kind) => {
     filterState.kind = kind;
@@ -268,6 +300,7 @@ export async function mount(container, { familyId, accessType, user }) {
         search: filterState.search,
         dateFrom: filterState.dateFrom,
         dateTo: filterState.dateTo,
+        sort: filterState.sort,
       });
 
       if (reset) feedEl.innerHTML = '';
@@ -300,6 +333,22 @@ export async function mount(container, { familyId, accessType, user }) {
   }
 
   await loadPage(true);
+}
+
+function renderSortChips(container, active, onSelect) {
+  container.innerHTML = SORT_OPTIONS.map((o) => `
+    <button class="filter-chip ${o.sort === active ? 'filter-chip--active' : ''}" data-sort="${o.sort}">
+      ${o.label}
+    </button>
+  `).join('');
+
+  container.querySelectorAll('.filter-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('filter-chip--active'));
+      btn.classList.add('filter-chip--active');
+      onSelect(btn.dataset.sort);
+    });
+  });
 }
 
 function renderKindChips(container, active, onSelect) {

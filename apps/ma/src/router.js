@@ -11,24 +11,50 @@
 // redirects it to 'beheer' (owner) or 'today' (everyone else) rather than
 // mounting a view for it; kept recognized here so currentRoute() doesn't
 // collapse it to 'today' before that redirect logic ever sees it.
-const TABS = new Set(['today', 'briefing', 'logboek', 'calendar', 'beheer', 'people', 'compose', 'devices', 'prullenbak', 'uitleg']);
+// 'documenten' / 'document-verwerken' / 'document-beoordelen' are the
+// owner-only Document Inbox routes (see main.js's ROUTE_ACCESS) — not part of
+// the bottom navigation either, reached from Logboek's "Documenten verwerken"
+// entry point.
+import { parseRouteHash, buildRouteHash } from './lib/route-parse.js';
+
+const TABS = new Set([
+  'today', 'briefing', 'logboek', 'calendar', 'beheer', 'people', 'compose', 'devices', 'prullenbak', 'uitleg',
+  'documenten', 'document-verwerken', 'document-beoordelen',
+]);
 
 const _listeners = new Set();
 
 /**
- * Returns the current route from the URL hash, defaulting to 'today'.
+ * Returns the current route *name* from the URL hash (query params stripped),
+ * defaulting to 'today'.
  */
 export function currentRoute() {
-  const hash = location.hash.slice(1);
-  return TABS.has(hash) ? hash : 'today';
+  const { name } = parseRouteHash(location.hash.slice(1));
+  return TABS.has(name) ? name : 'today';
 }
 
 /**
- * Navigate to a tab by name.
- * @param {string} tab
+ * Query params carried on the current hash, e.g. `#document-beoordelen?id=<uuid>`
+ * → `routeParams().get('id')`. Always safe to call; returns an empty
+ * URLSearchParams for a route with none.
+ * @returns {URLSearchParams}
  */
-export function navigate(tab) {
-  location.hash = TABS.has(tab) ? tab : 'today';
+export function routeParams() {
+  const { params } = parseRouteHash(location.hash.slice(1));
+  return params;
+}
+
+/**
+ * Navigate to a tab by name, optionally carrying a small set of query params
+ * (e.g. `navigate('document-beoordelen', { id: importId })`). Never pass
+ * source text or document content here — params belong in the URL, so only
+ * short opaque identifiers.
+ * @param {string} tab
+ * @param {Record<string, string>} [params]
+ */
+export function navigate(tab, params) {
+  const name = TABS.has(tab) ? tab : 'today';
+  location.hash = buildRouteHash(name, params);
 }
 
 /**
