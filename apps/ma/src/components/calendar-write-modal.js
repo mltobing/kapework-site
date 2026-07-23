@@ -18,7 +18,7 @@
 
 import { escapeHtml } from '../utils.js';
 import { formatClock } from '../lib/datetime.js';
-import { requestCalendarWrite, pollCalendarWrite, calendarWriteErrorMessage } from '../lib/calendar-write-api.js';
+import { requestCalendarWrite, suggestCalendarWrite, pollCalendarWrite, calendarWriteErrorMessage } from '../lib/calendar-write-api.js';
 
 const MAX_LEGS = 2;
 
@@ -94,7 +94,7 @@ function buildInitialLegs(sourceKind, notice) {
 export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolved }) {
   document.getElementById('ma-calendar-write-modal')?.remove();
 
-  const legs = buildInitialLegs(sourceKind, notice);
+  let legs = buildInitialLegs(sourceKind, notice);
   const isUnparsed = notice.match_status === 'unparsed';
   let cancelPoll = null;
 
@@ -119,6 +119,12 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
           <p class="compose-error" id="cw-unparsed-notice">
             Deze e-mail kon niet betrouwbaar worden gelezen. Controleer en vul alles zelf in.
           </p>
+        ` : ''}
+        ${notice.excerpt ? `
+          <div class="cw-suggest-row">
+            <button type="button" class="btn-ghost" id="cw-suggest-btn">Laat Ma de details voorstellen</button>
+          </div>
+          <p class="cw-suggest-hint" id="cw-suggest-hint" hidden></p>
         ` : ''}
         <div id="cw-legs"></div>
         <label class="cw-confirm-row">
@@ -228,6 +234,58 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
   confirmCheckbox.addEventListener('change', updateSubmitState);
   renderLegs();
   updateSubmitState();
+
+  // ─── "Laat Ma de details voorstellen" — owner-triggered Claude prefill ──────
+  // Replaces the legs with a *suggestion* the owner still reviews, edits, and
+  // confirms. A failed suggestion never blocks manual entry; the confirm
+  // checkbox and per-field completeness gate submission exactly as before.
+  const suggestBtn = modal.querySelector('#cw-suggest-btn');
+  const suggestHint = modal.querySelector('#cw-suggest-hint');
+
+  function applySuggestion(events) {
+    legs = events.map((e) => ({
+      title: e.title || (sourceKind === 'appointment_notice' ? 'Afspraak' : 'Rit'),
+      date: e.date || '',
+      startTime: e.startTime || '',
+      endTime: e.endTime || '',
+      location: e.location || '',
+      notes: '',
+      suggestedEnd: false,
+      endRequired: !e.endTime,
+      suggested: true,
+    }));
+    renderLegs();
+    updateSubmitState();
+  }
+
+  if (suggestBtn) {
+    suggestBtn.addEventListener('click', async () => {
+      const originalLabel = suggestBtn.textContent;
+      suggestBtn.disabled = true;
+      suggestBtn.textContent = 'Ma leest de e-mail…';
+      suggestHint.hidden = true;
+      try {
+        const { events, reliable } = await suggestCalendarWrite({
+          familyId, sourceKind, noticeId: notice.id,
+        });
+        if (!events.length) {
+          suggestHint.textContent = 'Ma kon geen gegevens uit dit bericht halen. Vul de velden hieronder zelf in.';
+        } else {
+          applySuggestion(events);
+          suggestHint.textContent = reliable
+            ? 'Voorstel van Ma ingevuld — controleer datum, tijden, titel en locatie voordat je toevoegt.'
+            : 'Voorstel van Ma ingevuld, maar niet zeker — controleer alles extra goed.';
+        }
+      } catch (err) {
+        console.error('[ma/calendar-write-modal] Suggestion failed:', err);
+        suggestHint.textContent = calendarWriteErrorMessage(err.errorCode);
+      } finally {
+        suggestHint.hidden = false;
+        suggestBtn.disabled = false;
+        suggestBtn.textContent = originalLabel;
+      }
+    });
+  }
 
   submitBtn.addEventListener('click', async () => {
     errorEl.hidden = true;

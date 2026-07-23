@@ -744,6 +744,16 @@ h1, h2, h3 { line-height: 1.25; }
   margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
 }
 
+.cw-suggest-row {
+  margin: var(--sp-2) 0 var(--sp-1);
+}
+
+.cw-suggest-hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--sp-2);
+}
+
 .cw-confirm-row {
   display: flex;
   align-items: flex-start;
