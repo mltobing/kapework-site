@@ -30,8 +30,7 @@ const LOGBOEK_ENTRY_COLUMNS = `
   id, title, body, kind, audience, tags, event_date, linked_event_uid,
   pinned, created_at, updated_at, author_id,
   ma_profiles!author_id ( display_name, relationship, avatar_url ),
-  ma_attachments ( id, object_path, mime_type ),
-  ma_post_sources ( source_label, source_locator )
+  ma_attachments ( id, object_path, mime_type )
 `;
 
 // Compact columns for the owner-only Prullenbak (trash) view — a preview, not
@@ -150,7 +149,8 @@ export async function fetchAccessContext(userId) {
  * @param {'created_at'|'event_date'} [opts.sort='created_at'] — 'event_date' sorts
  *   historical/imported entries by the date they concern (nulls last, tie-broken
  *   by created_at desc) rather than by when they were added — see
- *   lib/logboek-sort.js and views/logboek.js's "Sorteren" control.
+ *   lib/document-inbox.js's validateSortOption() and views/logboek.js's
+ *   "Sorteren" control.
  */
 export async function fetchLogboekEntries(familyId, {
   limit = 20, offset = 0, kind = null, audience = null,
@@ -179,7 +179,47 @@ export async function fetchLogboekEntries(familyId, {
 
   const { data, error } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
-  return data ?? [];
+  const entries = data ?? [];
+
+  // Provenance is a decoupled, best-effort lookup — never a PostgREST embed
+  // on ma_posts — so the feed itself always loads even in an environment
+  // where migration 011 (ma_post_sources) hasn't been applied yet. See
+  // fetchPostSourcesByPostId()'s own comment for why this must stay this way
+  // permanently, not just during rollout.
+  const sourcesByPostId = await fetchPostSourcesByPostId(entries.map((e) => e.id));
+  for (const entry of entries) {
+    entry.ma_post_sources = sourcesByPostId.get(entry.id) ?? null;
+  }
+
+  return entries;
+}
+
+/**
+ * Provenance metadata (source_label/source_locator) for a set of post ids,
+ * keyed by post_id. Deliberately a separate query rather than a PostgREST
+ * embed on ma_posts: an embed targeting a relationship that doesn't exist yet
+ * (e.g. before migration 011 is applied) fails the *entire* query, taking
+ * down the whole Logboek feed — and even createLogboekEntry/updateLogboekEntry,
+ * since they `.select()` the same column list back. Provenance is a small
+ * display-only enhancement, never something the feed itself should depend on
+ * to render at all, so a failure here is logged and swallowed rather than
+ * thrown.
+ * @param {string[]} postIds
+ * @returns {Promise<Map<string, { source_label: string, source_locator: string|null }>>}
+ */
+async function fetchPostSourcesByPostId(postIds) {
+  if (!postIds.length) return new Map();
+  try {
+    const { data, error } = await supabase
+      .from('ma_post_sources')
+      .select('post_id, source_label, source_locator')
+      .in('post_id', postIds);
+    if (error) throw error;
+    return new Map((data ?? []).map((row) => [row.post_id, row]));
+  } catch (err) {
+    console.error('[ma/api] Provenance lookup unavailable (non-fatal, feed still renders):', err);
+    return new Map();
+  }
 }
 
 /**
