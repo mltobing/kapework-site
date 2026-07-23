@@ -113,7 +113,13 @@ apps/ma/
                          member: Vandaag · Briefing · Logboek · Agenda (no Beheer);
                          caregiver: Vandaag · Logboek only. Exports TABS_BY_ACCESS,
                          reused by topbar.js so the two never drift apart.
-      ride-notices.js   Ride-reconciliation strip
+      ride-notices.js   Ride-reconciliation strip — owner-only "Toevoegen aan
+                         agenda" opens calendar-write-modal.js
+      appointment-notices.js Provider-appointment reconciliation strip — same
+                         shape/rules as ride-notices.js, a second independent
+                         mail-reconciliation surface
+      calendar-write-modal.js Owner-only review/confirm modal for "Toevoegen
+                         aan agenda" — see "Calendar write requests" below
       logboek-entry.js  Entry card: type/audience badges, photos, documents, tags,
                          comments, and (for an eligible viewer) a compact "⋯"
                          overflow menu — Bewerken (own entry only) / Verwijderen
@@ -124,6 +130,10 @@ apps/ma/
                          backs the Logboek "moved to trash, Ongedaan maken" undo
       event-card.js     Calendar event card
       modal.js          Full-screen photo lightbox
+
+    lib/
+      calendar-write-api.js Client for ma-calendar-write-request.js — request
+                         creation, status polling, Dutch error-code mapping
 ```
 
 Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
@@ -131,9 +141,12 @@ Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
 shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js` /
 `_ma-activity.js` — the last records Beheer activity events from the
 device-activation/revocation endpoints). `ma-sync-trigger` (owner-only manual
-calendar refresh) lives alongside them and reuses the same `_ma-devices.js`
-`verifyOwner()`/`serviceClient()` helpers — see "Agenda-synchronisatie —
-manual refresh" below. The Document Inbox's server code (`ma-document-process`,
+calendar refresh) and `ma-calendar-write-request` (owner-only "Toevoegen aan
+agenda" — see "Calendar write requests" below) live alongside them, reusing
+the same `_ma-devices.js` `verifyOwner()`/`serviceClient()` helpers and a
+shared `_ma-github-dispatch.js` (GitHub `workflow_dispatch` call, allowlisted
+inputs only) — see "Agenda-synchronisatie — manual refresh" below. The
+Document Inbox's server code (`ma-document-process`,
 `ma-document-process-background`, `_ma-document-ai.js`, `_ma-document-processing.js`)
 lives alongside them too, reusing the same `verifyOwner()`/`serviceClient()`
 helpers — see "Document Inbox" below.
@@ -810,6 +823,65 @@ history; Today/Briefing/compose keep their own narrow, task-focused windows.
 
 ---
 
+## Calendar write requests — "Toevoegen aan agenda"
+
+A ride (AutoMaatje) or provider-appointment notice that is `missing` or
+`unparsed` — i.e. an e-mail confirmation the mirror has no matching event
+for — can be turned into a real iCloud calendar event, but **only** through
+an explicit, owner-reviewed confirmation. There is no automatic path from
+e-mail to calendar anywhere in this system:
+
+1. The owner presses **Toevoegen aan agenda** on a `ride-notices.js` or
+   `appointment-notices.js` card (`ADD_ELIGIBLE_MATCH_STATUSES` — never
+   shown to a non-owner, never shown for an already-`matched` notice).
+2. `components/calendar-write-modal.js` opens with fields pre-filled *only*
+   from what the source notice actually states — it never invents a fact
+   the e-mail didn't contain. A ride's outbound/return legs get a suggested
+   15-minute end time (clearly labelled "controleer"); an appointment always
+   needs an explicit end time, since confirmation e-mails never state one;
+   an `unparsed` notice starts entirely blank with a warning banner. A
+   confirmation checkbox ("Ik heb datum, tijden, titel en locatie
+   gecontroleerd.") gates submission.
+3. On submit, `lib/calendar-write-api.js` calls
+   `netlify/functions/ma-calendar-write-request.js`, which re-verifies the
+   caller is the family's owner server-side (never trusts the UI having
+   hidden the button), re-validates every field, re-loads the source notice
+   itself (rejecting if it's no longer `open`/eligible), then creates one
+   `ma_calendar_write_requests` row plus 1–2 `ma_calendar_write_items` rows
+   (outbound/return legs for a ride, one row for an appointment) with
+   deterministic UIDs (`ma-<request-id>-<sequence>@kapework.invalid`) —
+   never a client-supplied UID. A retry reuses the same request row rather
+   than creating a second one, enforced by the partial unique index on
+   `ride_notice_id`/`appointment_notice_id` (migration 012), not left to
+   application-layer discipline alone.
+4. The function dispatches the private `irma-sync` workflow
+   (`_ma-github-dispatch.js`, shared with the existing manual-sync trigger)
+   with only the request id as input — never the event payload itself, since
+   GitHub Actions inputs aren't a safe channel for family data.
+5. The private job (`calendar_actions.py`, **the only place either
+   repository ever writes to iCloud**) atomically claims the request
+   (`ma_claim_calendar_write_request`, so a duplicate dispatch can never
+   double-write), writes each item idempotently (`no_overwrite=True` — an
+   identical UID that already exists is a no-op success; a different-content
+   conflict under the same UID is a controlled `uid_conflict` error, never a
+   silent overwrite), then always runs its normal mirror pass afterwards so
+   `ma_calendar_events` picks up the new event through the same read-only
+   path as everything else — this migration never writes to
+   `ma_calendar_events` directly. `calendar_write_completed` (`result`,
+   `event_count` only) is recorded once both halves finish.
+6. `lib/calendar-write-api.js`'s `pollCalendarWrite()` polls the request row
+   until it leaves `queued`/`processing`, then the modal shows a plain
+   success/partial/failed state and calls `onResolved()` so the caller does a
+   full reload — never an optimistic removal of the card.
+
+**What this release deliberately does not do:** update or delete an existing
+calendar event (only `create`, enforced by the `operation` check
+constraint); broaden the trusted-device payload; or give a browser any
+CalDAV credential — those live only in the private `irma-sync` repository's
+own secrets.
+
+---
+
 ## Trusted devices — the care recipient's `/vandaag` display
 
 `ma.kapework.com/vandaag` is a **separate, read-only** entry point (its own
@@ -1074,22 +1146,31 @@ reporting is never duplicated):
 | `ma_attachments` | `ma_attachments_activity_trg` | `attachment_added`, `attachment_removed` |
 | `ma_briefings` | `ma_briefings_activity_trg` | `briefing_marked_sent`, `briefing_reopened` |
 | `ma_ride_notices` | `ma_ride_notices_activity_trg` | `ride_notice_dismissed` |
+| `ma_appointment_notices` | `ma_appointment_notices_activity_trg` | `appointment_notice_dismissed` (migration 012 — same pattern as `ride_notice_dismissed`: only a member's own "Negeer" state transition fires it, never the service-role auto-match/auto-resolve write) |
 | `ma_care_team_members` | `ma_care_team_members_activity_trg` | `caregiver_access_granted`, `caregiver_access_revoked` (attributed via `created_by`/`revoked_by`, not the session — provisioning is a manual admin action with no browser insert policy, so there usually is no authenticated session to read) |
 
 `trusted_device_activated`/`trusted_device_revoked` come from the Netlify
 Functions directly (`recordActivity()` in `_ma-activity.js`), not a DB
 trigger, since those tables are default-deny to every browser role.
+`calendar_write_requested` (metadata: `source_kind`, `event_count`) comes the
+same way, from `ma-calendar-write-request.js` at the moment the owner
+confirms a "Toevoegen aan agenda" request — see "Calendar write requests"
+below.
 
-**The private irma-sync job's own activity rows.** Four further actions —
-`calendar_changed`, `briefings_generated`, `ride_notices_changed`, and
-`pipeline_attention` — are written by the private irma-sync job itself
-(service role) when a run actually changes something or needs attention.
-`admin-activity.js` renders each with a specific Dutch sentence built only
-from its allowlisted counts/status (e.g. "Heeft de agenda bijgewerkt: 1
-afspraak toegevoegd, 2 afspraken gewijzigd en 1 afspraak geannuleerd.")
-instead of the generic "Er is een systeemactie geregistreerd." fallback.
-`pipeline_attention`'s `error_stage` is never rendered raw — it is mapped to
-a small set of calm, non-technical Dutch sentences.
+**The private irma-sync job's own activity rows.** Five further actions —
+`calendar_changed`, `briefings_generated`, `ride_notices_changed`,
+`pipeline_attention`, and `calendar_write_completed` — are written by the
+private irma-sync job itself (service role) when a run actually changes
+something, needs attention, or (the last one) finishes processing an
+owner-confirmed calendar-write request. `admin-activity.js` renders each
+with a specific Dutch sentence built only from its allowlisted counts/status
+(e.g. "Heeft de agenda bijgewerkt: 1 afspraak toegevoegd, 2 afspraken
+gewijzigd en 1 afspraak geannuleerd.") instead of the generic "Er is een
+systeemactie geregistreerd." fallback. `pipeline_attention`'s `error_stage`
+is never rendered raw — it is mapped to a small set of calm, non-technical
+Dutch sentences. `calendar_write_completed`'s metadata is just `result`
+(`success`/`partial`/`failed`) and `event_count` — never the event's title,
+time, or location.
 
 **Quiet runs stay quiet, by design.** A scheduled run that completes
 successfully with nothing to report does **not** write a row here — the

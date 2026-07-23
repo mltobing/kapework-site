@@ -9,9 +9,11 @@
  * here ever renders raw JSON.
  *
  * Every builder reads only the metadata keys documented in
- * METADATA_ALLOWLIST for its action — matches the DB triggers in
- * supabase-migrations/007_ma_admin_dashboard.sql, which never write
- * anything else into `metadata`.
+ * METADATA_ALLOWLIST for its action — matches the writers that produce each
+ * action: the DB triggers in supabase-migrations/007_ma_admin_dashboard.sql
+ * and 012_ma_calendar_actions_and_appointment_notices.sql, the Netlify
+ * Function ma-calendar-write-request.js, and the private irma-sync job —
+ * none of which ever write anything else into `metadata`.
  */
 
 import { kindLabel } from './logboek-types.js';
@@ -30,6 +32,9 @@ export const METADATA_ALLOWLIST = {
   briefing_marked_sent:     ['briefing_date', 'from_status', 'to_status'],
   briefing_reopened:        ['briefing_date', 'from_status', 'to_status'],
   ride_notice_dismissed:    ['kind', 'ride_date'],
+  appointment_notice_dismissed: ['kind', 'appointment_date'],
+  calendar_write_requested: ['source_kind', 'event_count'],
+  calendar_write_completed: ['result', 'event_count'],
   caregiver_access_granted: [],
   caregiver_access_revoked: [],
   membership_role_changed:  ['from_role', 'to_role'],
@@ -80,6 +85,20 @@ const SENTENCE_BUILDERS = {
   briefing_reopened: (m) =>
     `Heeft de briefing${m.briefing_date ? ` voor ${m.briefing_date}` : ''} heropend.`,
   ride_notice_dismissed: () => 'Heeft een melding van AutoMaatje genegeerd.',
+  appointment_notice_dismissed: () => 'Heeft een melding over een afspraak genegeerd.',
+  calendar_write_requested: (m) => {
+    const label = m.source_kind === 'appointment_notice' ? 'een afspraak' : 'een rit';
+    const n = Number(m.event_count) || 0;
+    const suffix = n > 1 ? ` (${n} items)` : '';
+    return `Heeft gevraagd om ${label} toe te voegen aan de agenda${suffix}.`;
+  },
+  calendar_write_completed: (m) => {
+    const n = Number(m.event_count) || 0;
+    const items = n > 0 ? `${n} ${n === 1 ? 'item' : 'items'}` : 'de agenda';
+    if (m.result === 'success') return `Heeft ${items} aan de agenda toegevoegd.`;
+    if (m.result === 'partial') return 'Heeft de agenda gedeeltelijk bijgewerkt; niet alles kon worden toegevoegd.';
+    return 'Kon niet toevoegen aan de agenda.';
+  },
   caregiver_access_granted: () => 'Heeft een zorgteamlid toegevoegd.',
   caregiver_access_revoked: () => 'Heeft de toegang van een zorgteamlid ingetrokken.',
   membership_role_changed: (m) =>
@@ -138,6 +157,9 @@ const ICON_CATEGORY = {
   attachment_added: 'attachment', attachment_removed: 'attachment',
   briefing_marked_sent: 'briefing', briefing_reopened: 'briefing',
   ride_notice_dismissed: 'ride',
+  appointment_notice_dismissed: 'ride',
+  calendar_write_requested: 'system',
+  calendar_write_completed: 'system',
   caregiver_access_granted: 'care_team', caregiver_access_revoked: 'care_team',
   membership_role_changed: 'membership',
   trusted_device_activated: 'device', trusted_device_revoked: 'device',

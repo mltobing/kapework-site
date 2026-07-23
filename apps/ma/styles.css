@@ -675,6 +675,7 @@ h1, h2, h3 { line-height: 1.25; }
   margin-top: var(--sp-3);
   display: flex;
   justify-content: flex-end;
+  gap: var(--sp-2);
 }
 
 .ride-notice-dismiss {
@@ -691,6 +692,66 @@ h1, h2, h3 { line-height: 1.25; }
 
 .ride-notice-dismiss:active   { background: var(--surface-alt); }
 .ride-notice-dismiss:disabled { opacity: .5; cursor: default; }
+
+/* Owner-only — visibility is enforced server-side too (RLS + the Netlify
+   Function's own owner check); this is convenience, not the security boundary. */
+.ride-notice-add {
+  background: var(--amber);
+  color: #FFFFFF;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--sp-2) var(--sp-5);
+  border: none;
+  border-radius: var(--radius-md);
+  transition: opacity .12s;
+  -webkit-appearance: none;
+}
+
+.ride-notice-add:active   { opacity: .85; }
+.ride-notice-add:disabled { opacity: .5; cursor: default; }
+
+/* ─── Calendar-write modal (components/calendar-write-modal.js) ──────────── */
+
+.cw-leg {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+
+.cw-leg legend {
+  font-weight: 700;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  padding: 0 var(--sp-1);
+}
+
+.cw-time-row {
+  display: flex;
+  gap: var(--sp-3);
+}
+.cw-time-row .compose-field { flex: 1; }
+
+.cw-suggested-end {
+  font-size: var(--text-sm);
+  color: var(--amber);
+  margin: calc(var(--sp-1) * -1) 0 var(--sp-2);
+}
+
+.cw-confirm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.cw-modal-status {
+  margin-top: var(--sp-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
 
 /* An event whose end time has already passed — calm, never hidden. */
 .event-card--past {

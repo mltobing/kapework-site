@@ -20,6 +20,7 @@
 const { checkRateLimit, getClientIp, requireEnvVars, logError } = require('./_utils');
 const { serviceClient, verifyOwner, json, corsHeaders } = require('./_ma-devices');
 const { recordActivity } = require('./_ma-activity');
+const { githubWorkflowConfig, dispatchIrmaSync } = require('./_ma-github-dispatch');
 
 const RATE_LIMIT = 10;
 
@@ -33,74 +34,6 @@ const COOLDOWN_MS = 60_000;
 // A pending (unclaimed), not-yet-failed-to-dispatch request younger than this
 // is treated as still queued rather than creating a duplicate.
 const PENDING_REQUEST_FRESH_MS = 20 * 60_000;
-
-const DEFAULT_GITHUB_REPOSITORY = 'mltobing/irma-sync';
-const DEFAULT_GITHUB_WORKFLOW = 'sync.yml';
-const DEFAULT_GITHUB_REF = 'main';
-
-const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
-const WORKFLOW_RE = /^[\w.-]+\.ya?ml$/;
-const REF_RE = /^[\w./-]+$/;
-
-function githubConfig() {
-  requireEnvVars('MA_SYNC_GITHUB_TOKEN');
-  const token = process.env.MA_SYNC_GITHUB_TOKEN;
-  const repository = process.env.MA_SYNC_GITHUB_REPOSITORY || DEFAULT_GITHUB_REPOSITORY;
-  const workflow = process.env.MA_SYNC_GITHUB_WORKFLOW || DEFAULT_GITHUB_WORKFLOW;
-  const ref = process.env.MA_SYNC_GITHUB_REF || DEFAULT_GITHUB_REF;
-  if (!REPO_RE.test(repository) || !WORKFLOW_RE.test(workflow) || !REF_RE.test(ref)) {
-    throw new Error('invalid github dispatch configuration');
-  }
-  return { token, repository, workflow, ref };
-}
-
-/**
- * Dispatch the private irma-sync workflow for one request. Never logs the
- * token, the Authorization header, or the GitHub response body — only a
- * controlled error code on failure. Treats both documented GitHub Actions
- * workflow-dispatch success responses (204 No Content, and the newer 200
- * with a workflow-run id/URL) as success; a run id is kept only as an
- * internal correlation aid, never required, never returned to the browser as
- * a private Actions URL.
- */
-async function dispatchWorkflow(config, requestId) {
-  const { token, repository, workflow, ref } = config;
-  const url = `https://api.github.com/repos/${repository}/actions/workflows/${workflow}/dispatches`;
-
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ ref, inputs: { manual_request_id: requestId } }),
-    });
-  } catch (err) {
-    console.error('[ma-sync-trigger] github dispatch network error:', err.message);
-    return { ok: false, errorCode: 'network_error' };
-  }
-
-  if (res.status === 204) return { ok: true, githubRunId: null };
-
-  if (res.status === 200) {
-    let githubRunId = null;
-    try {
-      const runInfo = await res.json();
-      if (runInfo && runInfo.id != null) githubRunId = String(runInfo.id);
-    } catch {
-      // A 200 with an unparseable body is still a documented success — the
-      // run id is a best-effort correlation aid, never required.
-    }
-    return { ok: true, githubRunId };
-  }
-
-  console.error('[ma-sync-trigger] github dispatch rejected: status=%d', res.status);
-  return { ok: false, errorCode: res.status >= 500 ? 'github_server_error' : 'github_client_error' };
-}
 
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || '';
@@ -120,9 +53,8 @@ exports.handler = async (event) => {
 
   // Fail fast, before any write, if this deploy can't actually dispatch the
   // workflow — an audited request nobody can ever act on is worse than none.
-  let githubDispatchConfig;
   try {
-    githubDispatchConfig = githubConfig();
+    githubWorkflowConfig();
   } catch (err) {
     console.error('[ma-sync-trigger] github config error:', err.message);
     return json(503, { error: 'service_unavailable' }, origin);
@@ -232,7 +164,7 @@ exports.handler = async (event) => {
 
   // 5. Dispatch the private irma-sync workflow. Only now — after GitHub
   // actually accepts the dispatch — is this reported as 'queued'.
-  const dispatch = await dispatchWorkflow(githubDispatchConfig, inserted.id);
+  const dispatch = await dispatchIrmaSync({ manual_request_id: inserted.id });
 
   if (!dispatch.ok) {
     // Mark the dispatch failed so this row is excluded from step 3 above on

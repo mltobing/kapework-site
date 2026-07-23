@@ -19,6 +19,7 @@ import { fetchEvents, fetchCalendarLastSyncedAt, fetchBriefings, fetchRecentLogb
 import { renderEventCard }   from '../components/event-card.js';
 import { renderLogboekEntry } from '../components/logboek-entry.js';
 import { mountRideNotices }  from '../components/ride-notices.js';
+import { mountAppointmentNotices } from '../components/appointment-notices.js';
 import { sanitizeEventForState } from '../lib/event-derive.js';
 import { computeTodayState } from '../lib/today-state.js';
 import { navigate } from '../router.js';
@@ -69,6 +70,9 @@ export async function mount(container, { familyId, accessType }) {
         <!-- Ride-reconciliation: only today-relevant/overdue notices, else empty. -->
         <div id="today-notices"></div>
 
+        <!-- Provider appointment notices: only overdue or within 7 days, else empty. -->
+        <div id="today-appointment-notices"></div>
+
         <!-- Vanavond versturen: only when tomorrow's briefing is ready. -->
         <div id="today-tonight"></div>
 
@@ -95,6 +99,7 @@ export async function mount(container, { familyId, accessType }) {
   const nowEl      = container.querySelector('#today-now');
   const vandaagEl  = container.querySelector('#today-vandaag');
   const noticesEl  = container.querySelector('#today-notices');
+  const appointmentNoticesEl = container.querySelector('#today-appointment-notices');
   const tonightEl  = container.querySelector('#today-tonight');
   const careUpdatesEl = container.querySelector('#today-care-updates');
 
@@ -114,8 +119,19 @@ export async function mount(container, { familyId, accessType }) {
   // earlier (overdue). Future rides surface on their own day, not here.
   await mountRideNotices(noticesEl, {
     familyId,
+    accessType,
     eventsByUid: buildEventsByUid(eventsResult),
     filter: (n) => !n.ride_date || n.ride_date <= todayKey,
+  });
+
+  // Provider appointment notices: only overdue or within the next 7 days, so
+  // six future confirmations never overwhelm Today (brief §14) — the rest
+  // are still visible in full on Agenda.
+  const appointmentHorizon = addDaysKey(todayKey, 7);
+  await mountAppointmentNotices(appointmentNoticesEl, {
+    familyId,
+    accessType,
+    filter: (n) => !n.appointment_date || n.appointment_date <= appointmentHorizon,
   });
 }
 

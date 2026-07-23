@@ -21,6 +21,11 @@ import { fetchOpenRideNotices, dismissRideNotice } from '../api.js';
 import { getState } from '../state.js';
 import { escapeHtml } from '../utils.js';
 import { formatDateKeyHeader, formatTime, formatClock } from '../lib/datetime.js';
+import { openCalendarWriteModal } from './calendar-write-modal.js';
+
+// Only these statuses ever offer "Toevoegen aan agenda" — a matched/conflict/
+// cancellation card is review-only in this release (brief §B).
+const ADD_ELIGIBLE_MATCH_STATUSES = new Set(['missing', 'unparsed']);
 
 /**
  * Loads open notices and, if any exist, renders the strip into `container` and
@@ -29,14 +34,18 @@ import { formatDateKeyHeader, formatTime, formatClock } from '../lib/datetime.js
  * feature on quiet days and a reconciliation error never blanks the view.
  *
  * @param {HTMLElement} container
- * @param {{ familyId: string, eventsByUid?: Map<string, object>, filter?: (notice) => boolean }} opts
+ * @param {{ familyId: string, accessType?: string|null, eventsByUid?: Map<string, object>, filter?: (notice) => boolean }} opts
  *   eventsByUid maps ma_calendar_events.external_event_uid → event, used to show the
  *   calendar's own time on a "conflict" card. It is best-effort: if the matched
  *   event is outside the loaded window the headline falls back gracefully.
  *   filter, when given, narrows which open notices are shown (e.g. the Today view
  *   surfaces only today-relevant/overdue ones instead of every future notice).
+ *   accessType: only 'owner' ever sees "Toevoegen aan agenda" — UI hiding is
+ *   not the security boundary (the Netlify Function verifies ownership
+ *   itself), this just avoids showing a control that would 403.
  */
-export async function mountRideNotices(container, { familyId, eventsByUid, filter }) {
+export async function mountRideNotices(container, opts) {
+  const { familyId, eventsByUid, filter } = opts;
   let notices;
   try {
     notices = await fetchOpenRideNotices(familyId);
@@ -53,20 +62,23 @@ export async function mountRideNotices(container, { familyId, eventsByUid, filte
     return;
   }
 
+  const isOwner = opts.accessType === 'owner';
+
   container.innerHTML = `
     <section class="ride-notices" aria-label="Ritten om te controleren">
-      ${notices.map(n => renderCard(n, eventsByUid)).join('')}
+      ${notices.map(n => renderCard(n, eventsByUid, isOwner)).join('')}
     </section>
   `;
-  wire(container);
+  wire(container, notices, opts);
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
 
-function renderCard(notice, eventsByUid) {
+function renderCard(notice, eventsByUid, isOwner) {
   const driverLine = notice.driver
     ? `<p class="ride-notice-driver">Chauffeur: ${escapeHtml(notice.driver)}</p>`
     : '';
+  const canAdd = isOwner && ADD_ELIGIBLE_MATCH_STATUSES.has(notice.match_status);
 
   return `
     <article class="ride-notice-card" data-id="${escapeHtml(notice.id)}">
@@ -77,6 +89,7 @@ function renderCard(notice, eventsByUid) {
       ${driverLine}
       <blockquote class="ride-notice-excerpt">${escapeHtml(notice.excerpt)}</blockquote>
       <div class="ride-notice-actions">
+        ${canAdd ? `<button class="ride-notice-add" data-add data-id="${escapeHtml(notice.id)}">Toevoegen aan agenda</button>` : ''}
         <button class="ride-notice-dismiss" data-dismiss data-id="${escapeHtml(notice.id)}">
           Negeer
         </button>
@@ -137,11 +150,26 @@ function headline(notice, eventsByUid) {
   }
 }
 
-// ─── Dismiss ────────────────────────────────────────────────────────────────
+// ─── Dismiss / Toevoegen aan agenda ──────────────────────────────────────────
 
-function wire(container) {
+function wire(container, notices, opts) {
   container.querySelectorAll('[data-dismiss]').forEach(btn => {
     btn.addEventListener('click', () => dismiss(container, btn));
+  });
+  container.querySelectorAll('[data-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const notice = notices.find(n => n.id === btn.dataset.id);
+      if (!notice) return;
+      openCalendarWriteModal({
+        familyId: opts.familyId,
+        sourceKind: 'ride_notice',
+        notice,
+        // A resolved write reloads the whole strip from scratch — the card
+        // only disappears once a fresh fetch confirms the notice is no
+        // longer open, never optimistically.
+        onResolved: () => mountRideNotices(container, opts),
+      });
+    });
   });
 }
 
