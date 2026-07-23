@@ -174,8 +174,9 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
             <input class="compose-date" id="cw-end-${i}" type="time" value="${escapeHtml(leg.endTime || '')}">
           </div>
         </div>
+        <p class="cw-tz-note">Alle tijden zijn in Amsterdamse tijd.</p>
         ${leg.suggestedEnd ? '<p class="cw-suggested-end">Voorgestelde eindtijd — controleer</p>' : ''}
-        ${leg.endRequired && !leg.endTime ? '<p class="cw-suggested-end">De e-mail noemt geen eindtijd. Kies en controleer de eindtijd.</p>' : ''}
+        ${leg.endRequired ? `<p class="cw-suggested-end cw-end-hint" id="cw-endhint-${i}"${leg.endTime ? ' hidden' : ''}>De e-mail noemt geen eindtijd. Kies en controleer de eindtijd.</p>` : ''}
         <div class="compose-field">
           <label class="compose-label" for="cw-location-${i}">Locatie (optioneel)</label>
           <input class="compose-title" id="cw-location-${i}" type="text" maxlength="300" value="${escapeHtml(leg.location || '')}">
@@ -196,6 +197,10 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
             endTime: modal.querySelector(`#cw-end-${i}`).value,
             location: modal.querySelector(`#cw-location-${i}`).value,
           };
+          // Keep the "no end time in the e-mail" hint in step with the field —
+          // it must clear the moment the owner supplies one.
+          const endHint = modal.querySelector(`#cw-endhint-${i}`);
+          if (endHint) endHint.hidden = Boolean(legs[i].endTime);
           updateSubmitState();
         });
       });
