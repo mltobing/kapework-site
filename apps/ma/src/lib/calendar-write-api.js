@@ -50,6 +50,30 @@ export async function requestCalendarWrite({ familyId, sourceKind, noticeId, eve
 }
 
 /**
+ * Ask the server to suggest event fields for a notice the owner is reviewing
+ * (owner-only, via ma-calendar-suggest). Returns `{ events, reliable }` — the
+ * events are a *suggestion* the caller prefills into the still-editable,
+ * still-owner-confirmed form; nothing is written anywhere by this call. Throws
+ * on a network/auth/server failure, carrying `err.errorCode` when the server
+ * returned a controlled one.
+ */
+export async function suggestCalendarWrite({ familyId, sourceKind, noticeId }) {
+  const res = await fetch(`${BASE}/ma-calendar-suggest`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ familyId, sourceKind, noticeId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data?.error || `ma-calendar-suggest failed (${res.status})`);
+    err.status = res.status;
+    err.errorCode = data?.error;
+    throw err;
+  }
+  return { events: Array.isArray(data.events) ? data.events : [], reliable: data.reliable === true };
+}
+
+/**
  * Poll one calendar-write request (owner-only, via RLS — no separate GET
  * function) until it reaches a final status or `timeoutMs` elapses. Calls
  * `onUpdate({ request, items })` on every tick. Cancels automatically once
@@ -126,6 +150,10 @@ const ERROR_COPY = {
   server_error:            'Er ging iets mis. Probeer het opnieuw.',
   not_authorized:          'Je hebt geen toegang tot deze actie.',
   rate_limited:            'Te veel pogingen. Probeer het over een minuut opnieuw.',
+  // Suggestion (prefill) errors — a failed suggestion never blocks manual entry.
+  suggest_unavailable:     'Ma kon dit bericht nu niet lezen. Vul de gegevens hieronder zelf in.',
+  no_excerpt:              'Er is geen e-mailtekst om te lezen. Vul de gegevens hieronder zelf in.',
+  config_error:            'Automatisch voorstellen is nu niet beschikbaar. Vul de gegevens zelf in.',
 };
 
 const FALLBACK_ERROR_MESSAGE = 'Er ging iets mis. Probeer het opnieuw.';

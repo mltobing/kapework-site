@@ -141,11 +141,13 @@ Trusted-device server code lives in `netlify/functions/` (`ma-pairing-create`,
 shared `_ma-crypto.js` / `_ma-devices.js` / `_ma-today-derive.js` /
 `_ma-activity.js` — the last records Beheer activity events from the
 device-activation/revocation endpoints). `ma-sync-trigger` (owner-only manual
-calendar refresh) and `ma-calendar-write-request` (owner-only "Toevoegen aan
-agenda" — see "Calendar write requests" below) live alongside them, reusing
-the same `_ma-devices.js` `verifyOwner()`/`serviceClient()` helpers and a
-shared `_ma-github-dispatch.js` (GitHub `workflow_dispatch` call, allowlisted
-inputs only) — see "Agenda-synchronisatie — manual refresh" below. The
+calendar refresh), `ma-calendar-write-request` (owner-only "Toevoegen aan
+agenda"), and `ma-calendar-suggest` (owner-only Claude prefill for that modal
+— see "Calendar write requests" below) live alongside them, reusing the same
+`_ma-devices.js` `verifyOwner()`/`serviceClient()` helpers, a shared
+`_ma-github-dispatch.js` (GitHub `workflow_dispatch` call, allowlisted inputs
+only), and — for the suggestion — the Document Inbox's `_ma-document-ai.js`
+Anthropic wrapper. See "Agenda-synchronisatie — manual refresh" below. The
 Document Inbox's server code (`ma-document-process`,
 `ma-document-process-background`, `_ma-document-ai.js`, `_ma-document-processing.js`)
 lives alongside them too, reusing the same `verifyOwner()`/`serviceClient()`
@@ -182,8 +184,9 @@ Or run the Netlify CLI (`netlify dev`) with the env vars set in a local `.env` f
 | `SUPABASE_ANON_KEY`          | Yes      | client       | Supabase public anon key (browser-safe)                     |
 | `SUPABASE_SERVICE_ROLE_KEY`  | Yes      | **fn only**  | Service role; used by Netlify Functions. **Never** exposed to the browser. |
 | `MA_DEVICE_TOKEN_PEPPER`     | Yes      | **fn only**  | Random server-only secret; peppers device-token/code hashes. Set as a Netlify **secret**. |
-| `ANTHROPIC_API_KEY`          | Only for Document Inbox | **fn only** | Server-only Claude API key. The only mandatory variable for the Document Inbox feature — see "Document Inbox" below. Set as a Netlify **secret**. |
-| `MA_DOCUMENT_MODEL`          | No       | **fn only**  | Overrides the Document Inbox's Claude model. Defaults to `claude-sonnet-4-6`. |
+| `ANTHROPIC_API_KEY`          | Only for Document Inbox / calendar prefill | **fn only** | Server-only Claude API key. Mandatory for the Document Inbox (see below); also enables the optional owner-triggered "Laat Ma de details voorstellen" prefill in the calendar-write modal (see "Calendar write requests"). Without it, that prefill button reports it's unavailable and manual entry still works. Set as a Netlify **secret**. |
+| `MA_DOCUMENT_MODEL`          | No       | **fn only**  | Overrides the Document Inbox's Claude model. Defaults to `claude-sonnet-4-6`. Also the fallback model for the calendar-prefill suggestion when `MA_CALENDAR_SUGGEST_MODEL` is unset. |
+| `MA_CALENDAR_SUGGEST_MODEL`  | No       | **fn only**  | Overrides the model used by the calendar-write prefill suggestion (`ma-calendar-suggest`). Falls back to `MA_DOCUMENT_MODEL`, then `claude-sonnet-4-6`. |
 | `MA_DOCUMENT_MAX_INPUT_TOKENS`  | No    | **fn only**  | Document Inbox input-token ceiling. Defaults to `100000`. |
 | `MA_DOCUMENT_MAX_OUTPUT_TOKENS` | No    | **fn only**  | Document Inbox output-token ceiling (`max_tokens` on the Messages call). Defaults to `12000`. |
 | `GA_MEASUREMENT_ID`          | No       | client       | Google Analytics — used by other Kapework apps; **Ma deliberately never loads `/shared/analytics.js`, so this has no effect here** (see "Why no Google Analytics?" below) |
@@ -879,6 +882,40 @@ calendar event (only `create`, enforced by the `operation` check
 constraint); broaden the trusted-device payload; or give a browser any
 CalDAV credential — those live only in the private `irma-sync` repository's
 own secrets.
+
+### "Laat Ma de details voorstellen" — owner-triggered Claude prefill
+
+A `missing` notice already prefills the modal from what irma-sync's parser
+extracted. An `unparsed` one (Ma couldn't read the e-mail reliably at sync
+time) opens blank — so the owner can optionally press **Laat Ma de details
+voorstellen** to have Claude *suggest* the fields from the notice's own
+e-mail excerpt. This is a convenience layered on top of the same
+owner-confirmed flow, not a second write path:
+
+- `netlify/functions/ma-calendar-suggest.js` is owner-verified server-side,
+  re-loads the notice itself (never trusts a client-supplied excerpt), sends
+  **only the stored excerpt** to Claude with a fixed extraction schema
+  (`_ma-document-ai.js`'s `createStructuredMessage`), and returns a
+  suggestion. It **writes nothing** — no DB row, no calendar event, no
+  activity log; it is a pure read-plus-suggest.
+- The excerpt is untrusted e-mail content, handled strictly as data to
+  extract from, never instructions — identical contract to the Document
+  Inbox. The model output is re-validated and cleaned server-side (title
+  length-capped, dates/times format-and-realness checked, anything malformed
+  dropped to `null`), so a prompt-injection attempt in the e-mail can at
+  worst produce a wrong *suggestion* the owner sees and corrects — never a
+  calendar write, never code execution.
+- The suggestion prefills the still-editable form marked *"Voorstel van Ma —
+  controleer …"*. The owner still reviews every field, ticks the
+  confirmation box, and submits through `ma-calendar-write-request.js`, which
+  re-validates everything. A failed or unavailable suggestion (no
+  `ANTHROPIC_API_KEY`, an Anthropic error, an unreadable e-mail) never blocks
+  manual entry — the button just reports it and the owner types the fields
+  in, exactly as before.
+- Reuses the existing `ANTHROPIC_API_KEY`; the model is
+  `MA_CALENDAR_SUGGEST_MODEL` → `MA_DOCUMENT_MODEL` → `claude-sonnet-4-6`.
+  Never logs the excerpt, the suggested values, or the Anthropic response
+  body — only counts and controlled codes.
 
 ---
 
