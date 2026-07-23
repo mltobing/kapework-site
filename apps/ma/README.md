@@ -751,6 +751,13 @@ The subdomain edge function (`netlify/edge-functions/subdomain-router.ts`) will 
 route `ma.kapework.com/*` → `/apps/ma/*` (including `/vandaag` and
 `/.netlify/functions/*`) with no code changes required.
 
+**Static asset caching.** `index.html`, `src/*`, and `styles.css` are served
+at stable, unhashed paths — there's no content-hash filename to force a
+client past a stale cached copy after a deploy. `netlify.toml` sets
+`Cache-Control: no-cache` on these (and on `/shared/config.js`) so a browser
+always revalidates with a conditional request rather than trusting a local
+copy indefinitely; see "Follow-up risks" for the incident that prompted this.
+
 ---
 
 ## Privacy / noindex
@@ -1406,6 +1413,51 @@ disappearing. `fetchRecentLogboekEntries` (Today's "added today" indicator)
 is untouched — it stays based on recently *added* entries, never the date an
 entry concerns. Every existing filter (kind/audience/author/search/date
 range), pagination, and RLS boundary is preserved regardless of sort.
+
+If an `event_date`-sorted page fails at runtime, `fetchLogboekEntries` (via
+`lib/logboek-feed.js`) retries **once** with `created_at` and reports
+`usedSortFallback: true`; the view shows a small non-blocking "Tijdelijk
+gesorteerd op recent toegevoegd." notice rather than either silently
+mis-sorting or blanking the feed. A `created_at` failure has nowhere left to
+fall back to and propagates as a normal load failure.
+
+### Resilient feed architecture (core query vs. hydration)
+
+`ma_posts` is fetched as a **scalar-only core query** — no embedded
+`ma_profiles`/`ma_attachments`/`ma_post_sources` relationships. PostgREST
+fails an *entire* query when an embedded relationship can't be resolved (an
+unapplied migration, an ambiguous FK path, whatever), so embedding them
+directly on the feed query means one broken optional relationship blanks
+every entry, including ones with nothing to do with it. Author profile,
+attachment, and provenance are each hydrated by a separate, best-effort
+lookup in `lib/logboek-feed.js`'s `loadLogboekFeedPage()`/
+`hydrateLogboekEntries()`: a failure in any one of them is caught, logged,
+and simply leaves that field unhydrated (unknown author / no attachments /
+no provenance line) rather than throwing. Only the core query's own failure
+is fatal. `fetchRecentLogboekEntries`, `createLogboekEntry`, and
+`updateLogboekEntry` all go through the same hydration path.
+
+**Incident.** PR #122 originally embedded `ma_post_sources` directly on the
+feed query; since that table (migration 011) had not been applied yet,
+PostgREST rejected the query outright and the whole Logboek feed went down
+(`Kon het logboek niet laden.`). PR #123 decoupled provenance into its own
+best-effort lookup, which fixed the query shape in the repository — but
+production logs (Supabase `api` service logs, captured read-only via MCP)
+showed requests continuing to fail with the *pre-#123* embedded shape
+(`ma_post_sources(source_label,source_locator)` still present in the
+`select=` query string) for a period after PR #123 merged, then no further
+Logboek requests at all in the following ~3 hours. `index.html`/`src/*` had
+no explicit `Cache-Control` header at the time, so the most likely
+explanation is a client (the affected session was iOS Safari) continuing to
+run a cached pre-#123 build rather than a code defect surviving PR #123 —
+see "Static asset caching" above for the header fix. This PR could not
+independently reproduce the failure in a live authenticated browser (no such
+session was available); the diagnosis rests on the production log evidence
+above plus the schema check confirming `ma_post_sources` genuinely doesn't
+exist yet in production. **Regardless of which explanation is right, the
+core/hydration split above means neither can blank the feed going
+forward** — the architectural fix does not depend on the caching diagnosis
+being correct.
 
 ### Retry and duplicate behavior
 

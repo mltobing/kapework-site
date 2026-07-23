@@ -25,12 +25,18 @@
 
 import { supabase } from './supabase.js';
 import { todayAms, addDaysKey, startOfTodayAmsISO } from './lib/datetime.js';
+import { loadLogboekFeedPage, hydrateLogboekEntries } from './lib/logboek-feed.js';
 
-const LOGBOEK_ENTRY_COLUMNS = `
+// Scalar columns only — deliberately no embedded relationships. PostgREST
+// fails an *entire* query when a select embeds a relationship it can't
+// resolve (a table a migration hasn't created yet, an ambiguous FK path,
+// whatever) — see lib/logboek-feed.js's module comment for the full
+// reasoning. Author profile, attachments, and provenance are hydrated
+// separately and independently by loadLogboekFeedPage()/hydrateLogboekEntries()
+// so that a broken *optional* relationship can never blank the feed itself.
+const LOGBOEK_CORE_COLUMNS = `
   id, title, body, kind, audience, tags, event_date, linked_event_uid,
-  pinned, created_at, updated_at, author_id,
-  ma_profiles!author_id ( display_name, relationship, avatar_url ),
-  ma_attachments ( id, object_path, mime_type )
+  pinned, created_at, updated_at, author_id
 `;
 
 // Compact columns for the owner-only Prullenbak (trash) view — a preview, not
@@ -151,15 +157,40 @@ export async function fetchAccessContext(userId) {
  *   by created_at desc) rather than by when they were added — see
  *   lib/document-inbox.js's validateSortOption() and views/logboek.js's
  *   "Sorteren" control.
+ * @returns {Promise<{ entries: object[], usedSortFallback: boolean }>} —
+ *   `usedSortFallback` is true when an 'event_date' sort failed at runtime and
+ *   the page was retried once with 'created_at' instead (see
+ *   lib/logboek-feed.js) — the view shows a small non-blocking notice for
+ *   this, never a silently-wrong sort order.
  */
 export async function fetchLogboekEntries(familyId, {
   limit = 20, offset = 0, kind = null, audience = null,
   authorId = null, search = null, dateFrom = null, dateTo = null,
   sort = 'created_at',
 } = {}) {
+  return loadLogboekFeedPage({
+    sort,
+    fetchCorePage: (effectiveSort) => fetchLogboekCorePage(familyId, {
+      limit, offset, kind, audience, authorId, search, dateFrom, dateTo, sort: effectiveSort,
+    }),
+    fetchProfiles: fetchProfilesForAuthors,
+    fetchAttachments: fetchAttachmentsForPosts,
+    fetchProvenance: fetchPostSourcesByPostId,
+  });
+}
+
+/**
+ * The core Logboek page query — scalar ma_posts columns only, no embedded
+ * relationships (see LOGBOEK_CORE_COLUMNS). A failure here is authoritative
+ * and propagates; loadLogboekFeedPage() (lib/logboek-feed.js) is what applies
+ * the one-time event_date → created_at sort fallback around it.
+ */
+async function fetchLogboekCorePage(familyId, {
+  limit, offset, kind, audience, authorId, search, dateFrom, dateTo, sort,
+}) {
   let query = supabase
     .from('ma_posts')
-    .select(LOGBOEK_ENTRY_COLUMNS)
+    .select(LOGBOEK_CORE_COLUMNS)
     .eq('family_id', familyId)
     .is('deleted_at', null);
 
@@ -179,48 +210,81 @@ export async function fetchLogboekEntries(familyId, {
 
   const { data, error } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
-  const entries = data ?? [];
+  return data ?? [];
+}
 
-  // Provenance is a decoupled, best-effort lookup — never a PostgREST embed
-  // on ma_posts — so the feed itself always loads even in an environment
-  // where migration 011 (ma_post_sources) hasn't been applied yet. See
-  // fetchPostSourcesByPostId()'s own comment for why this must stay this way
-  // permanently, not just during rollout.
-  const sourcesByPostId = await fetchPostSourcesByPostId(entries.map((e) => e.id));
-  for (const entry of entries) {
-    entry.ma_post_sources = sourcesByPostId.get(entry.id) ?? null;
+/**
+ * Author profile (display_name/relationship/avatar_url) for a set of author
+ * ids, keyed by user_id. A separate query rather than a PostgREST embed —
+ * see LOGBOEK_CORE_COLUMNS's comment. Left to throw naturally; the caller
+ * (loadLogboekFeedPage/hydrateLogboekEntries) is what catches and swallows a
+ * failure here.
+ * @param {string[]} authorIds
+ * @returns {Promise<Map<string, { display_name: string, relationship: string|null, avatar_url: string|null }>>}
+ */
+async function fetchProfilesForAuthors(authorIds) {
+  if (!authorIds.length) return new Map();
+  const { data, error } = await supabase
+    .from('ma_profiles')
+    .select('user_id, display_name, relationship, avatar_url')
+    .in('user_id', authorIds);
+  if (error) throw error;
+  return new Map((data ?? []).map((row) => [row.user_id, row]));
+}
+
+/**
+ * Attachments (id/object_path/mime_type) for a set of post ids, grouped by
+ * post_id. A separate query rather than a PostgREST embed — see
+ * LOGBOEK_CORE_COLUMNS's comment. Left to throw naturally; the caller is
+ * what catches and swallows a failure here.
+ * @param {string[]} postIds
+ * @returns {Promise<Map<string, Array<{ id: string, object_path: string, mime_type: string|null }>>>}
+ */
+async function fetchAttachmentsForPosts(postIds) {
+  if (!postIds.length) return new Map();
+  const { data, error } = await supabase
+    .from('ma_attachments')
+    .select('id, post_id, object_path, mime_type')
+    .in('post_id', postIds);
+  if (error) throw error;
+  const byPostId = new Map();
+  for (const row of data ?? []) {
+    if (!byPostId.has(row.post_id)) byPostId.set(row.post_id, []);
+    byPostId.get(row.post_id).push({ id: row.id, object_path: row.object_path, mime_type: row.mime_type });
   }
-
-  return entries;
+  return byPostId;
 }
 
 /**
  * Provenance metadata (source_label/source_locator) for a set of post ids,
- * keyed by post_id. Deliberately a separate query rather than a PostgREST
- * embed on ma_posts: an embed targeting a relationship that doesn't exist yet
- * (e.g. before migration 011 is applied) fails the *entire* query, taking
- * down the whole Logboek feed — and even createLogboekEntry/updateLogboekEntry,
- * since they `.select()` the same column list back. Provenance is a small
- * display-only enhancement, never something the feed itself should depend on
- * to render at all, so a failure here is logged and swallowed rather than
- * thrown.
+ * keyed by post_id. A separate query rather than a PostgREST embed on
+ * ma_posts: an embed targeting a relationship that doesn't exist yet (e.g.
+ * before migration 011 is applied) fails the *entire* query, taking down the
+ * whole Logboek feed — and even createLogboekEntry/updateLogboekEntry, since
+ * they `.select()` a column list back. Provenance is a small display-only
+ * enhancement, never something the feed itself should depend on to render
+ * at all. Left to throw naturally here; loadLogboekFeedPage()/
+ * hydrateLogboekEntries() (lib/logboek-feed.js) is what catches and swallows
+ * a failure — this must stay a separate, best-effort lookup permanently,
+ * not just during migration 011's rollout.
  * @param {string[]} postIds
  * @returns {Promise<Map<string, { source_label: string, source_locator: string|null }>>}
  */
 async function fetchPostSourcesByPostId(postIds) {
   if (!postIds.length) return new Map();
-  try {
-    const { data, error } = await supabase
-      .from('ma_post_sources')
-      .select('post_id, source_label, source_locator')
-      .in('post_id', postIds);
-    if (error) throw error;
-    return new Map((data ?? []).map((row) => [row.post_id, row]));
-  } catch (err) {
-    console.error('[ma/api] Provenance lookup unavailable (non-fatal, feed still renders):', err);
-    return new Map();
-  }
+  const { data, error } = await supabase
+    .from('ma_post_sources')
+    .select('post_id, source_label, source_locator')
+    .in('post_id', postIds);
+  if (error) throw error;
+  return new Map((data ?? []).map((row) => [row.post_id, row]));
 }
+
+const logboekHydrationDeps = {
+  fetchProfiles: fetchProfilesForAuthors,
+  fetchAttachments: fetchAttachmentsForPosts,
+  fetchProvenance: fetchPostSourcesByPostId,
+};
 
 /**
  * Distinct authors who have a (non-trashed) Logboek entry in this family, for
@@ -251,27 +315,31 @@ export async function fetchLogboekAuthors(familyId) {
  * Fetch a small, bounded set of the most recent entries — used for the Today
  * tab's "added today" indicator (family: count of today's care-team entries;
  * caregiver: a short today-only list). Never grows into a feed; callers cap
- * what they render.
+ * what they render. Same resilient core/hydration split as
+ * fetchLogboekEntries(); unlike that function, callers here never need the
+ * sort fallback flag (always sorted by created_at), so this returns the
+ * entry array directly.
  */
 export async function fetchRecentLogboekEntries(familyId, { limit = 15, audience = null } = {}) {
-  let query = supabase
-    .from('ma_posts')
-    .select(LOGBOEK_ENTRY_COLUMNS)
-    .eq('family_id', familyId)
-    .is('deleted_at', null);
-  if (audience) query = query.eq('audience', audience);
-
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return data ?? [];
+  const { entries } = await loadLogboekFeedPage({
+    sort: 'created_at',
+    fetchCorePage: () => fetchLogboekCorePage(familyId, {
+      limit, offset: 0, kind: null, audience, authorId: null, search: null, dateFrom: null, dateTo: null,
+      sort: 'created_at',
+    }),
+    ...logboekHydrationDeps,
+  });
+  return entries;
 }
 
 /**
  * Create a new Logboek entry. `audience` defaults to 'family' — family-only
  * is always the safe default; callers must opt into 'care_team' explicitly.
- * Returns the inserted row.
+ * The insert itself is the authoritative step and its failure always
+ * propagates; the returned row is hydrated with the same best-effort
+ * profile/attachment/provenance lookups as the feed, so an unavailable
+ * enrichment table can never turn a successful create into a thrown error.
+ * Returns the hydrated inserted row.
  */
 export async function createLogboekEntry({
   familyId, authorId, kind, title = null, body = null,
@@ -290,10 +358,11 @@ export async function createLogboekEntry({
       tags,
       linked_event_uid: linkedEventUid,
     })
-    .select(LOGBOEK_ENTRY_COLUMNS)
+    .select(LOGBOEK_CORE_COLUMNS)
     .single();
   if (error) throw error;
-  return data;
+  const [hydrated] = await hydrateLogboekEntries([data], logboekHydrationDeps);
+  return hydrated;
 }
 
 /**
@@ -312,7 +381,10 @@ export async function deleteLogboekEntry(id) {
  * tags. RLS (author-own or owner-any) is the real permission boundary; the UI
  * only ever offers "Bewerken" to an entry's own author (see logboek-entry.js).
  * Never touches audience/kind/attachments — out of scope for this edit form.
- * Returns the updated row.
+ * Same hydration guarantee as createLogboekEntry(): the update is
+ * authoritative and its failure propagates, but the returned row's
+ * profile/attachment/provenance hydration is best-effort. Returns the
+ * hydrated updated row.
  */
 export async function updateLogboekEntry(id, { title, body, eventDate, tags }, userId) {
   const { data, error } = await supabase
@@ -325,10 +397,11 @@ export async function updateLogboekEntry(id, { title, body, eventDate, tags }, u
       updated_by: userId,
     })
     .eq('id', id)
-    .select(LOGBOEK_ENTRY_COLUMNS)
+    .select(LOGBOEK_CORE_COLUMNS)
     .single();
   if (error) throw error;
-  return data;
+  const [hydrated] = await hydrateLogboekEntries([data], logboekHydrationDeps);
+  return hydrated;
 }
 
 /**

@@ -85,6 +85,9 @@ export async function mount(container, { familyId, accessType, user }) {
         <span class="logboek-sort-label">Sorteren:</span>
         <div class="filter-row" id="logboek-sort" role="tablist" aria-label="Sorteren"></div>
       </div>
+      <p class="logboek-sort-fallback-notice" id="logboek-sort-fallback-notice" hidden>
+        Tijdelijk gesorteerd op recent toegevoegd.
+      </p>
 
       <div class="filter-row" id="filter-kind" role="tablist" aria-label="Filter op type"></div>
       ${isCareTeam ? '' : '<div class="filter-row filter-row--chips" id="filter-audience" role="tablist" aria-label="Filter op zichtbaarheid"></div>'}
@@ -118,6 +121,7 @@ export async function mount(container, { familyId, accessType, user }) {
   const feedEl  = container.querySelector('#logboek-feed');
   const moreEl  = container.querySelector('#logboek-more');
   const moreBtn = container.querySelector('#logboek-more-btn');
+  const sortFallbackNotice = container.querySelector('#logboek-sort-fallback-notice');
 
   if (!familyId) {
     feedEl.innerHTML = '<p class="empty-state">Familie niet gevonden.</p>';
@@ -291,7 +295,7 @@ export async function mount(container, { familyId, accessType, user }) {
     moreBtn.textContent = 'Laden…';
 
     try {
-      const entries = await fetchLogboekEntries(familyId, {
+      const { entries, usedSortFallback } = await fetchLogboekEntries(familyId, {
         limit: PAGE_SIZE,
         offset,
         kind: filterState.kind,
@@ -302,6 +306,8 @@ export async function mount(container, { familyId, accessType, user }) {
         dateTo: filterState.dateTo,
         sort: filterState.sort,
       });
+
+      sortFallbackNotice.hidden = !usedSortFallback;
 
       if (reset) feedEl.innerHTML = '';
 
@@ -323,7 +329,20 @@ export async function mount(container, { familyId, accessType, user }) {
       moreEl.hidden = entries.length < PAGE_SIZE;
     } catch (err) {
       console.error('[ma/logboek] Failed to load entries:', err);
-      if (reset) feedEl.innerHTML = '<p class="empty-state">Kon het logboek niet laden. Probeer het opnieuw.</p>';
+      sortFallbackNotice.hidden = true;
+      if (reset) {
+        feedEl.innerHTML = '';
+        const errorState = document.createElement('p');
+        errorState.className = 'empty-state';
+        errorState.textContent = 'Kon het logboek niet laden. ';
+        const retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'btn-ghost';
+        retryBtn.textContent = 'Opnieuw proberen';
+        retryBtn.addEventListener('click', () => reload());
+        errorState.appendChild(retryBtn);
+        feedEl.appendChild(errorState);
+      }
       moreEl.hidden = true;
     } finally {
       loading = false;

@@ -1269,6 +1269,13 @@ h1, h2, h3 { line-height: 1.25; }
   white-space: nowrap;
 }
 
+.logboek-sort-fallback-notice {
+  margin: 0;
+  padding: 0 var(--sp-4) var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 /* ─── Event Card ────────────────────────────────────────────────────────── */
 .event-card {
   background: var(--surface);
