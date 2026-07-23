@@ -16,6 +16,7 @@ import { getFileUrl }                from '../storage.js';
 import { openPhotoModal }            from './modal.js';
 import { renderLogboekComments }     from './logboek-comments.js';
 import { kindLabel, kindIcon, AUDIENCE_LABELS } from '../lib/logboek-types.js';
+import { formatProvenance }          from '../lib/document-inbox.js';
 
 /**
  * @param {object}  entry           — row from ma_posts with nested profile + attachments
@@ -35,6 +36,10 @@ export function renderLogboekEntry(entry, {
   const images      = attachments.filter(a => a.mime_type?.startsWith('image/'));
   const documents    = attachments.filter(a => !a.mime_type?.startsWith('image/'));
   const tags        = entry.tags ?? [];
+  // PostgREST embeds a unique-FK relationship as a single object, but stay
+  // defensive in case a future query shape returns it as a one-element array.
+  const postSource   = Array.isArray(entry.ma_post_sources) ? entry.ma_post_sources[0] : entry.ma_post_sources;
+  const provenance   = formatProvenance(postSource);
 
   const isAuthor  = Boolean(currentUserId) && entry.author_id === currentUserId;
   const canEdit   = isAuthor && typeof onEdit === 'function';
@@ -96,6 +101,8 @@ export function renderLogboekEntry(entry, {
         ${tags.map(t => `<span class="entry-tag">#${escapeHtml(t)}</span>`).join('')}
       </div>
     ` : ''}
+
+    ${provenance ? `<p class="entry-provenance">${escapeHtml(provenance)}</p>` : ''}
 
     <div class="post-comments" id="post-comments-${entry.id}"></div>
   `;

@@ -856,6 +856,13 @@ h1, h2, h3 { line-height: 1.25; }
   border-radius: var(--radius-sm);
 }
 
+.entry-provenance {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 0 var(--sp-4) var(--sp-3);
+}
+
 .post-avatar {
   width: 40px;
   height: 40px;
@@ -1241,6 +1248,26 @@ h1, h2, h3 { line-height: 1.25; }
 }
 
 .logboek-filter-dates .compose-field { flex: 1; }
+
+.logboek-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.logboek-sort-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-2);
+}
+
+.logboek-sort-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
 
 /* ─── Event Card ────────────────────────────────────────────────────────── */
 .event-card {
@@ -1722,6 +1749,101 @@ h1, h2, h3 { line-height: 1.25; }
   font-size: var(--text-sm);
   text-align: center;
 }
+
+/* ─── Document Inbox ──────────────────────────────────────────────────────── */
+
+.dev-body .compose-error,
+.dev-body .compose-progress { margin: var(--sp-3) 0; }
+
+.dv-consent {
+  align-items: flex-start;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.document-row-error { color: var(--danger); }
+
+.document-processing-status {
+  padding: var(--sp-4);
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+.document-processing-status--error { color: var(--danger); }
+
+.document-review-header {
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--sp-3);
+}
+.document-review-label { font-size: var(--text-lg); font-weight: 700; }
+.document-review-files { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.document-review-summary { font-size: var(--text-base); line-height: 1.6; margin: var(--sp-2) 0; }
+
+.document-review-warnings {
+  margin: var(--sp-2) 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--amber-light);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--radius-md);
+  color: var(--amber);
+  font-size: var(--text-sm);
+}
+
+.document-review-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-4) 0; }
+.document-approve-success { color: var(--success); font-weight: 600; }
+
+.document-candidate-list { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.document-candidate-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.document-candidate-header { display: flex; align-items: center; gap: var(--sp-3); }
+.document-candidate-select { width: 22px; height: 22px; }
+
+.document-candidate-status--pending  { background: var(--surface-alt);  color: var(--text-secondary); }
+.document-candidate-status--rejected { background: var(--danger-light); color: var(--danger); }
+.document-candidate-status--approved { background: var(--accent-light); color: var(--accent); }
+
+.document-candidate-excerpt {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-alt);
+  border-left: 3px solid var(--border);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.document-candidate-warnings {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--amber-light);
+  border-radius: var(--radius-md);
+  color: var(--amber);
+  font-size: var(--text-sm);
+}
+
+.document-candidate-followup { font-size: var(--text-sm); color: var(--text-secondary); }
+
+.document-candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.document-candidate-saved { font-size: var(--text-xs); color: var(--success); font-weight: 600; }
 
 /* ─── Beheer (owner-only admin dashboard) ──────────────────────────────────── */
 .view-beheer { padding-bottom: var(--sp-8); }

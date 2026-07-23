@@ -30,7 +30,8 @@ const LOGBOEK_ENTRY_COLUMNS = `
   id, title, body, kind, audience, tags, event_date, linked_event_uid,
   pinned, created_at, updated_at, author_id,
   ma_profiles!author_id ( display_name, relationship, avatar_url ),
-  ma_attachments ( id, object_path, mime_type )
+  ma_attachments ( id, object_path, mime_type ),
+  ma_post_sources ( source_label, source_locator )
 `;
 
 // Compact columns for the owner-only Prullenbak (trash) view — a preview, not
@@ -146,10 +147,15 @@ export async function fetchAccessContext(userId) {
  * @param {string|null} [opts.search]    — free-text match against title/body
  * @param {string|null} [opts.dateFrom]  — YYYY-MM-DD, inclusive lower bound on event_date
  * @param {string|null} [opts.dateTo]    — YYYY-MM-DD, inclusive upper bound on event_date
+ * @param {'created_at'|'event_date'} [opts.sort='created_at'] — 'event_date' sorts
+ *   historical/imported entries by the date they concern (nulls last, tie-broken
+ *   by created_at desc) rather than by when they were added — see
+ *   lib/logboek-sort.js and views/logboek.js's "Sorteren" control.
  */
 export async function fetchLogboekEntries(familyId, {
   limit = 20, offset = 0, kind = null, audience = null,
   authorId = null, search = null, dateFrom = null, dateTo = null,
+  sort = 'created_at',
 } = {}) {
   let query = supabase
     .from('ma_posts')
@@ -167,9 +173,11 @@ export async function fetchLogboekEntries(familyId, {
     if (term) query = query.or(`title.ilike.%${term}%,body.ilike.%${term}%`);
   }
 
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  query = sort === 'event_date'
+    ? query.order('event_date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
+    : query.order('created_at', { ascending: false });
+
+  const { data, error } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
   return data ?? [];
 }
@@ -760,6 +768,184 @@ export async function fetchAdminActivity(familyId, { limit = 30, offset = 0 } = 
  */
 export async function fetchAdminRoster(familyId) {
   const { data, error } = await supabase.rpc('ma_admin_roster', { p_family_id: familyId });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ─── Document Inbox (owner-only) ───────────────────────────────────────────
+// Every function below is owner-only at the RLS layer (see
+// supabase-migrations/011_ma_document_inbox.sql) — a non-owner request
+// returns nothing (or is rejected outright by an RPC), never another
+// family's data. Never returns the source body/bytes — only metadata, the
+// AI's summary/warnings, and (for candidates) the model's proposed text,
+// which the owner reviews before anything reaches ma_posts.
+
+const DOCUMENT_IMPORT_COLUMNS = `
+  id, family_id, created_by, audience, source_type, source_label, document_date,
+  status, source_hash, duplicate_of, document_summary, document_warnings,
+  model, prompt_version, input_tokens, output_tokens, candidate_count,
+  error_code, processing_started_at, processed_at, completed_at,
+  created_at, updated_at
+`;
+
+const DOCUMENT_CANDIDATE_COLUMNS = `
+  id, import_id, sequence_no, status, event_date, date_basis, date_confidence,
+  kind, title, body, audience, tags, source_locator, source_excerpt, warnings,
+  follow_up, post_id, created_at, updated_at
+`;
+
+/**
+ * Create a new Document Inbox import row (status 'draft'). The owner-selected
+ * `audience` becomes the default every resulting candidate inherits — the AI
+ * never chooses it. Returns the inserted row.
+ */
+export async function createDocumentImport({
+  familyId, createdBy, audience, sourceType, sourceLabel, documentDate = null,
+}) {
+  const { data, error } = await supabase
+    .from('ma_document_imports')
+    .insert({
+      family_id: familyId,
+      created_by: createdBy,
+      audience,
+      source_type: sourceType,
+      source_label: sourceLabel,
+      document_date: documentDate,
+    })
+    .select(DOCUMENT_IMPORT_COLUMNS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Record one uploaded source object's metadata. RLS only allows this while
+ * the parent import is still 'draft'. Returns the inserted row.
+ */
+export async function createDocumentImportFile({
+  importId, familyId, uploadedBy, sequenceNo, objectPath, mimeType, sizeBytes, originalFilename = null,
+}) {
+  const { data, error } = await supabase
+    .from('ma_document_import_files')
+    .insert({
+      import_id: importId,
+      family_id: familyId,
+      uploaded_by: uploadedBy,
+      sequence_no: sequenceNo,
+      object_path: objectPath,
+      mime_type: mimeType,
+      size_bytes: sizeBytes,
+      original_filename: originalFilename,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Marks a draft import 'uploaded' once every source object has been written.
+ * Only ever transitions draft → uploaded — never marks an import queued,
+ * ready, or completed (those transitions are server-side only, driven by
+ * ma-document-process / the background worker). Returns null if the import
+ * wasn't in 'draft' (e.g. a duplicate call), the updated row otherwise.
+ */
+export async function markDocumentImportUploaded(importId) {
+  const { data, error } = await supabase
+    .from('ma_document_imports')
+    .update({ status: 'uploaded' })
+    .eq('id', importId)
+    .eq('status', 'draft')
+    .select(DOCUMENT_IMPORT_COLUMNS)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Owner-only imports for this family, newest first. Never the source body. */
+export async function fetchDocumentImports(familyId, { limit = 20, offset = 0 } = {}) {
+  const { data, error } = await supabase
+    .from('ma_document_imports')
+    .select(DOCUMENT_IMPORT_COLUMNS)
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** One import's processing metadata/status/summary/warnings/token counts. */
+export async function fetchDocumentImport(importId) {
+  const { data, error } = await supabase
+    .from('ma_document_imports')
+    .select(DOCUMENT_IMPORT_COLUMNS)
+    .eq('id', importId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** The source object metadata (not the bytes) for one import, in upload order. */
+export async function fetchDocumentImportFiles(importId) {
+  const { data, error } = await supabase
+    .from('ma_document_import_files')
+    .select('id, sequence_no, object_path, mime_type, size_bytes, original_filename, created_at')
+    .eq('import_id', importId)
+    .order('sequence_no', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Draft candidates for one import, in the order the AI proposed them. */
+export async function fetchDocumentCandidates(importId) {
+  const { data, error } = await supabase
+    .from('ma_document_candidates')
+    .select(DOCUMENT_CANDIDATE_COLUMNS)
+    .eq('import_id', importId)
+    .order('sequence_no', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Owner edit of one still-pending-or-rejected candidate — date/type/title/
+ * body/audience/tags, and a status move between 'pending' and 'rejected'
+ * only. Goes through the ma_save_document_candidate() RPC, which re-verifies
+ * ownership and every field constraint server-side; this can never set a
+ * candidate 'approved'. Returns the updated row.
+ */
+export async function saveDocumentCandidate(candidateId, {
+  eventDate, dateBasis, dateConfidence, kind, title, body, audience, tags, status,
+}) {
+  const { data, error } = await supabase.rpc('ma_save_document_candidate', {
+    p_candidate_id:    candidateId,
+    p_event_date:      eventDate,
+    p_date_basis:      dateBasis,
+    p_date_confidence: dateConfidence,
+    p_kind:            kind,
+    p_title:           title,
+    p_body:            body,
+    p_audience:        audience,
+    p_tags:            tags ?? [],
+    p_status:          status,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Owner approval of one or more selected pending candidates — one
+ * transactional, idempotent RPC call. Creates one ordinary `ma_posts` row
+ * (the approving owner as author) plus one `ma_post_sources` provenance row
+ * per newly-approved candidate; a repeated call with the same ids returns the
+ * same mapping rather than creating duplicates. Returns an array of
+ * `{ candidate_id, post_id }`.
+ */
+export async function approveDocumentCandidates(importId, candidateIds) {
+  const { data, error } = await supabase.rpc('ma_approve_document_candidates', {
+    p_import_id:     importId,
+    p_candidate_ids: candidateIds,
+  });
   if (error) throw error;
   return data ?? [];
 }

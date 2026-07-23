@@ -4,7 +4,7 @@
   "private": true,
   "description": "Kapework — Netlify Functions dependencies",
   "scripts": {
-    "test": "node --test apps/ma/src/lib/today-state.test.mjs apps/ma/src/lib/beheer-health.test.mjs apps/ma/src/lib/admin-activity.test.mjs apps/ma/src/lib/presence-heartbeat.test.mjs apps/ma/src/lib/no-analytics.test.mjs apps/ma/src/lib/datetime.test.mjs netlify/functions-tests/_ma-crypto.test.js netlify/functions-tests/_ma-today-derive.test.js netlify/functions-tests/_ma-devices.test.js netlify/functions-tests/_ma-activity.test.js netlify/functions-tests/ma-device-handlers.test.js netlify/functions-tests/ma-sync-trigger.test.js",
+    "test": "node --test apps/ma/src/lib/today-state.test.mjs apps/ma/src/lib/beheer-health.test.mjs apps/ma/src/lib/admin-activity.test.mjs apps/ma/src/lib/presence-heartbeat.test.mjs apps/ma/src/lib/no-analytics.test.mjs apps/ma/src/lib/datetime.test.mjs apps/ma/src/lib/route-parse.test.mjs apps/ma/src/lib/document-inbox.test.mjs netlify/functions-tests/_ma-crypto.test.js netlify/functions-tests/_ma-today-derive.test.js netlify/functions-tests/_ma-devices.test.js netlify/functions-tests/_ma-activity.test.js netlify/functions-tests/ma-device-handlers.test.js netlify/functions-tests/ma-sync-trigger.test.js netlify/functions-tests/_ma-document-ai.test.js netlify/functions-tests/_ma-document-processing.test.js netlify/functions-tests/ma-document-process.test.js netlify/functions-tests/ma-document-process-background.test.js",
     "test:today-state": "for tz in UTC America/New_York Europe/Amsterdam Asia/Jakarta; do echo \"TZ=$tz\"; TZ=$tz node --test apps/ma/src/lib/today-state.test.mjs || exit 1; done"
   },
   "dependencies": {
