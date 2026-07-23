@@ -693,6 +693,81 @@ export async function dismissRideNotice(id, userId) {
   return data;
 }
 
+// ─── Appointment notices (provider e-mail reconciliation) ─────────────────────
+// A second, independent mail-reconciliation strip alongside ride notices —
+// see supabase-migrations/012_ma_calendar_actions_and_appointment_notices.sql.
+// Written only by the private irma-sync job (service role); this app reads
+// open ones and lets a member dismiss them, exactly like ride notices.
+
+/**
+ * Fetch OPEN provider-appointment notices for a family, soonest appointment
+ * first. Notices with no appointment_date (unparsed e-mails) sort last.
+ */
+export async function fetchOpenAppointmentNotices(familyId) {
+  const { data, error } = await supabase
+    .from('ma_appointment_notices')
+    .select(`
+      id, kind, provider_label, appointment_date, start_time, end_time,
+      practitioner, location, excerpt, confidence,
+      match_status, matched_event_uid, received_at
+    `)
+    .eq('family_id', familyId)
+    .eq('state', 'open')
+    .order('appointment_date', { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Dismiss a provider appointment notice ("Negeer"). The BEFORE UPDATE guard
+ * (migration 012) permits members to change only state/dismissed_by/
+ * dismissed_at. Returns the updated row.
+ */
+export async function dismissAppointmentNotice(id, userId) {
+  const { data, error } = await supabase
+    .from('ma_appointment_notices')
+    .update({ state: 'dismissed', dismissed_at: new Date().toISOString(), dismissed_by: userId })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+// ─── Owner-confirmed calendar-write requests ──────────────────────────────────
+// Rows are created by the ma-calendar-write-request Netlify Function
+// (owner-authenticated) and updated by the private irma-sync job (service
+// role) — this app only ever reads them, via owner-only RLS, to poll status.
+// See lib/calendar-write-api.js for the client wrapper that creates a request.
+
+const CALENDAR_WRITE_REQUEST_COLUMNS = `
+  id, family_id, source_kind, ride_notice_id, appointment_notice_id,
+  status, dispatch_status, write_status, mirror_status, error_code,
+  requested_at, dispatched_at, finished_at
+`;
+
+/** One calendar-write request by id, for polling — owner-only (RLS), null if not found/not readable. */
+export async function fetchCalendarWriteRequest(requestId) {
+  const { data, error } = await supabase
+    .from('ma_calendar_write_requests')
+    .select(CALENDAR_WRITE_REQUEST_COLUMNS)
+    .eq('id', requestId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** This request's items (1-2), in sequence order — owner-only (RLS). */
+export async function fetchCalendarWriteItems(requestId) {
+  const { data, error } = await supabase
+    .from('ma_calendar_write_items')
+    .select('id, sequence_no, title, starts_at, ends_at, location, status, error_code')
+    .eq('request_id', requestId)
+    .order('sequence_no', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ─── Presence ────────────────────────────────────────────────────────────────
 
 /**

@@ -10,6 +10,7 @@
 
 import { fetchEvents, fetchCalendarLastSyncedAt } from '../api.js';
 import { renderEventCard } from '../components/event-card.js';
+import { mountAppointmentNotices } from '../components/appointment-notices.js';
 import { amsDateKey, todayAms, addDaysKey, formatDayHeader, formatTime, monthsAheadISO } from '../lib/datetime.js';
 
 // Matches the private irma-sync job's CALENDAR_LOOKAHEAD_MONTHS \u2014 the Agenda
@@ -22,15 +23,17 @@ const PAGE_SIZE = 60;
 
 /**
  * @param {HTMLElement} container
- * @param {{ familyId: string|null }} state
+ * @param {{ familyId: string|null, accessType?: string|null }} state
  */
-export async function mount(container, { familyId }) {
+export async function mount(container, { familyId, accessType }) {
   container.innerHTML = `
     <div class="view-calendar">
       <div class="view-header">
         <h1>Calendar</h1>
       </div>
       <p class="calendar-sync-line" id="calendar-sync-line" hidden></p>
+      <!-- Provider appointment notices: the full open list, near the top. -->
+      <div id="calendar-appointment-notices"></div>
       <div id="calendar-content">
         <div class="section-loading">Loading events\u2026</div>
       </div>
@@ -42,6 +45,7 @@ export async function mount(container, { familyId }) {
 
   const contentEl = container.querySelector('#calendar-content');
   const syncLineEl = container.querySelector('#calendar-sync-line');
+  const appointmentNoticesEl = container.querySelector('#calendar-appointment-notices');
   const moreEl = container.querySelector('#calendar-more');
   const moreBtn = container.querySelector('#calendar-more-btn');
 
@@ -49,6 +53,9 @@ export async function mount(container, { familyId }) {
     contentEl.innerHTML = '<p class="empty-state">Family not found.</p>';
     return;
   }
+
+  mountAppointmentNotices(appointmentNoticesEl, { familyId, accessType })
+    .catch(err => console.error('[ma/calendar] Failed to load appointment notices:', err));
 
   // Small, nontechnical freshness cue for every authenticated user \u2014 not an
   // admin dashboard, just "is this roughly current." Full sync health/history

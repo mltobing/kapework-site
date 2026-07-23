@@ -104,6 +104,47 @@ test('ride_notice_dismissed / caregiver_access_* / trusted_device_* are fixed se
   assert.equal(activitySentence(event({ action: 'trusted_device_revoked', metadata: {} })), 'Heeft een vertrouwd apparaat ingetrokken.');
 });
 
+test('appointment_notice_dismissed is a fixed sentence', () => {
+  assert.equal(
+    activitySentence(event({ action: 'appointment_notice_dismissed', metadata: { kind: 'confirmation', appointment_date: '2026-07-22' } })),
+    'Heeft een melding over een afspraak genegeerd.',
+  );
+});
+
+test('calendar_write_requested names the source kind and adds an item count only when there is more than one', () => {
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_requested', metadata: { source_kind: 'ride_notice', event_count: 1 } })),
+    'Heeft gevraagd om een rit toe te voegen aan de agenda.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_requested', metadata: { source_kind: 'ride_notice', event_count: 2 } })),
+    'Heeft gevraagd om een rit toe te voegen aan de agenda (2 items).',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_requested', metadata: { source_kind: 'appointment_notice', event_count: 1 } })),
+    'Heeft gevraagd om een afspraak toe te voegen aan de agenda.',
+  );
+});
+
+test('calendar_write_completed maps success/partial/failed to distinct safe Dutch copy', () => {
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_completed', metadata: { result: 'success', event_count: 2 } })),
+    'Heeft 2 items aan de agenda toegevoegd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_completed', metadata: { result: 'success', event_count: 1 } })),
+    'Heeft 1 item aan de agenda toegevoegd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_completed', metadata: { result: 'partial', event_count: 2 } })),
+    'Heeft de agenda gedeeltelijk bijgewerkt; niet alles kon worden toegevoegd.',
+  );
+  assert.equal(
+    activitySentence(event({ action: 'calendar_write_completed', metadata: { result: 'failed', event_count: 0 } })),
+    'Kon niet toevoegen aan de agenda.',
+  );
+});
+
 test('logboek_trashed / logboek_restored use the kind label, lowercased', () => {
   assert.equal(
     activitySentence(event({ action: 'logboek_trashed', metadata: { kind: 'note' } })),
@@ -270,6 +311,7 @@ test('every action with a sentence builder is documented in METADATA_ALLOWLIST',
     'logboek_trashed', 'logboek_restored', 'logboek_audience_changed',
     'comment_added', 'attachment_added', 'attachment_removed',
     'briefing_marked_sent', 'briefing_reopened', 'ride_notice_dismissed',
+    'appointment_notice_dismissed', 'calendar_write_requested', 'calendar_write_completed',
     'caregiver_access_granted', 'caregiver_access_revoked', 'membership_role_changed',
     'trusted_device_activated', 'trusted_device_revoked', 'manual_sync_requested',
     'calendar_changed', 'briefings_generated', 'ride_notices_changed', 'pipeline_attention',
