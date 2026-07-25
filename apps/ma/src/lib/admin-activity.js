@@ -44,6 +44,11 @@ export const METADATA_ALLOWLIST = {
   calendar_changed:         ['created', 'updated', 'cancelled'],
   briefings_generated:      ['updated'],
   ride_notices_changed:     ['written', 'superseded', 'auto_resolved'],
+  // Caren reconciliation: counts and controlled statuses only. Deliberately no
+  // title, date, time, evidence id or message id — the whole Caren path is
+  // built on the rule that e-mail payload never reaches a log or an audit row.
+  caren_reconciliation_changed: ['seen', 'partly_seen', 'not_seen', 'changed_after_seen', 'ambiguous'],
+  caren_item_reviewed:      ['action'],
   pipeline_attention:       ['status', 'error_stage'],
 };
 
@@ -129,6 +134,26 @@ const SENTENCE_BUILDERS = {
     if (!parts.length) return 'Heeft AutoMaatje gecontroleerd.';
     return `Heeft AutoMaatje bijgewerkt: ${joinDutchParts(parts)}.`;
   },
+  caren_reconciliation_changed: (m) => {
+    const parts = [];
+    if (m.seen)               parts.push(`${m.seen} gezien in Caren`);
+    if (m.partly_seen)        parts.push(`${m.partly_seen} gedeeltelijk gezien`);
+    if (m.changed_after_seen) parts.push(`${m.changed_after_seen} gewijzigd sinds Caren`);
+    if (m.ambiguous)          parts.push(`${m.ambiguous} met controle nodig`);
+    // Never "ontbreekt": no e-mail is not evidence an appointment is absent.
+    if (m.not_seen)           parts.push(`${m.not_seen} nog niet gezien`);
+    if (!parts.length) return 'Heeft de Caren-controle uitgevoerd; niets gewijzigd.';
+    return `Heeft de Caren-controle bijgewerkt: ${joinDutchParts(parts)}.`;
+  },
+  caren_item_reviewed: (m) => {
+    const ACTIONS = {
+      confirm_candidate: 'Heeft een Caren-melding bevestigd als dezelfde afspraak.',
+      reject_candidate:  'Heeft een Caren-melding afgewezen als andere afspraak.',
+      manual_confirm:    'Heeft handmatig bevestigd dat een afspraak in Caren staat.',
+      reopen:            'Heeft een Caren-controle heropend.',
+    };
+    return ACTIONS[m.action] ?? 'Heeft een Caren-controle beoordeeld.';
+  },
   pipeline_attention: (m) => {
     const stage = m.error_stage;
     if (m.status === 'partial') {
@@ -167,6 +192,8 @@ const ICON_CATEGORY = {
   calendar_changed: 'system',
   briefings_generated: 'briefing',
   ride_notices_changed: 'ride',
+  caren_reconciliation_changed: 'briefing',
+  caren_item_reviewed: 'briefing',
   pipeline_attention: 'system',
 };
 
@@ -195,6 +222,9 @@ const ICONS = {
 function systemSourceLabel(source, action) {
   if (source !== 'irma_sync') return 'Systeem';
   const a = String(action || '');
+  // Checked before the generic /calendar|agenda/ test: 'caren' must not be
+  // mistaken for a calendar action just because the words look alike.
+  if (/caren/.test(a))           return 'Caren-controle';
   if (/calendar|agenda/.test(a)) return 'Agenda-sync';
   if (/briefing/.test(a))        return 'Briefing-sync';
   if (/mail|notice|ride/.test(a)) return 'E-mailcontrole';

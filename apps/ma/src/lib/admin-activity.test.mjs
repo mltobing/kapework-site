@@ -421,3 +421,65 @@ test('buildRosterLookup tolerates a null/undefined rows argument', () => {
   assert.equal(lookup.familyUserIds.size, 0);
   assert.equal(lookup.caregiverUserIds.size, 0);
 });
+
+// ─── Caren reconciliation activity ──────────────────────────────────────────
+
+test('caren_reconciliation_changed allowlist carries counts only, never content', () => {
+  assert.deepEqual(METADATA_ALLOWLIST.caren_reconciliation_changed, [
+    'seen', 'partly_seen', 'not_seen', 'changed_after_seen', 'ambiguous',
+  ]);
+  // No appointment title, date, time, evidence id or message id may ever be
+  // allowlisted here — the whole Caren path keeps e-mail payload out of the
+  // audit trail as strictly as it keeps it out of the logs.
+  for (const key of METADATA_ALLOWLIST.caren_reconciliation_changed) {
+    assert.doesNotMatch(key, /title|date|time|location|excerpt|message|thread|uid|url|person/);
+  }
+  assert.deepEqual(METADATA_ALLOWLIST.caren_item_reviewed, ['action']);
+});
+
+test('caren_reconciliation_changed builds a natural Dutch sentence from non-zero counts', () => {
+  const s = activitySentence(event({
+    actor_type: 'system', actor_user_id: null, source: 'irma_sync',
+    action: 'caren_reconciliation_changed',
+    metadata: { seen: 2, not_seen: 1, ambiguous: 1 },
+  }));
+  assert.equal(s, 'Heeft de Caren-controle bijgewerkt: 2 gezien in Caren, 1 met controle nodig en 1 nog niet gezien.');
+});
+
+test('caren_reconciliation_changed never says an appointment is missing', () => {
+  const s = activitySentence(event({
+    actor_type: 'system', actor_user_id: null, source: 'irma_sync',
+    action: 'caren_reconciliation_changed',
+    metadata: { not_seen: 3 },
+  }));
+  assert.match(s, /nog niet gezien/);
+  assert.doesNotMatch(s, /ontbreek|niet in caren/i);
+});
+
+test('caren_reconciliation_changed with nothing changed is a calm sentence', () => {
+  const s = activitySentence(event({
+    actor_type: 'system', actor_user_id: null, source: 'irma_sync',
+    action: 'caren_reconciliation_changed',
+    metadata: {},
+  }));
+  assert.equal(s, 'Heeft de Caren-controle uitgevoerd; niets gewijzigd.');
+});
+
+test('caren_item_reviewed maps each action to distinct safe Dutch copy', () => {
+  const sentence = (action) => activitySentence(event({
+    action: 'caren_item_reviewed', metadata: { action },
+  }));
+  assert.equal(sentence('confirm_candidate'), 'Heeft een Caren-melding bevestigd als dezelfde afspraak.');
+  assert.equal(sentence('reject_candidate'),  'Heeft een Caren-melding afgewezen als andere afspraak.');
+  assert.equal(sentence('manual_confirm'),    'Heeft handmatig bevestigd dat een afspraak in Caren staat.');
+  assert.equal(sentence('reopen'),            'Heeft een Caren-controle heropend.');
+  // An action the app does not know about degrades, never throws or leaks.
+  assert.equal(sentence('something_new'),     'Heeft een Caren-controle beoordeeld.');
+});
+
+test('a Caren system event is labelled Caren-controle, not Agenda-sync', () => {
+  assert.equal(actorLabel(event({
+    actor_type: 'system', actor_user_id: null, source: 'irma_sync',
+    action: 'caren_reconciliation_changed',
+  })), 'Caren-controle');
+});

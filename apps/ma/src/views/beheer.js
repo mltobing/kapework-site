@@ -16,6 +16,7 @@ import {
   fetchLatestIntegrationRun, fetchLatestIntegrationRunByTrigger, fetchCalendarSourceAdminStatus,
   fetchTomorrowBriefingAdminStatus, fetchRideNoticeAdminSummary, fetchAdminActivity, fetchAdminRoster,
   fetchTrashedLogboekCount, fetchSyncRequestStatus, fetchIntegrationRunById,
+  fetchBriefings, fetchCarenExpectedItems, fetchLatestCarenRun,
 } from '../api.js';
 import { listDevices } from '../lib/devices-api.js';
 import { triggerManualSync } from '../lib/sync-api.js';
@@ -27,6 +28,9 @@ import {
 import {
   computeAgendaHealth, computeBriefingHealth, computeNoticesHealth, agendaFreshnessAt,
 } from '../lib/beheer-health.js';
+import {
+  carenFreshness, carenItemsNeedingAttention, carenErrorText,
+} from '../lib/caren-status.js';
 import { navigate } from '../router.js';
 
 const ACTIVITY_PAGE_SIZE = 30;
@@ -57,6 +61,7 @@ export async function mount(container, { familyId, accessType }) {
           <div class="beheer-card" id="card-agenda"><div class="section-loading">Laden…</div></div>
           <div class="beheer-card" id="card-briefing"><div class="section-loading">Laden…</div></div>
           <div class="beheer-card" id="card-notices"><div class="section-loading">Laden…</div></div>
+          <div class="beheer-card" id="card-caren"><div class="section-loading">Laden…</div></div>
           <div class="beheer-card" id="card-devices"><div class="section-loading">Laden…</div></div>
         </div>
       </section>
@@ -105,6 +110,7 @@ export async function mount(container, { familyId, accessType }) {
     mountAgendaCard(container.querySelector('#card-agenda'), familyId),
     mountBriefingCard(container.querySelector('#card-briefing'), familyId),
     mountNoticesCard(container.querySelector('#card-notices'), familyId),
+    mountCarenCard(container.querySelector('#card-caren'), familyId),
     mountDevicesCard(container.querySelector('#card-devices'), devices),
   ]);
 
@@ -530,6 +536,90 @@ async function mountNoticesCard(el, familyId) {
     ${summary?.openCount > 0 ? '<button class="btn-ghost beheer-card-link" id="notices-card-link">Naar Vandaag</button>' : ''}
   `;
   el.querySelector('#notices-card-link')?.addEventListener('click', () => navigate('today'));
+}
+
+// ─── Card: Caren-controle ───────────────────────────────────────────────────────
+
+/**
+ * Stage health only — when the check last ran, whether it succeeded, and how
+ * many controls need attention. Deliberately no appointment titles, dates or
+ * times: this card is about the pipeline, and the reconciliation itself lives
+ * on Briefing.
+ *
+ * Every failure degrades to a calm line rather than an error, and the whole
+ * card is independent of the other three (it reads columns that only exist
+ * once migration 014 is applied).
+ */
+async function mountCarenCard(el, familyId) {
+  el.innerHTML = '<h3 class="beheer-card-title">Caren-controle</h3><div class="section-loading">Laden…</div>';
+
+  let run = null;
+  let briefings = [];
+  try {
+    [run, briefings] = await Promise.all([
+      fetchLatestCarenRun(familyId),
+      fetchBriefings(familyId, { limit: 7 }),
+    ]);
+  } catch (err) {
+    console.error('[ma/beheer] Caren card failed:', err);
+    el.innerHTML =
+      '<h3 class="beheer-card-title">Caren-controle</h3>' +
+      `<p class="beheer-card-line">${escapeHtml(carenErrorText('caren_unavailable'))}</p>`;
+    return;
+  }
+
+  const freshness = carenFreshness(run);
+  const { level, statusText } = carenCardState(run, freshness);
+
+  let attentionLine = '';
+  if (level !== 'neutral' && briefings.length) {
+    try {
+      const items = await fetchCarenExpectedItems(briefings.map(b => b.id));
+      const count = carenItemsNeedingAttention(items).length;
+      attentionLine = `<p class="beheer-card-line beheer-card-line--muted">${escapeHtml(
+        count === 1 ? '1 controle vraagt aandacht' : `${count} controles vragen aandacht`,
+      )}</p>`;
+    } catch (err) {
+      console.error('[ma/beheer] Caren item counts unavailable:', err);
+    }
+  }
+
+  const lastCheckLine = run?.finished_at
+    ? `<p class="beheer-card-line beheer-card-line--muted">Laatste controle: ${escapeHtml(formatDayHeader(run.finished_at))} om ${escapeHtml(formatTime(run.finished_at))}</p>`
+    : '';
+
+  el.innerHTML = `
+    <h3 class="beheer-card-title">Caren-controle</h3>
+    ${healthBadge(level, level === 'neutral' ? 'Uitgeschakeld' : level === 'green' ? 'In orde' : level === 'amber' ? 'Controleren' : 'Aandacht nodig')}
+    <p class="beheer-card-line">${escapeHtml(statusText)}</p>
+    ${lastCheckLine}
+    ${attentionLine}
+    ${level === 'neutral' ? '' : '<button class="btn-ghost beheer-card-link" id="caren-card-link">Naar Briefing</button>'}
+  `;
+  el.querySelector('#caren-card-link')?.addEventListener('click', () => navigate('briefing'));
+}
+
+/** Card level + copy from the run's Caren stage status. Pure. */
+function carenCardState(run, freshness) {
+  if (!run || !run.caren_status || run.caren_status === 'skipped') {
+    return { level: 'amber', statusText: 'Nog geen gegevens.' };
+  }
+  if (run.caren_status === 'disabled') {
+    return { level: 'neutral', statusText: 'Uitgeschakeld. Stel CAREN_SENDER_ALLOWLIST in om dit te activeren.' };
+  }
+  if (run.caren_status === 'misconfigured') {
+    return { level: 'red', statusText: 'Verkeerd geconfigureerd.' };
+  }
+  if (run.caren_status === 'failed') {
+    return { level: 'red', statusText: 'Laatste controle mislukt.' };
+  }
+  if (freshness.level === 'stale') {
+    return { level: 'amber', statusText: carenErrorText('caren_stale') };
+  }
+  if (freshness.level === 'unavailable') {
+    return { level: 'amber', statusText: 'De Caren-controle is bezig.' };
+  }
+  return { level: 'green', statusText: 'Gecontroleerd.' };
 }
 
 // ─── Card: Vertrouwde apparaten ─────────────────────────────────────────────────
