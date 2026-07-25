@@ -15,7 +15,10 @@
  * Neither belongs on Today.
  */
 
-import { fetchEvents, fetchCalendarLastSyncedAt, fetchBriefings, fetchRecentLogboekEntries } from '../api.js';
+import {
+  fetchEvents, fetchCalendarLastSyncedAt, fetchBriefings, fetchRecentLogboekEntries,
+  fetchCarenExpectedItems, fetchLatestCarenRun,
+} from '../api.js';
 import { renderEventCard }   from '../components/event-card.js';
 import { renderLogboekEntry } from '../components/logboek-entry.js';
 import { mountRideNotices }  from '../components/ride-notices.js';
@@ -23,6 +26,8 @@ import { mountAppointmentNotices } from '../components/appointment-notices.js';
 import { sanitizeEventForState } from '../lib/event-derive.js';
 import { activeCalendarEvents, activeEventsByUid, activeEventsOnDay } from '../lib/calendar-events.js';
 import { computeTodayState } from '../lib/today-state.js';
+import { carenFreshness, carenAttentionIsActionable, carenItemsNeedingAttention } from '../lib/caren-status.js';
+import { carenTodayLine } from '../lib/caren-render.js';
 import { navigate } from '../router.js';
 import { escapeHtml } from '../utils.js';
 import {
@@ -77,6 +82,9 @@ export async function mount(container, { familyId, accessType }) {
         <!-- Vanavond versturen: only when tomorrow's briefing is ready. -->
         <div id="today-tonight"></div>
 
+        <!-- Owner-only, one line, links to Briefing. Never a second list. -->
+        <div id="today-caren"></div>
+
         <!-- Small link only — never a second feed. -->
         <div id="today-care-updates"></div>
       `}
@@ -116,6 +124,10 @@ export async function mount(container, { familyId, accessType }) {
   renderTonight(briefingsResult, todayKey, tonightEl);
   await renderCareUpdatesLink(careUpdatesEl, familyId, todayKey);
 
+  if (accessType === 'owner') {
+    await renderCarenSignal(container.querySelector('#today-caren'), familyId, briefingsResult);
+  }
+
   // Today-relevant notices only: undated (unparsed) or with a ride_date today or
   // earlier (overdue). Future rides surface on their own day, not here.
   await mountRideNotices(noticesEl, {
@@ -134,6 +146,51 @@ export async function mount(container, { familyId, accessType }) {
     accessType,
     filter: (n) => !n.appointment_date || n.appointment_date <= appointmentHorizon,
   });
+}
+
+// ─── Caren reconciliation — owner-only, one compact line ────────────────────
+
+/**
+ * A single count linking to Briefing. Today deliberately gets no Caren list:
+ * the full per-item view with its review actions lives on one screen, and a
+ * second one here would compete with it.
+ *
+ * Shown only when the reconciliation is genuinely current — a "3 controles
+ * vragen aandacht" produced by a stage that last succeeded yesterday would be
+ * telling the owner about appointments nobody has actually looked for. Every
+ * failure is swallowed: this is the least important thing on the page.
+ */
+async function renderCarenSignal(el, familyId, briefingsResult) {
+  if (!el) return;
+  el.innerHTML = '';
+  if (briefingsResult.status !== 'fulfilled') return;
+
+  const briefingIds = (briefingsResult.value ?? []).map(b => b.id);
+  if (!briefingIds.length) return;
+
+  try {
+    const [itemsResult, runResult] = await Promise.allSettled([
+      fetchCarenExpectedItems(briefingIds),
+      fetchLatestCarenRun(familyId),
+    ]);
+    if (itemsResult.status !== 'fulfilled') return;
+
+    const freshness = carenFreshness(runResult.status === 'fulfilled' ? runResult.value : null);
+    if (!carenAttentionIsActionable(freshness)) return;
+
+    const line = carenTodayLine(carenItemsNeedingAttention(itemsResult.value).length);
+    if (!line) return;
+
+    el.innerHTML = `
+      <button class="today-caren-link" id="today-caren-link">
+        ${escapeHtml(line)} →
+      </button>
+    `;
+    el.querySelector('#today-caren-link').addEventListener('click', () => navigate('briefing'));
+  } catch (err) {
+    console.error('[ma/today] Caren signal unavailable:', err);
+    el.innerHTML = '';
+  }
 }
 
 // ─── Care-team-added-today (family view: link only, never a feed) ───────────

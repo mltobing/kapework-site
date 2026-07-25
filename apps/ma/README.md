@@ -949,6 +949,106 @@ owner-confirmed flow, not a second write path:
 
 ---
 
+## Caren-controle — owner-only reconciliation
+
+Caren (Nedap) is where the care team reads the daily plan. Somebody has to
+paste the briefing's Caren line into it by hand, and that step can silently be
+missed. Caren e-mails the family when an appointment is added or changed, and
+again shortly before it starts — so the private `irma-sync` job reads those
+notifications (read-only, from the mailbox it already uses for AutoMaatje) and
+matches them against what Ma's briefing says should be in Caren.
+
+**This is positive evidence only, and that shapes everything about it.**
+
+An e-mail proves an appointment existed in Caren when the message was
+generated. The absence of an e-mail proves nothing: Caren may not have
+notified, the message may have been filtered, or the reconciliation stage may
+simply not have run. So the copy is **"Nog niet gezien in Caren"** — never
+"Ontbreekt in Caren" or "Niet in Caren". `lib/caren-isolation.test.mjs` fails
+the build if any of those phrases appears in app source.
+
+No deletion is ever inferred either: no reliable Caren deletion-notification
+template has been observed, so this feature cannot and does not tell you an
+appointment was removed.
+
+Nothing here logs into Caren, writes to Caren, or sends an e-mail.
+
+### What the owner sees
+
+Each Briefing card gains a separate Caren section with its own badge, derived
+from that day's expected items (`lib/caren-status.js`). Precedence, most urgent
+first:
+
+| Summary | Badge |
+|---|---|
+| `changed_after_seen` | Ma is gewijzigd sinds Caren |
+| `ambiguous`          | Controle nodig |
+| `partly_seen`        | Gedeeltelijk gezien in Caren |
+| `seen`               | Gezien in Caren ✓ |
+| `not_seen`           | Nog niet gezien in Caren |
+
+Per item the owner can mark it manually as being in Caren, re-confirm a
+changed version, compare an ambiguous candidate side by side ("Dit is dezelfde
+afspraak" / "Niet dezelfde afspraak"), or reopen a closed check. Every one of
+those goes through the `ma_review_caren_item` RPC, which writes an audit row.
+
+An ambiguous match is always resolved by a human. The matcher refuses to guess,
+and **no model is involved anywhere in the Caren path** — the two e-mail
+templates are parsed deterministically.
+
+### Separation from "Markeer als verzonden"
+
+The briefing's own `ready` / `sent` / `changed_after_sent` status is a human
+workflow and is never changed by Caren evidence, in either direction. They are
+two independent axes: one records "I sent the briefing", the other "Caren
+appears to have it". Nothing in the Caren path writes to `ma_briefings`.
+
+### Freshness
+
+A `not_seen` only means something if the check actually ran. `carenFreshness()`
+reads the latest `ma_integration_runs.caren_status`:
+
+| Latest run | Shown as |
+|---|---|
+| `success`, finished ≤6h ago | current |
+| `success`, 6–12h ago | current, with a mild "enkele uren oud" note |
+| `success` >12h ago, or `failed`/`misconfigured` | **Caren-controle niet actueel** — stored statuses stay visible, but not-seen is not emphasized |
+| `disabled` | section hidden entirely; Beheer explains the setup once |
+
+Today shows only a compact owner-only count linking to Briefing — never a
+second list — and only while the check is current.
+
+### Access
+
+Owner-only in this MVP: John and Martin need this administrative
+reconciliation; ordinary family members and care-team users do not. **UI hiding
+is not authorization.** `ma_caren_evidence`, `ma_caren_expected_items` and
+`ma_caren_match_reviews` are all owner-SELECT-only with no browser write policy
+at all, and `ma_review_caren_item` is `SECURITY DEFINER` and re-checks family
+ownership itself.
+
+### Privacy
+
+Caren notification bodies contain a calendar URL of the shape
+`https://caren.nl/people/<private-id>/calendar?date=YYYY-MM-DD`. Only the
+`date` query parameter is ever parsed; the URL and the person id are discarded
+at parse time, and **no column exists to store them**. Nothing renders a source
+message id either. Everything shown comes from an e-mail and is escaped —
+`lib/caren-render.js` holds the builders precisely so those two properties are
+unit-tested rather than reviewed by eye.
+
+### Failure isolation
+
+Caren is optional enrichment. `fetchBriefings()` never mentions a Caren table,
+the Briefing view loads the enrichment through `Promise.allSettled` after the
+briefing text is already in hand, and `caren_status` is fetched by its own
+narrow query rather than added to `INTEGRATION_RUN_COLUMNS`. If migration 014
+has not been applied, or RLS denies the read, the Caren section simply does not
+appear — the briefing text is unaffected. This is a direct lesson from the
+Logboek incident, where one unavailable embedded relationship blanked a page.
+
+---
+
 ## Trusted devices — the care recipient's `/vandaag` display
 
 `ma.kapework.com/vandaag` is a **separate, read-only** entry point (its own
