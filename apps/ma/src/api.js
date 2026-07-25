@@ -1137,3 +1137,106 @@ export async function approveDocumentCandidates(importId, candidateIds) {
   if (error) throw error;
   return data ?? [];
 }
+
+// ─── Caren reconciliation (owner-only) ───────────────────────────────────────
+//
+// Rows are written only by the private irma-sync job (service role), which
+// reads Caren notification e-mails read-only and matches them against what
+// Ma's briefing says should be in Caren. RLS on all three tables is owner
+// SELECT only, and the single mutation path is the ma_review_caren_item RPC,
+// which re-checks ownership itself — the UI hiding in views/briefing.js is
+// presentation, never authorization.
+//
+// Every function here is deliberately SEPARATE from fetchBriefings(). Caren is
+// optional enrichment: embedding it in the core briefing select would mean a
+// single unavailable relationship — most obviously migration 014 not yet
+// applied — blanks the entire Briefing page. That is exactly how the Logboek
+// incident happened (see lib/logboek-feed.js). fetchBriefings() must keep
+// working unchanged whether or not any of this exists.
+
+const CAREN_EXPECTED_ITEM_COLUMNS = `
+  id, briefing_id, briefing_date, cluster_identity, sequence_no,
+  content_hash, content_changed_at, expected_summary, known_times,
+  cluster_starts_at, cluster_ends_at, status,
+  matched_evidence_id, ambiguous_evidence_id, matched_content_hash, matched_at,
+  manual_confirmed_at, retired_at
+`;
+
+// Deliberately no source_message_id and no URL/person-id column exists to
+// select: a Caren calendar URL is discarded at parse time and never stored.
+const CAREN_EVIDENCE_COLUMNS = `
+  id, received_at, evidence_type, appointment_date, starts_at, ends_at,
+  title, location, excerpt, confidence
+`;
+
+/**
+ * Expected Caren items for the given briefings, oldest date first then
+ * sequence order. Returns [] for an empty id list without a round trip.
+ *
+ * Retired items are included so callers can reason about history if they need
+ * to; lib/caren-status.js's activeCarenItems() is what the UI counts.
+ */
+export async function fetchCarenExpectedItems(briefingIds) {
+  if (!Array.isArray(briefingIds) || !briefingIds.length) return [];
+  const { data, error } = await supabase
+    .from('ma_caren_expected_items')
+    .select(CAREN_EXPECTED_ITEM_COLUMNS)
+    .in('briefing_id', briefingIds)
+    .order('briefing_date', { ascending: true })
+    .order('sequence_no', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * The evidence rows behind a set of matched/ambiguous item references, for the
+ * comparison modal. Fetched separately (and lazily) rather than embedded, for
+ * the same isolation reason as above.
+ */
+export async function fetchCarenEvidence(evidenceIds) {
+  const ids = Array.isArray(evidenceIds) ? evidenceIds.filter(Boolean) : [];
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from('ma_caren_evidence')
+    .select(CAREN_EVIDENCE_COLUMNS)
+    .in('id', ids);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Record an owner decision about one expected item. The RPC is the only write
+ * path: it verifies family ownership, locks the item, enforces the action
+ * vocabulary and the evidence pairing, and writes the audit row — none of
+ * which a direct table update would do. Returns the updated item row.
+ *
+ * @param {{ itemId: string, action: 'confirm_candidate'|'reject_candidate'|'manual_confirm'|'reopen', evidenceId?: string|null }} args
+ */
+export async function reviewCarenItem({ itemId, action, evidenceId = null }) {
+  const { data, error } = await supabase.rpc('ma_review_caren_item', {
+    p_expected_item_id: itemId,
+    p_action:           action,
+    p_evidence_id:      evidenceId,
+  });
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] ?? null : data;
+}
+
+/**
+ * Latest run's Caren stage health, for the freshness rules in
+ * lib/caren-status.js. Selects only the three columns it needs rather than
+ * reusing INTEGRATION_RUN_COLUMNS: caren_status arrives with migration 014,
+ * and adding it to the shared list would make every Beheer run query fail
+ * until that migration is applied.
+ */
+export async function fetchLatestCarenRun(familyId) {
+  const { data, error } = await supabase
+    .from('ma_integration_runs')
+    .select('id, finished_at, caren_status')
+    .eq('family_id', familyId)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
