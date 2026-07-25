@@ -26,6 +26,7 @@
 import { supabase } from './supabase.js';
 import { todayAms, addDaysKey, startOfTodayAmsISO } from './lib/datetime.js';
 import { loadLogboekFeedPage, hydrateLogboekEntries } from './lib/logboek-feed.js';
+import { buildActiveEventsQuery } from './lib/calendar-events.js';
 
 // Scalar columns only — deliberately no embedded relationships. PostgREST
 // fails an *entire* query when a select embeds a relationship it can't
@@ -547,9 +548,20 @@ export async function createAttachment({ postId, familyId, uploaderId, objectPat
 // ─── Calendar events ─────────────────────────────────────────────────────────
 
 /**
- * Fetch upcoming calendar events from the mirrored ma_calendar_events table.
- * Events are read-only; the source of truth is the family iCloud calendar,
- * synced separately into this table.
+ * Fetch upcoming *active* calendar events from the mirrored ma_calendar_events
+ * table. Events are read-only; the source of truth is the family iCloud
+ * calendar, synced separately into this table.
+ *
+ * Contract: this returns confirmed events only. The mirror soft-cancels rather
+ * than deletes (status = 'cancelled') so the audit/reconciliation trail
+ * survives an iCloud deletion — which means an unfiltered read keeps showing
+ * events that no longer exist in iCloud. The filter lives in
+ * lib/calendar-events.js and is a positive `status = 'confirmed'` match, never
+ * `!= 'cancelled'`, so a status introduced later fails closed instead of
+ * appearing on Today unannounced.
+ *
+ * Callers needing cancelled rows (diagnostics, admin history) must query for
+ * them deliberately — nothing here deletes or hides them at rest.
  *
  * Family-only: RLS has no care-team policy on ma_calendar_events (deliberately
  * out of scope for this PR — see apps/ma/README.md "Follow-up risks"), so a
@@ -566,16 +578,10 @@ export async function createAttachment({ postId, familyId, uploaderId, objectPat
  * unaffected.
  */
 export async function fetchEvents(familyId, { from, to, limit = 40, offset = 0 } = {}) {
-  const fromDate = from ?? startOfTodayAmsISO();
-  let query = supabase
-    .from('ma_calendar_events')
-    .select('id, external_event_uid, title, starts_at, ends_at, all_day, location, notes, external_url, status')
-    .eq('family_id', familyId)
-    .gte('starts_at', fromDate);
-  if (to) query = query.lt('starts_at', to);
-  const { data, error } = await query
-    .order('starts_at', { ascending: true })
-    .range(offset, offset + limit - 1);
+  const { data, error } = await buildActiveEventsQuery(
+    supabase.from('ma_calendar_events'),
+    { familyId, from: from ?? startOfTodayAmsISO(), to, limit, offset },
+  );
   if (error) throw error;
   return data ?? [];
 }

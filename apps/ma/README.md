@@ -824,6 +824,36 @@ fetches events in paginated pages bounded to that same six-month horizon
 ("Meer laden" loads further pages), rather than an unbounded lifetime
 history; Today/Briefing/compose keep their own narrow, task-focused windows.
 
+### Deleted events — why the mirror keeps them and the app hides them
+
+iCloud remains the source of truth, but the mirror **never deletes a row**.
+When an event disappears from "Met Irma", `irma-sync` marks the mirrored row
+`status = 'cancelled'` and leaves it in place. That soft-cancel is deliberate:
+the reconciliation strips (ride notices, appointment notices) compare e-mail
+evidence against what the calendar held, and a physically deleted row would
+destroy that audit trail.
+
+The consequence is that **every active read in this app must filter on status
+itself**. That filter lives in one place, `src/lib/calendar-events.js`:
+
+- `fetchEvents()` composes `.eq('status', 'confirmed')` alongside the family
+  filter, so Today, Agenda and compose see confirmed rows only;
+- the same module's `activeCalendarEvents()` / `activeEventsOnDay()` /
+  `bucketActiveEventsByHorizon()` / `activeEventsByUid()` re-apply the rule at
+  render time, as defense in depth.
+
+The filter is a positive match on `'confirmed'`, never `!= 'cancelled'`: a
+status a later migration introduces must **fail closed** (stay hidden) rather
+than appear on Today the day it ships.
+
+**Timing.** Deleting an appointment in Apple Calendar does not remove it from
+Ma instantly. It disappears after the next successful sync — within three
+hours, or immediately if an owner presses **Agenda nu bijwerken** in Beheer.
+Until that sync runs, Ma is still showing what the last sync saw.
+
+Cancelled rows stay readable for diagnostics and admin history; nothing in
+this app deletes them, and the historical/admin queries are untouched.
+
 ---
 
 ## Calendar write requests — "Toevoegen aan agenda"

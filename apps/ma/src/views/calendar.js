@@ -11,7 +11,8 @@
 import { fetchEvents, fetchCalendarLastSyncedAt } from '../api.js';
 import { renderEventCard } from '../components/event-card.js';
 import { mountAppointmentNotices } from '../components/appointment-notices.js';
-import { amsDateKey, todayAms, addDaysKey, formatDayHeader, formatTime, monthsAheadISO } from '../lib/datetime.js';
+import { activeCalendarEvents, bucketActiveEventsByHorizon } from '../lib/calendar-events.js';
+import { todayAms, formatDayHeader, formatTime, monthsAheadISO } from '../lib/datetime.js';
 
 // Matches the private irma-sync job's CALENDAR_LOOKAHEAD_MONTHS \u2014 the Agenda
 // view is the one place in this app that needs the wide mirror horizon;
@@ -74,7 +75,11 @@ export async function mount(container, { familyId, accessType }) {
 
   async function loadPage() {
     const page = await fetchEvents(familyId, { to, limit: PAGE_SIZE, offset });
-    allEvents = allEvents.concat(page);
+    // Accumulate active rows only (defense in depth — the query already filters
+    // on status). Pagination is driven by the *raw* page length and `offset`
+    // advances by it, because both describe the database window, not what
+    // survived filtering; using the filtered length would skip rows.
+    allEvents = allEvents.concat(activeCalendarEvents(page));
     offset += page.length;
     moreEl.hidden = page.length < PAGE_SIZE;
   }
@@ -134,30 +139,17 @@ export async function mount(container, { familyId, accessType }) {
 }
 
 /**
- * Groups events into Today / This week / Coming up buckets.
- * Boundaries follow the Amsterdam calendar day, so an event never lands in the
- * wrong bucket because the viewer is in a different timezone.
+ * Groups events into the labelled Today / This week / Coming up sections.
+ *
+ * The bucketing itself (and the cancelled-row exclusion that goes with it)
+ * lives in lib/calendar-events.js so it can be unit-tested without this
+ * module's Supabase import chain; only the section labels stay here.
  *
  * @param {Array} events — sorted ascending by starts_at
  * @returns {Array<[string, Array]>}
  */
 function groupByTime(events) {
-  const todayKey    = todayAms();
-  const tomorrowKey = addDaysKey(todayKey, 1);
-  const weekEndKey  = addDaysKey(todayKey, 7);
-
-  const today    = [];
-  const thisWeek = [];
-  const later    = [];
-
-  for (const event of events) {
-    // YYYY-MM-DD keys compare chronologically as plain strings.
-    const key = amsDateKey(event.starts_at);
-    if (key < tomorrowKey)     today.push(event);
-    else if (key < weekEndKey) thisWeek.push(event);
-    else                       later.push(event);
-  }
-
+  const { today, thisWeek, later } = bucketActiveEventsByHorizon(events, todayAms());
   return [
     ['Today',       today],
     ['This week',   thisWeek],

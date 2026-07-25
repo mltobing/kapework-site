@@ -24,13 +24,14 @@ import { renderLogboekEntry } from '../components/logboek-entry.js';
 import { mountRideNotices }  from '../components/ride-notices.js';
 import { mountAppointmentNotices } from '../components/appointment-notices.js';
 import { sanitizeEventForState } from '../lib/event-derive.js';
+import { activeCalendarEvents, activeEventsByUid, activeEventsOnDay } from '../lib/calendar-events.js';
 import { computeTodayState } from '../lib/today-state.js';
 import { carenFreshness, carenAttentionIsActionable, carenItemsNeedingAttention } from '../lib/caren-status.js';
 import { carenTodayLine } from '../lib/caren-render.js';
 import { navigate } from '../router.js';
 import { escapeHtml } from '../utils.js';
 import {
-  amsDateKey, todayAms, addDaysKey, formatDateKeyHeader, isPast, isTodayAms,
+  todayAms, addDaysKey, formatDateKeyHeader, isPast, isTodayAms,
 } from '../lib/datetime.js';
 
 const QUICK_ACTION_HTML = `
@@ -231,15 +232,15 @@ async function renderTodayCareEntries(el, familyId, todayKey) {
   }
 }
 
-/** Map ma_calendar_events.external_event_uid → event, for matching conflict notices. */
+/**
+ * Map ma_calendar_events.external_event_uid → event, for matching conflict
+ * notices. Active events only: a notice about a ride whose event was deleted
+ * from iCloud describes a real, still-open discrepancy, and must not be
+ * silently satisfied by the soft-cancelled row the mirror keeps for audit.
+ */
 function buildEventsByUid(eventsResult) {
-  const map = new Map();
-  if (eventsResult.status === 'fulfilled') {
-    for (const ev of eventsResult.value ?? []) {
-      if (ev.external_event_uid) map.set(ev.external_event_uid, ev);
-    }
-  }
-  return map;
+  if (eventsResult.status !== 'fulfilled') return new Map();
+  return activeEventsByUid(eventsResult.value);
 }
 
 // ─── Nu — deterministic current-state card ───────────────────────────────────
@@ -252,7 +253,7 @@ function renderNow(eventsResult, syncResult, nowEl) {
     return;
   }
 
-  const events   = (eventsResult.value ?? []).map(sanitizeEventForState);
+  const events   = activeCalendarEvents(eventsResult.value).map(sanitizeEventForState);
   const lastSync = syncResult.status === 'fulfilled' ? syncResult.value : null;
   const s = computeTodayState({ events, now: Date.now(), calendarLastSyncedAt: lastSync });
 
@@ -274,8 +275,10 @@ function renderTodayEvents(eventsResult, todayKey, vandaagEl) {
     return;
   }
 
-  const events = eventsResult.value ?? [];
-  const todayEvents = events.filter(e => amsDateKey(e.starts_at) === todayKey);
+  // activeEventsOnDay() is defense in depth: fetchEvents() already filters at
+  // the database, but Today must never render a cancelled row even if a future
+  // caller or a test double hands one over.
+  const todayEvents = activeEventsOnDay(eventsResult.value, todayKey);
 
   vandaagEl.innerHTML = '';
   if (!todayEvents.length) {
