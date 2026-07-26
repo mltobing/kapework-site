@@ -19,6 +19,7 @@
 import { escapeHtml } from '../utils.js';
 import { formatClock } from '../lib/datetime.js';
 import { requestCalendarWrite, suggestCalendarWrite, pollCalendarWrite, calendarWriteErrorMessage } from '../lib/calendar-write-api.js';
+import { blockingReason as legsBlockingReason } from '../lib/calendar-write-form.js';
 
 const MAX_LEGS = 2;
 
@@ -122,7 +123,7 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
         ` : ''}
         ${notice.excerpt ? `
           <div class="cw-suggest-row">
-            <button type="button" class="btn-ghost" id="cw-suggest-btn">Laat Ma de details voorstellen</button>
+            <button type="button" class="cw-suggest-btn" id="cw-suggest-btn">Laat Ma de details voorstellen</button>
           </div>
           <p class="cw-suggest-hint" id="cw-suggest-hint" hidden></p>
         ` : ''}
@@ -131,6 +132,7 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
           <input type="checkbox" id="cw-confirm-checkbox">
           Ik heb datum, tijden, titel en locatie gecontroleerd.
         </label>
+        <p class="cw-blocked" id="cw-modal-blocked" hidden></p>
         <div id="cw-modal-error" class="compose-error" hidden></div>
         <div id="cw-modal-status" class="cw-modal-status" hidden></div>
       </div>
@@ -146,6 +148,7 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
   const confirmCheckbox = modal.querySelector('#cw-confirm-checkbox');
   const errorEl = modal.querySelector('#cw-modal-error');
   const statusEl = modal.querySelector('#cw-modal-status');
+  const blockedEl = modal.querySelector('#cw-modal-blocked');
 
   function close() {
     if (cancelPoll) cancelPoll();
@@ -193,22 +196,14 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
 
     legsEl.querySelectorAll('.cw-leg').forEach((fieldset) => {
       fieldset.querySelectorAll('input').forEach((input) => {
-        input.addEventListener('input', () => {
-          const i = Number(fieldset.dataset.leg);
-          legs[i] = {
-            ...legs[i],
-            title: modal.querySelector(`#cw-title-${i}`).value,
-            date: modal.querySelector(`#cw-date-${i}`).value,
-            startTime: modal.querySelector(`#cw-start-${i}`).value,
-            endTime: modal.querySelector(`#cw-end-${i}`).value,
-            location: modal.querySelector(`#cw-location-${i}`).value,
-          };
-          // Keep the "no end time in the e-mail" hint in step with the field —
-          // it must clear the moment the owner supplies one.
-          const endHint = modal.querySelector(`#cw-endhint-${i}`);
-          if (endHint) endHint.hidden = Boolean(legs[i].endTime);
-          updateSubmitState();
-        });
+        // Both events, deliberately. `input` alone was silently wrong on
+        // mobile: iOS Safari's native date and time pickers commit their value
+        // on `change` and do not reliably fire `input`, so `legs[]` never
+        // caught up with what the owner had picked, the submit button stayed
+        // disabled, and tapping "Toevoegen" did nothing at all. Desktop
+        // browsers fire both; the duplicate sync is idempotent.
+        input.addEventListener('input', syncFromDom);
+        input.addEventListener('change', syncFromDom);
       });
     });
 
@@ -221,14 +216,44 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
     });
   }
 
-  function legIsComplete(leg) {
-    return Boolean(leg.title?.trim()) && Boolean(leg.date) && Boolean(leg.startTime) && Boolean(leg.endTime)
-      && leg.endTime > leg.startTime;
+  /**
+   * Reads every field back out of the DOM into `legs`.
+   *
+   * The rendered inputs — not `legs` — are the source of truth for what the
+   * owner actually typed or picked. Syncing wholesale on every event (and once
+   * more immediately before submitting) means a single missed event can never
+   * leave the submitted payload out of step with the visible form.
+   */
+  function syncFromDom() {
+    legsEl.querySelectorAll('.cw-leg').forEach((fieldset) => {
+      const i = Number(fieldset.dataset.leg);
+      if (!legs[i]) return;
+      legs[i] = {
+        ...legs[i],
+        title: modal.querySelector(`#cw-title-${i}`).value,
+        date: modal.querySelector(`#cw-date-${i}`).value,
+        startTime: modal.querySelector(`#cw-start-${i}`).value,
+        endTime: modal.querySelector(`#cw-end-${i}`).value,
+        location: modal.querySelector(`#cw-location-${i}`).value,
+      };
+      // Keep the "no end time in the e-mail" hint in step with the field —
+      // it must clear the moment the owner supplies one.
+      const endHint = modal.querySelector(`#cw-endhint-${i}`);
+      if (endHint) endHint.hidden = Boolean(legs[i].endTime);
+    });
+    updateSubmitState();
+  }
+
+  /** What is still missing, in the owner's words — never a silent dead button. */
+  function blockingReason() {
+    return legsBlockingReason(legs, confirmCheckbox.checked);
   }
 
   function updateSubmitState() {
-    const allComplete = legs.length > 0 && legs.every(legIsComplete);
-    submitBtn.disabled = !(allComplete && confirmCheckbox.checked);
+    const reason = blockingReason();
+    submitBtn.disabled = Boolean(reason);
+    blockedEl.textContent = reason || '';
+    blockedEl.hidden = !reason;
   }
 
   confirmCheckbox.addEventListener('change', updateSubmitState);
@@ -288,7 +313,19 @@ export function openCalendarWriteModal({ familyId, sourceKind, notice, onResolve
   }
 
   submitBtn.addEventListener('click', async () => {
+    // Authoritative final read: a field the owner was still editing when they
+    // tapped "Toevoegen" — or one whose picker never fired an event — must be
+    // in the payload, and must be re-validated before anything is sent.
+    syncFromDom();
+    const blocked = blockingReason();
+    if (blocked) {
+      errorEl.textContent = blocked;
+      errorEl.hidden = false;
+      return;
+    }
+
     errorEl.hidden = true;
+    blockedEl.hidden = true;
     submitBtn.disabled = true;
     cancelBtn.disabled = true;
     statusEl.hidden = false;

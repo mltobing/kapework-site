@@ -748,6 +748,26 @@ h1, h2, h3 { line-height: 1.25; }
   margin: var(--sp-2) 0 var(--sp-1);
 }
 
+/* Deliberately not .btn-ghost: this is the one action in the modal that is
+   easy to miss, and borderless text on a white sheet did not read as tappable
+   at all. Full width and a real 44px target, so it is obviously a button. */
+.cw-suggest-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--text-base);
+  font-weight: 600;
+  transition: background .12s;
+}
+
+.cw-suggest-btn:active { background: var(--surface-alt); }
+.cw-suggest-btn:disabled { opacity: .5; }
+
 .cw-suggest-hint {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -761,6 +781,14 @@ h1, h2, h3 { line-height: 1.25; }
   margin-top: var(--sp-4);
   font-size: var(--text-sm);
   color: var(--text);
+}
+
+/* Says what is still missing while "Toevoegen" is disabled — a greyed-out
+   button that never explains itself is indistinguishable from a broken one. */
+.cw-blocked {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
 }
 
 .cw-modal-status {
