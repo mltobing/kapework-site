@@ -11,6 +11,9 @@ const key = (scope, id) => `${scope}:${id}`;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const MAX_BACKUP_BYTES = 80 * 1024 * 1024;
 const JOURNAL_PREFIX = 'kapework-myplan-pending-v1:';
+// Legacy drafts predate contentRevision. Their complete content is a collision-
+// free fallback, stable when only the acknowledged cloud version changes.
+const rowRevision = row => row ? row.contentRevision || `legacy:${JSON.stringify([row.schedule, row.deleted])}` : null;
 
 async function boundedFetch(input, options = {}) {
   const controller = new AbortController();
@@ -109,6 +112,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   let pendingLocalWrites = 0;
   const journalTab = uuid();
   let journalSequence = 0;
+  const editorStates = new Map(), implicitEditors = new Map();
   const config = globalThis.KapeworkConfig || {};
   const configured = Boolean(suppliedClient || (config.supabaseUrl && config.supabaseAnonKey));
 
@@ -123,6 +127,18 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   const read = (store, id, owner = scope) => transact(db, store, 'readonly', s => s.get(key(owner, id)));
   const readScope = (store, owner = scope) => transact(db, store, 'readonly', s => s.index('scope').getAll(owner));
   const write = (store, row) => transact(db, store, 'readwrite', s => s.put(row));
+  const changeRow = (id, owner, change) => new Promise((resolve, reject) => {
+    const tx = db.transaction('schedules', 'readwrite');
+    const store = tx.objectStore('schedules');
+    const request = store.get(key(owner, id));
+    let result, failure;
+    request.onsuccess = () => {
+      try { result = change(request.result, store); }
+      catch (error) { failure = error; tx.abort(); }
+    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = tx.onabort = () => reject(failure || new Error('Device storage is unavailable. Your pending edit is kept for recovery.'));
+  });
   const enqueue = action => {
     const next = writes.then(action);
     writes = next.catch(() => {});
@@ -156,16 +172,57 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     });
   }
 
-  function journalEdit(schedule, owner) {
-    const old = cache.get(schedule.id);
+  function beginEdit(id) {
+    const context = captureContext(); requireContext(context);
+    const row = cache.get(id);
+    const token = Object.freeze({});
+    editorStates.set(token, { token, editorId: uuid(), ...context, id,
+      revision: rowRevision(row), baseVersion: row?.version || 0,
+      baseLocalSeq: row?.localSeq || 0, sourceIds: new Set([id]), journalKey: null, titleRedirects: [] });
+    return token;
+  }
+
+  function editorFor(id, token) {
+    if (!token) {
+      token = implicitEditors.get(key(scope, id));
+      if (!token || editorStates.get(token)?.epoch !== accountEpoch) {
+        token = beginEdit(id); implicitEditors.set(key(scope, id), token);
+      }
+    }
+    const editor = editorStates.get(token);
+    if (!editor || !editor.sourceIds.has(id)) throw new Error('Reopen this schedule before editing it.');
+    requireContext(editor);
+    return editor;
+  }
+
+  function advanceEditor(editor, row, titleRedirect = null) {
+    if (titleRedirect) editor.titleRedirects.push(titleRedirect);
+    editor.sourceIds.add(row.id); editor.id = row.id; editor.revision = rowRevision(row);
+    editor.baseVersion = row.version; editor.baseLocalSeq = row.localSeq;
+    // Retarget the latest queued journal too. A camera interruption between the
+    // first conflict copy and a later queued edit must recover into that copy.
+    if (editor.journalKey) try {
+      const pending = JSON.parse(globalThis.localStorage.getItem(editor.journalKey));
+      if (pending?.editorId === editor.editorId) {
+        pending.schedule.id = row.id; pending.baseRevision = editor.revision;
+        if (titleRedirect && pending.schedule.title === titleRedirect.from) pending.schedule.title = titleRedirect.to;
+        pending.baseVersion = row.version; pending.baseLocalSeq = row.localSeq;
+        globalThis.localStorage.setItem(editor.journalKey, JSON.stringify(pending));
+      }
+    } catch { /* Existing journal remains a safe separate-copy recovery fallback. */ }
+  }
+
+  function journalEdit(schedule, owner, editor) {
     const pending = { format: 1, owner, schedule, tab: journalTab,
       sequence: ++journalSequence, requestId: uuid(),
-      baseVersion: old?.version || 0, baseLocalSeq: old?.localSeq || 0,
+      editorId: editor.editorId, baseRevision: editor.revision,
+      baseVersion: editor.baseVersion, baseLocalSeq: editor.baseLocalSeq,
       writtenAt: new Date().toISOString() };
     const journalKey = `${JOURNAL_PREFIX}${owner}:${schedule.id}:${journalTab}`;
     try {
       // Synchronous and text-only: survives a camera handoff before IDB commits.
       globalThis.localStorage.setItem(journalKey, JSON.stringify(pending));
+      editor.journalKey = journalKey;
       return { journalKey, pending };
     } catch {
       // IDB may still work when localStorage is unavailable/full. Do not claim
@@ -216,13 +273,14 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
           const ownWrite = old?.journal?.tab === pending.tab;
           if ((!old?.deleted && old && JSON.stringify(old.schedule) === JSON.stringify(pending.schedule))
             || (ownWrite && old.journal.sequence >= pending.sequence)) return;
-          const matchesBase = !old?.deleted && (old?.version || 0) === pending.baseVersion
-            && (old?.localSeq || 0) === pending.baseLocalSeq;
+          const matchesBase = !old?.deleted && ('baseRevision' in pending
+            ? rowRevision(old) === pending.baseRevision
+            : (old?.version || 0) === pending.baseVersion && (old?.localSeq || 0) === pending.baseLocalSeq);
           if (matchesBase || (ownWrite && !old.deleted && old.journal.sequence < pending.sequence)) {
             const schedule = pending.schedule;
             const row = { key: key(owner, schedule.id), scope: owner, id: schedule.id,
               schedule, version: old?.version || 0, dirty: true, deleted: false,
-              localSeq: (old?.localSeq || 0) + 1, updatedAt: pending.writtenAt,
+              localSeq: (old?.localSeq || 0) + 1, contentRevision: uuid(), updatedAt: pending.writtenAt,
               journal: { tab: pending.tab, sequence: pending.sequence } };
             store.put(row); outcome = { type: 'recovered', row };
           } else {
@@ -236,7 +294,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
               schedule.title = `${pending.schedule.title.slice(0, 63)} (recovered copy)`;
               const row = { key: key(owner, schedule.id), scope: owner, id: schedule.id,
                 schedule, version: 0, dirty: true, deleted: false, localSeq: 1,
-                updatedAt: pending.writtenAt, journal: { tab: pending.tab, sequence: pending.sequence } };
+                updatedAt: pending.writtenAt, contentRevision: uuid(), journal: { tab: pending.tab, sequence: pending.sequence } };
               store.put(row); outcome = { type: 'conflict', row };
             };
           }
@@ -311,9 +369,11 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     if (typeof BroadcastChannel !== 'undefined') {
       channel = new BroadcastChannel(DB_NAME);
       channel.onmessage = async event => {
-        if (event.data?.scope !== scope) return;
+        if (destroyed || event.data?.scope !== scope) return;
         await writes;
+        if (destroyed) return;
         await loadScope();
+        if (destroyed) return;
         onChange({ type: 'refresh' });
         reportLocal();
       };
@@ -335,27 +395,57 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     return row && !row.deleted ? clone(row.schedule) : null;
   }
 
-  async function save(value) {
+  async function save(value, { editSession } = {}) {
     if (!initialized) throw new Error('Saving is not ready yet. Please try again.');
-    requireContext(captureContext());
     const schedule = validateSchedule(value);
-    const owner = scope;
+    const editor = editorFor(schedule.id, editSession);
+    const capturedTitleRedirects = editor.titleRedirects.length;
+    const owner = editor.owner;
     pendingLocalWrites++;
     status('saving', 'Saving…');
-    const entry = journalEdit(schedule, owner);
+    const entry = journalEdit(schedule, owner, editor);
     return enqueue(async () => {
       try {
-        const old = await read('schedules', schedule.id, owner);
-        const row = { key: key(owner, schedule.id), scope: owner, id: schedule.id,
-          schedule, version: old?.version || 0, dirty: true, deleted: false,
-          localSeq: (old?.localSeq || 0) + 1, updatedAt: new Date().toISOString(),
-          journal: entry ? { tab: entry.pending.tab, sequence: entry.pending.sequence } : undefined };
-        await write('schedules', row);
+        const originalId = editor.id;
+        const desired = { ...schedule, id: originalId };
+        // Only snapshots queued before a redirect inherit its disambiguating
+        // title. A later deliberate rename, even back to the original, is kept.
+        for (const redirect of editor.titleRedirects.slice(capturedTitleRedirects)) {
+          if (desired.title === redirect.from) desired.title = redirect.to;
+        }
+        const result = await changeRow(originalId, owner, (old, rows) => {
+          // Read, compare the editor's baseline, and write under one IDB lock.
+          // A BroadcastChannel cache refresh never advances this baseline.
+          if (old && !old.deleted && JSON.stringify(old.schedule) === JSON.stringify(desired)) {
+            return { row: old, conflict: false, unchanged: true };
+          }
+          const conflict = Boolean(old?.deleted || rowRevision(old) !== editor.revision);
+          const saved = conflict ? { ...desired, id: uuid(), title: desired.title.slice(0, 62) + ' (conflict copy)' } : desired;
+          const row = { key: key(owner, saved.id), scope: owner, id: saved.id,
+            schedule: saved, version: conflict ? 0 : old?.version || 0,
+            dirty: true, deleted: false, localSeq: conflict ? 1 : (old?.localSeq || 0) + 1,
+            contentRevision: uuid(), updatedAt: new Date().toISOString(),
+            journal: entry ? { tab: entry.pending.tab, sequence: entry.pending.sequence } : undefined };
+          rows.put(row);
+          return { row, conflict, old };
+        });
+        advanceEditor(editor, result.row, result.conflict ? { from: desired.title, to: result.row.schedule.title } : null);
         clearJournal(entry);
         localError = false;
-        if (scope === owner) { cache.set(row.id, row); emit({ type: 'saved', id: row.id }); }
+        if (scope === owner) {
+          if (result.old) cache.set(result.old.id, result.old);
+          cache.set(result.row.id, result.row);
+          if (result.conflict) {
+            const event = { source: 'local', originalId, originalTitle: desired.title,
+              copyId: result.row.id, schedule: clone(result.row.schedule),
+              editSession: editor.token, editSessions: [editor.token],
+              message: 'Another tab changed this schedule. Both versions are kept; your edits are in the conflict copy.' };
+            onConflict(event);
+            emit({ type: 'conflict', id: originalId, schedule: event.schedule });
+          } else emit({ type: 'saved', id: result.row.id });
+        }
         scheduleSync();
-        return clone(schedule);
+        return clone(result.row.schedule);
       } catch (error) {
         localError = true;
         status('error', 'Not saved: device storage is unavailable. Export a backup before leaving.');
@@ -367,21 +457,32 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     });
   }
 
-  async function remove(id) {
-    requireContext(captureContext());
-    const owner = scope;
+  async function remove(id, { editSession } = {}) {
+    const editor = editorFor(id, editSession);
+    const owner = editor.owner;
     pendingLocalWrites++;
     status('saving', 'Saving…');
     return enqueue(async () => {
       try {
-        const old = await read('schedules', id, owner);
-        if (!old) return;
-        // Retain a versioned tombstone, not the deleted routine's private text.
-        const cleared = { id, title: '', steps: [], reward: null, print: old.schedule.print };
-        const row = { ...old, schedule: cleared, dirty: true, deleted: true, localSeq: old.localSeq + 1, updatedAt: new Date().toISOString() };
-        await write('schedules', row);
-        if (scope === owner) { cache.set(id, row); emit({ type: 'removed', id }); }
+        const target = editor.id;
+        const result = await changeRow(target, owner, (old, rows) => {
+          if (!old || old.deleted) return { removed: true, row: old };
+          if (rowRevision(old) !== editor.revision) return { removed: false, row: old };
+          const cleared = { id: target, title: '', steps: [], reward: null, print: old.schedule.print };
+          const row = { ...old, schedule: cleared, dirty: true, deleted: true,
+            localSeq: old.localSeq + 1, contentRevision: uuid(), updatedAt: new Date().toISOString() };
+          rows.put(row); return { removed: true, row };
+        });
+        if (result.removed && result.row) advanceEditor(editor, result.row);
+        if (scope === owner) {
+          if (result.row) cache.set(result.row.id, result.row);
+          if (result.removed) emit({ type: 'removed', id: target });
+          else onConflict({ source: 'local-delete', originalId: target, copyId: null,
+            editSession: editor.token, editSessions: [], schedule: null,
+            message: 'Another tab changed this schedule. Its newer version has been kept instead of deleted.' });
+        }
         scheduleSync();
+        return result.removed;
       } catch (error) {
         localError = true;
         status('error', 'The schedule could not be deleted. Try again.');
@@ -465,34 +566,47 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   function remoteRecord(remote, owner) {
     return { key: key(owner, remote.id), scope: owner, id: remote.id,
       schedule: validateSchedule(remote.document), version: remote.version,
-      dirty: false, deleted: remote.deleted, localSeq: 0, updatedAt: remote.updated_at };
+      dirty: false, deleted: remote.deleted, localSeq: 0, contentRevision: uuid(), updatedAt: remote.updated_at };
   }
 
   async function preserveConflict(local, remote, owner) {
-    // Read the newest local version: edits may have continued during the request.
     return enqueue(async () => {
-      const latest = await read('schedules', local.id, owner) || local;
-      let copy = null;
-      if (!latest.deleted) {
-        const schedule = duplicateSchedule(latest.schedule);
-        schedule.title = `${latest.schedule.title.slice(0, 62)} (conflict copy)`;
-        copy = { ...latest, key: key(owner, schedule.id), id: schedule.id, schedule,
-          version: 0, dirty: true, localSeq: 1, updatedAt: new Date().toISOString() };
-      }
-      // Commit both records atomically so a tab interruption cannot lose either version.
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction('schedules', 'readwrite');
-        const store = tx.objectStore('schedules');
-        if (copy) store.put(copy);
-        if (remote) store.put(remoteRecord(remote, owner));
-        else store.delete(key(owner, local.id));
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () => reject(new Error('Could not preserve both versions on this device.'));
+      const result = await changeRow(local.id, owner, (existing, rows) => {
+        const latest = existing || local;
+        // A different tab may already have acknowledged a newer cloud version.
+        if (remote && latest.version > remote.version) return { ignored: true, row: latest };
+        if (remote && latest.deleted === remote.deleted
+          && JSON.stringify(latest.schedule) === JSON.stringify(remote.document)) {
+          const row = { ...latest, version: remote.version, dirty: false, updatedAt: remote.updated_at };
+          rows.put(row); return { ignored: true, row };
+        }
+        const original = remote ? remoteRecord(remote, owner) : null;
+        let copy = null;
+        if (!latest.deleted) {
+          const schedule = { ...clone(latest.schedule), id: uuid(), title: latest.schedule.title.slice(0, 62) + ' (conflict copy)' };
+          copy = { ...latest, key: key(owner, schedule.id), id: schedule.id, schedule,
+            version: 0, dirty: true, localSeq: 1, contentRevision: uuid(), updatedAt: new Date().toISOString() };
+          rows.put(copy);
+        }
+        if (original) rows.put(original); else rows.delete(key(owner, local.id));
+        return { latest, original, copy };
       });
+      if (result.ignored) {
+        if (scope === owner) cache.set(result.row.id, result.row);
+        return;
+      }
+      const { latest, original, copy } = result;
+      const retargeted = [];
+      if (copy) for (const editor of editorStates.values()) {
+        if (editor.owner === owner && editor.id === local.id && editor.revision === rowRevision(latest)) {
+          advanceEditor(editor, copy, { from: latest.schedule.title, to: copy.schedule.title }); retargeted.push(editor.token);
+        }
+      }
       if (scope === owner) {
-        if (remote) cache.set(remote.id, remoteRecord(remote, owner)); else cache.delete(local.id);
+        if (original) cache.set(original.id, original); else cache.delete(local.id);
         if (copy) cache.set(copy.id, copy);
-        const event = { originalId: local.id, copyId: copy?.id || null, schedule: copy ? clone(copy.schedule) : null,
+        const event = { source: 'cloud', originalId: local.id, originalTitle: latest.schedule.title,
+          copyId: copy?.id || null, schedule: copy ? clone(copy.schedule) : null, editSessions: retargeted,
           message: copy ? 'Another device changed this schedule. Both versions are kept; your edits are in the conflict copy.'
             : 'Another device changed this schedule. It has been kept instead of deleted.' };
         onConflict(event);
@@ -521,13 +635,15 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
       if (data.status === 'conflict') { await preserveConflict(local, data.row, owner); continue; }
       if (data.status !== 'saved' || !data.row) throw new Error('Unexpected save response');
       await enqueue(async () => {
-        const latest = await read('schedules', local.id, owner);
-        if (!latest) return;
-        const row = { ...latest, version: data.row.version,
-          dirty: latest.localSeq !== local.localSeq,
-          updatedAt: latest.localSeq === local.localSeq ? data.row.updated_at : latest.updatedAt };
-        await write('schedules', row);
-        if (scope === owner) cache.set(row.id, row);
+        const row = await changeRow(local.id, owner, (latest, rows) => {
+          if (!latest || latest.version > data.row.version
+            || (latest.version === data.row.version && !latest.dirty)) return latest;
+          const sameContent = rowRevision(latest) === rowRevision(local);
+          const updated = { ...latest, version: data.row.version, dirty: !sameContent,
+            updatedAt: sameContent ? data.row.updated_at : latest.updatedAt };
+          rows.put(updated); return updated;
+        });
+        if (row && scope === owner) cache.set(row.id, row);
       });
     }
     requireContext(context);
@@ -537,11 +653,15 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     if (error) throw error;
     for (const remote of remoteRows || []) {
       await enqueue(async () => {
-        const local = await read('schedules', remote.id, owner);
-        if (local?.dirty || (local && local.version >= remote.version)) return;
-        const row = remoteRecord(remote, owner);
-        await write('schedules', row);
-        if (scope === owner) { cache.set(row.id, row); onChange({ type: 'refresh', id: row.id, schedule: row.deleted ? null : clone(row.schedule) }); }
+        const row = await changeRow(remote.id, owner, (local, rows) => {
+          if (local?.dirty || (local && local.version >= remote.version)) return null;
+          const incoming = remoteRecord(remote, owner);
+          rows.put(incoming); return incoming;
+        });
+        if (row && scope === owner) {
+          cache.set(row.id, row);
+          onChange({ type: 'refresh', id: row.id, schedule: row.deleted ? null : clone(row.schedule) });
+        }
       });
     }
     if (scope === owner) {
@@ -690,7 +810,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     db?.close();
   }
 
-  const api = { init, list, get, save, remove, duplicate, putPhoto, getPhoto, sync,
+  const api = { init, list, get, beginEdit, save, remove, duplicate, putPhoto, getPhoto, sync,
     flushLocal: async () => { await writes; },
     flush: async () => { await writes; await sync(); await writes; },
     signIn, sendMagicLink, signOut, claimGuestDrafts,

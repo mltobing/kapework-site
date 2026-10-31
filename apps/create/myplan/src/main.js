@@ -9,7 +9,7 @@ const esc = (value = '') => String(value).replace(/[&<>"']/g, char => ({'&':'&am
 const clone = value => structuredClone(value);
 let current = null, screen = 'home', history = [], inputGroup = '', previewVersion = 0;
 let previewTimer, photoTarget, lastFocus, lastScroll = 0, modalCleanup = () => {}, libraryVersion = 0;
-let store, knownAccountId = null, accountRevision = 0;
+let store, knownAccountId = null, accountRevision = 0, editorSession = null;
 const photoAssets=new Map();
 function resolvePhoto(id){
   const revision=accountRevision,key=revision+':'+id;
@@ -50,10 +50,20 @@ function edit(mutate, { group = '', redraw = false } = {}) {
   if (redraw) renderEditor(true); else updateUndo();
   queuePreview();
 }
-function persist() {
-  const snapshot = clone(current);
-  store.save(snapshot).catch(error => showError(error, 'Your latest edit could not be saved on this device. Keep this page open and export a backup.'));
+function saveEditor() {
+  if (!current || !editorSession) return;
+  const snapshot = clone(current), editor = editorSession;
+  editor.pending++; const intent = ++editor.intent;
+  return store.save(snapshot, { editSession: editor.token })
+    .then(schedule => { editor.saved = Math.max(editor.saved, intent); return schedule; })
+    .finally(() => { editor.pending--; });
 }
+function persist() {
+  const editor = editorSession;
+  saveEditor()?.catch(error => { if (editorSession === editor) showError(error, 'Your latest edit could not be saved on this device. Keep this page open and export a backup.'); });
+}
+function beginEditor(id) { return { token: store.beginEdit(id), pending: 0, intent: 0, saved: 0 }; }
+function editorHasUnsavedIntent() { return editorSession && (editorSession.pending || editorSession.saved < editorSession.intent); }
 function updateUndo() { const button = $('#undo-button'); if (button) button.disabled = !history.length; }
 function undo() {
   if (!history.length) return;
@@ -61,7 +71,8 @@ function undo() {
 }
 function openSchedule(schedule) {
   if (!schedule) return;
-  current = clone(schedule); history = []; inputGroup = ''; screen = 'editor'; rememberCurrent();
+  current = clone(schedule); editorSession = beginEditor(schedule.id);
+  history = []; inputGroup = ''; screen = 'editor'; rememberCurrent();
   renderEditor(); window.scrollTo(0, 0);
 }
 async function startRoutine(key) {
@@ -72,7 +83,7 @@ async function startRoutine(key) {
 function headerAccount(session) { $('#account-button').textContent = session ? 'Account' : 'Sign in'; }
 
 function renderHome() {
-  screen = 'home'; current = null; previewVersion++; $('#notice').hidden = true;
+  screen = 'home'; current = null; editorSession = null; previewVersion++; $('#notice').hidden = true;
   app.innerHTML = `<div class="home">
     <section class="hero"><div><div class="eyebrow">Small steps. Made together.</div><h1>A little plan.<br>A <em>lovely day.</em></h1><p>Make a picture routine together, one familiar moment at a time. Add your photos or our illustrations, then print a page to keep.</p><div class="together-note"><span aria-hidden="true">✦</span><span>Made for your family. Ready for every day.</span></div></div><div class="hero-art" aria-label="Example bedtime routine"><div class="paper-wrap" id="hero-page"></div><div class="sun-badge">${illustrationSVG('star')}</div><div class="art-caption">Your pictures. Your pace. Your plan.</div></div></section>
     <section aria-labelledby="start-heading"><div class="section-heading"><div><h2 id="start-heading">Where shall we start?</h2><p>Every step is yours to change. These are just ideas.</p></div></div><div class="starter-grid">${[
@@ -261,19 +272,20 @@ async function openCrop(asset,target,initial={x:.5,y:.5,zoom:1}) {
 
 async function duplicate(id) {
   const revision=accountRevision;app.inert=true;
-  try {if(current?.id===id)await store.save(clone(current));await store.flushLocal();if(revision!==accountRevision)return;const copy=await store.duplicate(id);if(revision!==accountRevision)return;openSchedule(copy);toast('A separate copy, ready to make your own.');}
+  try {if(current?.id===id)id=(await saveEditor()).id;await store.flushLocal();if(revision!==accountRevision)return;const copy=await store.duplicate(id);if(revision!==accountRevision)return;openSchedule(copy);toast('A separate copy, ready to make your own.');}
   catch(error){showError(error,'The copy could not be saved. Please try again.');}
   finally {app.inert=false;}
 }
 function confirmDelete(id) {
   const schedule=store.get(id);if(!schedule)return;
+  const deleteSession=current?.id===id ? editorSession.token : store.beginEdit(id);
   openModal('Delete this schedule?',`<p class="dialog-copy">“${esc(schedule.title||'Untitled routine')}” will be removed from your schedules. You can export an editable backup first.</p><div class="dialog-actions"><button class="secondary" data-close>Keep schedule</button><button class="danger" id="confirm-delete">Delete schedule</button></div>`);
-  $('#confirm-delete').onclick=async()=>{const button=$('#confirm-delete');button.disabled=true;try{await store.remove(id);closeModal();if(current?.id===id)current=null;renderLibrary();toast('Schedule deleted.');}catch(error){button.disabled=false;showError(error,'The schedule could not be deleted. Please try again.');}};
+  $('#confirm-delete').onclick=async()=>{const button=$('#confirm-delete');button.disabled=true;try{const removed=await store.remove(id,{editSession:deleteSession});closeModal();if(current?.id===id)current=null;renderLibrary();if(removed)toast('Schedule deleted.');else notice('This schedule changed in another tab. The latest version has been kept. Open it before deciding whether to delete it.');}catch(error){button.disabled=false;showError(error,'The schedule could not be deleted. Please try again.');}};
 }
 async function exportBackup(){if(!current)return;const revision=accountRevision;try{const blob=await store.exportBackup(clone(current));if(revision!==accountRevision)return;download(blob,'my-plan.myplan.json');toast('Editable backup downloaded, including pictures.');}catch(error){showError(error,'The backup could not be created. Retry sync so all pictures are available.');}}
 $('#backup-input').onchange=async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;const revision=accountRevision;try{const schedule=await store.importBackup(file);if(revision!==accountRevision)return;openSchedule(schedule);toast('Backup restored as a separate schedule.');}catch(error){showError(error,'This backup could not be restored. Your existing schedules are unchanged.');}};
 function renderLibrary() {
-  screen='library';current=null;previewVersion++;const version=++libraryVersion;const schedules=store.list();
+  screen='library';current=null;editorSession=null;previewVersion++;const version=++libraryVersion;const schedules=store.list();
   app.innerHTML=`<section class="library"><div class="section-heading"><div><div class="eyebrow">Ready whenever you are</div><h1>My schedules</h1><p>Reopen, change a little, or make a fresh copy.</p></div><button class="primary" id="new-schedule">＋ New</button></div>${schedules.length?`<div class="library-grid">${schedules.map(schedule=>`<article class="schedule-card"><div class="schedule-thumb" data-open="${schedule.id}" role="button" tabindex="0" aria-label="Open ${esc(schedule.title)}"><div class="paper-wrap" data-thumb="${schedule.id}"></div></div><h3>${esc(schedule.title||'Untitled routine')}</h3><p>${schedule.steps.length} steps · ${schedule.print.paper==='letter'?'US Letter':'11 × 17'}</p><div class="schedule-card-actions"><button class="primary" data-open="${schedule.id}">Edit</button><button data-duplicate="${schedule.id}">Duplicate</button><button class="danger" data-delete="${schedule.id}">Delete</button></div></article>`).join('')}</div>`:`<div class="empty-library">${illustrationSVG('star')}<h2>Your little plans live here.</h2><p>Start with a routine, make it yours, and come back to it whenever you like.</p><button class="primary" id="first-schedule">Make a schedule</button></div>`}<div class="home-footer"><p>${store.getSession()?'Private to your account. Never posted to a family feed.':'Stored in this browser. Sign in to save across devices, or keep an editable backup.'}</p><button class="text-button" id="library-import">Restore a backup</button></div></section>`;
   $('#new-schedule').onclick=renderHome;$('#first-schedule')?.addEventListener('click',renderHome);$('#library-import').onclick=()=>$('#backup-input').click();
   app.querySelectorAll('[data-open]').forEach(button=>{button.onclick=()=>openSchedule(store.get(button.dataset.open));if(button.tagName!=='BUTTON')button.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();button.click();}};});
@@ -303,17 +315,62 @@ $('#home-button').onclick=renderHome;$('#library-button').onclick=renderLibrary;
 $('#retry-save').onclick=()=>{if(current)persist();store.sync().catch(error=>showError(error));};
 window.addEventListener('offline',()=>toast('Offline. Keep editing; changes stay on this device.'));
 window.addEventListener('online',()=>store?.sync().catch(()=>{}));
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&current)persist();});
-window.addEventListener('pagehide',()=>{if(current)persist();});
+// Every edit already journals synchronously and queues an IndexedDB commit.
+// Hiding an unchanged tab must not submit its possibly stale editor snapshot.
 window.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key==='z'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)&&screen==='editor'&&!modal.open){event.preventDefault();undo();}});
+
+function storageChanged(event) {
+  if (event.type === 'refresh' && current?.id === event.id) {
+    // A pending intent still owns its original baseline. The store will preserve
+    // it separately if the refresh committed a competing version first.
+    if (editorHasUnsavedIntent()) return;
+    if (event.schedule) {
+      current = clone(event.schedule);
+      editorSession = beginEditor(current.id);
+      history = []; renderEditor(true); toast('Loaded the latest saved version.');
+    } else {
+      current = null; editorSession = null; history = [];
+      if ($('#preview-dialog').open) closePreview();
+      if (modal.open) closeModal();
+      renderLibrary(); notice('This schedule was deleted on another device. Other schedules are still here.');
+    }
+  } else if (screen === 'library' && ['refresh', 'removed', 'conflict', 'saved'].includes(event.type)) renderLibrary();
+}
+function storageConflict(event) {
+  notice(event.message || 'Another device changed this schedule. Both versions are kept in My schedules.');
+  if (current?.id !== event.originalId || !event.schedule) return;
+  // The event may belong to an editor closed and reopened while its write was
+  // pending. Only the exact handles redirected by storage may follow the copy.
+  if (!event.editSessions?.includes(editorSession?.token)) return;
+  if (editorHasUnsavedIntent() || event.editSession === editorSession?.token) {
+    // A first queued keystroke may trigger the copy after later edits have
+    // already reached the editor. Keep those fields and redirect their identity.
+    current.id = event.schedule.id;
+    if (current.title === event.originalTitle) current.title = event.schedule.title;
+    for (const entry of history) entry.id = event.schedule.id;
+    const titleField = $('#schedule-title');
+    if (titleField && titleField.value !== current.title) {
+      const start = titleField.selectionStart, end = titleField.selectionEnd;
+      titleField.value = current.title;
+      if (document.activeElement === titleField) titleField.setSelectionRange(start, end);
+    }
+    // Keep the focused input and caret while rapid typing continues.
+    queuePreview(); updateUndo();
+  } else {
+    current = clone(event.schedule); history = [];
+    editorSession = beginEditor(current.id);
+    renderEditor(true);
+  }
+  rememberCurrent();
+}
 
 async function boot() {
   window.KapeworkShell?.init({appSlug:'myplan',mountId:'kw-shell-mount'});
   store=createStore({
     onStatus(status){$('#save-status').textContent=status.message;$('.status-bar').dataset.state=status.state;$('#retry-save').hidden=!['error','local'].includes(status.state)||!store?.getSession();},
-    onAuth(session){const nextId=session?.user?.id||null;headerAccount(session);if(knownAccountId!==nextId){accountRevision++;photoAssets.clear();previewVersion++;libraryVersion++;current=null;history=[];if(modal.open)closeModal();if($('#preview-dialog').open)closePreview();$('#phone-preview').replaceChildren();$('#print-surface')?.remove();if(screen!=='home')renderLibrary();}knownAccountId=nextId;},
-    onChange(event){if(event.type==='refresh'&&current?.id===event.id){if(event.schedule){current=clone(event.schedule);history=[];renderEditor(true);toast('Loaded the latest saved version.');}else{current=null;history=[];if($('#preview-dialog').open)closePreview();if(modal.open)closeModal();renderLibrary();notice('This schedule was deleted on another device. Other schedules are still here.');}}else if(screen==='library'&&['refresh','removed','conflict','saved'].includes(event.type))renderLibrary();},
-    onConflict(event){notice(event.message||'Another device changed this schedule. Both versions are kept in My schedules.');if(current?.id===event.originalId&&event.schedule){current=clone(event.schedule);history=[];rememberCurrent();renderEditor(true);}},
+    onAuth(session){const nextId=session?.user?.id||null;headerAccount(session);if(knownAccountId!==nextId){accountRevision++;photoAssets.clear();previewVersion++;libraryVersion++;current=null;editorSession=null;history=[];if(modal.open)closeModal();if($('#preview-dialog').open)closePreview();$('#phone-preview').replaceChildren();$('#print-surface')?.remove();if(screen!=='home')renderLibrary();}knownAccountId=nextId;},
+    onChange: storageChanged,
+    onConflict: storageConflict,
   });
   try {
     await store.init();headerAccount(store.getSession());

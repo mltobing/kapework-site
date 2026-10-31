@@ -69,7 +69,7 @@ test('journal recovery preserves a newer committed version and is idempotent', a
   const saving = first.save(plan);
   const journalKey = localStorage.key(0), raw = localStorage.getItem(journalKey);
   first.destroy(); await assert.rejects(saving);
-  await editStoredRow(plan.id,row => ({...row,localSeq:row.localSeq+1,
+  await editStoredRow(plan.id,row => ({...row,localSeq:row.localSeq+1,contentRevision:crypto.randomUUID(),
     schedule:{...row.schedule,title:'Newer committed edit'},journal:{tab:'another-tab',sequence:1}}));
   const conflicts = [];
   const recovered = await setup(t,false,{onConflict:event=>conflicts.push(event)});

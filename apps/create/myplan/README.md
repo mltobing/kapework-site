@@ -62,6 +62,8 @@ No Ma family membership, feed, table or media bucket is used. No privileged cred
 
 ## Durability, conflicts and backups
 
+Each open editor holds its own content revision. Local writes compare that revision and commit atomically in IndexedDB; stale tabs preserve a separate conflict copy, queued edits follow that copy, and stale deletion keeps the newer routine. Closing an unchanged tab does not write its older snapshot. Cloud acknowledgements cannot lower a newer stored version.
+
 IndexedDB `kapework-myplan-v1` keeps schedules and JPEG blobs in separate stores, scoped to `guest` or the account UUID. Before a schedule edit is queued, a per-page/account text journal is written synchronously to localStorage; pictures stay in IndexedDB. A commit clears only its own exact journal request. On reopen, an interrupted edit is replayed only against its matching base; a newer committed version is kept alongside a recovered copy.
 
 Local commits and cloud success have distinct visible states. Cloud sync uploads pictures before saving the record. Network calls time out after 20 seconds and retry on reconnection, focus, manual sync or further edits. An expired session or failed upload leaves the local copy intact. Network operations bind their original account token and abort local changes after an account switch, including switches during uploads or imports. A version conflict preserves both schedules; the open editor follows the conflict copy.
@@ -80,9 +82,9 @@ Print invokes the browser's print dialog with the same single-page SVG. The shee
 
 ## Validation on 31 October 2026
 
-- **522 automated tests passed:** 494 existing repository checks plus 28 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
+- **528 automated tests passed:** 494 existing repository checks plus 34 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
 - **19 live database assertions passed:** owner create/read/update/photo access, other-account and anonymous denial, validated input, immutable version conflict behaviour, private bucket and write grants. All fixtures rolled back.
-- **Chrome on macOS:** starter creation; insert/reorder/remove reflected in page order; reload and continued editing; independent copy; native synthetic JPEG selection, crop and recrop; backup export/import and intact crop; cancelled native photo picker without loss; actual PDF download; native print preview showing one sheet and no editor controls. A physical page was not printed.
+- **Chrome on macOS:** starter creation; insert/reorder/remove reflected in page order; reload and continued editing; independent copy; native synthetic JPEG selection, crop and recrop; backup export/import and intact crop; cancelled native photo picker without loss; actual PDF download; native print preview showing one sheet and no editor controls; two open tabs preserve their independent edits and reopen the conflict copy intact. A physical page was not printed.
 - **Responsive Chrome viewport:** narrow (375 CSS-pixel) editor has no horizontal overflow, prominent preview action, and return-to-edit flow. This is viewport testing, not an iPhone browser result.
 - **PDF inspection:** downloaded bedtime Letter PDF is one 612 × 792-point page; rasterized and visually checked. Separate Letter reward and 11 × 17 outputs were generated and inspected during development.
 - **Controlled persistence tests:** same-account second-device reopening, concurrent changes, expired/failed network paths, failed uploads, editing during cloud save, interrupted local write recovery, stale deletion conflicts and account separation.
