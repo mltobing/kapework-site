@@ -559,7 +559,12 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     const context = captureContext();
     syncing = synchronize(context).catch(() => {
       if (owner === scope) status('local', 'Saved on this device—waiting to sync. Check your connection or sign in again.');
-    }).finally(() => { syncing = null; });
+    }).finally(() => {
+      syncing = null;
+      // A sign-in that joined an old account's in-flight sync still needs its
+      // own initial download once that operation has stopped.
+      if (session && context.epoch !== accountEpoch) scheduleSync();
+    });
     return syncing;
   }
 

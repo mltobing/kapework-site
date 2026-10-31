@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { createCropSession, cropPhoto } from '../src/images.js';
 import { createRoutine } from '../src/model.js';
 import { renderPreview, createPdf } from '../src/print.js';
@@ -33,7 +32,7 @@ test('crop sessions and bounded preview cache avoid redundant photo decodes', as
   globalThis.fetch = async url => ({ok:true,arrayBuffer:async()=>{
     const data=await readFile(url);return data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
   }});
-  globalThis.jspdf = createRequire(import.meta.url)('../vendor/jspdf.umd.min.js');
+  await import('../vendor/jspdf.umd.min.js');
   const asset = {id:crypto.randomUUID(),blob:new Blob(['photo'],{type:'image/jpeg'}),width:1200,height:800};
   try {
     const session = await createCropSession(asset);
