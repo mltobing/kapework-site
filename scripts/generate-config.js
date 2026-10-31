@@ -23,6 +23,7 @@ const path = require('path');
 const gaId        = process.env.GA_MEASUREMENT_ID || '';
 const supabaseUrl = process.env.SUPABASE_URL       || '';
 const supabaseKey = process.env.SUPABASE_ANON_KEY  || '';
+const myplanMagicLinkEnabled = process.env.MYPLAN_MAGIC_LINK_ENABLED === 'true';
 const dest        = path.join(__dirname, '..', 'shared', 'config.js');
 
 const content = [
@@ -32,6 +33,7 @@ const content = [
   '  gaMeasurementId: ' + JSON.stringify(gaId)        + ',',
   '  supabaseUrl:     ' + JSON.stringify(supabaseUrl) + ',',
   '  supabaseAnonKey: ' + JSON.stringify(supabaseKey) + ',',
+  '  myplanMagicLinkEnabled: ' + JSON.stringify(myplanMagicLinkEnabled) + ',',
   '};',
   '',
 ].join('\n');
