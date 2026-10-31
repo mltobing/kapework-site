@@ -106,3 +106,17 @@ test('duplicate waits for the latest queued edit before copying', async t => {
   assert.equal(copy.title,'Latest title (copy)');
   assert.notEqual(copy.id,plan.id);
 });
+
+test('interrupted stale editor journal cannot overwrite a newer editor in the same tab', async t => {
+  const store=await setup(t), plan=createRoutine('home');await store.save(plan);
+  const staleToken=store.beginEdit(plan.id), freshToken=store.beginEdit(plan.id);
+  const latest=structuredClone(plan);latest.title='Newer editor';
+  await store.save(latest,{editSession:freshToken});
+  plan.title='Interrupted old editor';
+  const pending=store.save(plan,{editSession:staleToken});store.destroy();
+  await assert.rejects(pending);
+  const reopened=await setup(t,false);
+  assert.equal(reopened.get(plan.id).title,'Newer editor');
+  assert.ok(reopened.list().some(s=>s.title==='Interrupted old editor (recovered copy)'));
+  assert.equal(reopened.list().length,2);
+});

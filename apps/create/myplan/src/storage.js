@@ -218,7 +218,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
       editorId: editor.editorId, baseRevision: editor.revision,
       baseVersion: editor.baseVersion, baseLocalSeq: editor.baseLocalSeq,
       writtenAt: new Date().toISOString() };
-    const journalKey = `${JOURNAL_PREFIX}${owner}:${schedule.id}:${journalTab}`;
+    const journalKey = `${JOURNAL_PREFIX}${owner}:${schedule.id}:${journalTab}:${editor.editorId}`;
     try {
       // Synchronous and text-only: survives a camera handoff before IDB commits.
       globalThis.localStorage.setItem(journalKey, JSON.stringify(pending));
@@ -270,7 +270,8 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
         let outcome = null;
         existing.onsuccess = () => {
           const old = existing.result;
-          const ownWrite = old?.journal?.tab === pending.tab;
+          const ownWrite = old?.journal?.tab === pending.tab
+            && (!pending.editorId || old.journal.editorId === pending.editorId);
           if ((!old?.deleted && old && JSON.stringify(old.schedule) === JSON.stringify(pending.schedule))
             || (ownWrite && old.journal.sequence >= pending.sequence)) return;
           const matchesBase = !old?.deleted && ('baseRevision' in pending
@@ -281,7 +282,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
             const row = { key: key(owner, schedule.id), scope: owner, id: schedule.id,
               schedule, version: old?.version || 0, dirty: true, deleted: false,
               localSeq: (old?.localSeq || 0) + 1, contentRevision: uuid(), updatedAt: pending.writtenAt,
-              journal: { tab: pending.tab, sequence: pending.sequence } };
+              journal: { tab: pending.tab, sequence: pending.sequence, editorId: pending.editorId } };
             store.put(row); outcome = { type: 'recovered', row };
           } else {
             // Another tab/device committed a different version. Keep it, and
@@ -294,7 +295,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
               schedule.title = `${pending.schedule.title.slice(0, 63)} (recovered copy)`;
               const row = { key: key(owner, schedule.id), scope: owner, id: schedule.id,
                 schedule, version: 0, dirty: true, deleted: false, localSeq: 1,
-                updatedAt: pending.writtenAt, contentRevision: uuid(), journal: { tab: pending.tab, sequence: pending.sequence } };
+                updatedAt: pending.writtenAt, contentRevision: uuid(), journal: { tab: pending.tab, sequence: pending.sequence, editorId: pending.editorId } };
               store.put(row); outcome = { type: 'conflict', row };
             };
           }
@@ -425,7 +426,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
             schedule: saved, version: conflict ? 0 : old?.version || 0,
             dirty: true, deleted: false, localSeq: conflict ? 1 : (old?.localSeq || 0) + 1,
             contentRevision: uuid(), updatedAt: new Date().toISOString(),
-            journal: entry ? { tab: entry.pending.tab, sequence: entry.pending.sequence } : undefined };
+            journal: entry ? { tab: entry.pending.tab, sequence: entry.pending.sequence, editorId: editor.editorId } : undefined };
           rows.put(row);
           return { row, conflict, old };
         });

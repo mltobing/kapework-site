@@ -82,7 +82,7 @@ Print invokes the browser's print dialog with the same single-page SVG. The shee
 
 ## Validation on 31 October 2026
 
-- **528 automated tests passed:** 494 existing repository checks plus 34 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
+- **529 automated tests passed:** 494 existing repository checks plus 35 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
 - **19 live database assertions passed:** owner create/read/update/photo access, other-account and anonymous denial, validated input, immutable version conflict behaviour, private bucket and write grants. All fixtures rolled back.
 - **Chrome on macOS:** starter creation; insert/reorder/remove reflected in page order; reload and continued editing; independent copy; native synthetic JPEG selection, crop and recrop; backup export/import and intact crop; cancelled native photo picker without loss; actual PDF download; native print preview showing one sheet and no editor controls; two open tabs preserve their independent edits and reopen the conflict copy intact. A physical page was not printed.
 - **Responsive Chrome viewport:** narrow (375 CSS-pixel) editor has no horizontal overflow, prominent preview action, and return-to-edit flow. This is viewport testing, not an iPhone browser result.
