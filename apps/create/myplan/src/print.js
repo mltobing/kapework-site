@@ -48,7 +48,33 @@ export function inspectLayout(input){
 }
 function escape(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));}
 function textSVG(lines,x,y,size,color,anchor='start',lineHeight=1.2){return lines.map((t,i)=>`<text x="${x}" y="${y+i*size*lineHeight}" font-family="MyPlanNoto, sans-serif" font-size="${size}" fill="${color}" text-anchor="${anchor}">${escape(t)}</text>`).join('');}
-async function pictureURL(picture,resolvePhoto,image){if(picture.kind==='illustration')return illustrationURL(picture.id);const asset=await resolvePhoto(picture.assetId);const canvas=await cropPhoto(asset,picture.crop,Math.ceil(image.width*3),Math.ceil(image.height*3));return canvas.toDataURL('image/jpeg',.9);}
+// Blob identity is immutable and scoped by the caller's account cache. Weak keys
+// release all results when that cache is cleared; each photo retains at most 3 crops.
+const previewPhotos = new WeakMap();
+async function pictureURL(picture, resolvePhoto, image) {
+  if (picture.kind === 'illustration') return illustrationURL(picture.id);
+  const asset = await resolvePhoto(picture.assetId);
+  if (!asset?.blob) throw new Error('A picture is missing. Reconnect to sync it, or replace this picture.');
+  const width = Math.ceil(image.width * 3), height = Math.ceil(image.height * 3);
+  const crop = picture.crop || { x: .5, y: .5, zoom: 1 };
+  const key = [width, height, crop.x, crop.y, crop.zoom].join(':');
+  let variants = previewPhotos.get(asset.blob);
+  if (!variants) { variants = new Map(); previewPhotos.set(asset.blob, variants); }
+  if (variants.has(key)) {
+    const cached = variants.get(key);
+    variants.delete(key); variants.set(key, cached);
+    return cached;
+  }
+  const pending = cropPhoto(asset, crop, width, height)
+    .then(canvas => canvas.toDataURL('image/jpeg', .9));
+  variants.set(key, pending);
+  while (variants.size > 3) variants.delete(variants.keys().next().value);
+  try { return await pending; }
+  catch (error) {
+    if (variants.get(key) === pending) variants.delete(key);
+    throw error;
+  }
+}
 function imageSVG(url,r){return `<image href="${escape(url)}" x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" preserveAspectRatio="xMidYMid meet"/>`;}
 export async function renderPreview(schedule,resolvePhoto){
  const {encoded}=await printAssets();const layout=inspectLayout(schedule),{paper,margin,theme,titleSize,titleLines,labelSize,captionSize}=layout;
@@ -64,7 +90,12 @@ export async function createPdf(schedule,resolvePhoto){
  const {makeDoc}=await printAssets(),l=inspectLayout(schedule);if(!l.ok)throw new Error(l.issues.join(' '));const doc=makeDoc(schedule.print.paper);
  // Never silently substitute missing glyphs in a child's name or routine text.
  const cmap=doc.getFont().metadata?.cmap?.unicode?.codeMap;const allText=[schedule.title,...schedule.steps.flatMap(s=>[s.label,s.caption]),...(schedule.reward?[schedule.reward.label,schedule.reward.caption]:[])].join('');
- if(cmap&&[...allText].some(c=>c.charCodeAt(0)>31&&!cmap[c.codePointAt(0)]))throw new Error('A character in this routine is not supported by the print font. Remove emoji or use a supported spelling before downloading. Your editable schedule is still saved.');
+ if (cmap && [...allText].some(c => c.charCodeAt(0) > 31 && !cmap[c.codePointAt(0)])) {
+   const message = 'A character in this routine is not supported by the print font. Remove emoji or use a supported spelling before downloading. Your editable schedule is still saved.';
+   const error = new Error(message);
+   error.userMessage = message;
+   throw error;
+ }
  pdfText(doc,l.titleLines,l.margin,l.margin+l.titleSize,l.titleSize,'#263e3a');
  for(const c of l.cards){doc.setDrawColor('#dce5df');doc.setFillColor('#ffffff');doc.roundedRect(c.x,c.y,c.width,c.height,10,10,'FD');await pdfPicture(doc,c.step.picture,c.image,resolvePhoto);doc.setFillColor(l.theme.accent);doc.circle(c.x+c.pad+c.numberSize/2,c.y+c.pad+c.numberSize/2,c.numberSize/2+3,'F');pdfText(doc,[c.number],c.x+c.pad+c.numberSize/2,c.y+c.pad+c.numberSize*.8,c.numberSize*.68,'#ffffff',1.2,'center');pdfText(doc,c.labelLines,c.x+c.pad,c.labelY,l.labelSize,'#263e3a');pdfText(doc,c.captionLines,c.x+c.pad,c.captionY,l.captionSize,'#52645f',1.3);}
  if(l.reward){const r=l.reward;doc.setFillColor(l.theme.soft);doc.roundedRect(r.x,r.y,r.width,r.height,10,10,'F');await pdfPicture(doc,r.step.picture,r.image,resolvePhoto);pdfText(doc,['A SPECIAL REWARD'],r.textX,r.y+r.pad+l.captionSize,l.captionSize,l.theme.accent);pdfText(doc,r.labelLines,r.textX,r.labelY,l.labelSize,'#263e3a');pdfText(doc,r.captionLines,r.textX,r.captionY,l.captionSize,'#52645f',1.3);}

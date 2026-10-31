@@ -1,6 +1,6 @@
 import { createRoutine, createStep, LIMITS } from './model.js';
 import { illustrations, illustrationSVG } from './illustrations.js';
-import { preparePhoto, cropPhoto } from './images.js';
+import { preparePhoto, cropPhoto, createCropSession } from './images.js';
 import { renderPreview, createPdf, inspectLayout } from './print.js';
 import { createStore } from './storage.js';
 
@@ -10,6 +10,13 @@ const clone = value => structuredClone(value);
 let current = null, screen = 'home', history = [], inputGroup = '', previewVersion = 0;
 let previewTimer, photoTarget, lastFocus, lastScroll = 0, modalCleanup = () => {}, libraryVersion = 0;
 let store, knownAccountId = null, accountRevision = 0;
+const photoAssets=new Map();
+function resolvePhoto(id){
+  const revision=accountRevision,key=revision+':'+id;
+  if(!photoAssets.has(key)&&photoAssets.size>=32)photoAssets.delete(photoAssets.keys().next().value);
+  if(!photoAssets.has(key))photoAssets.set(key,store.getPhoto(id).then(asset=>{if(revision!==accountRevision)throw new Error('Account changed.');return asset;}).catch(error=>{photoAssets.delete(key);throw error;}));
+  return photoAssets.get(key);
+}
 const app = $('#app');
 const modal = $('#modal');
 
@@ -58,7 +65,8 @@ function openSchedule(schedule) {
   renderEditor(); window.scrollTo(0, 0);
 }
 async function startRoutine(key) {
-  try { const schedule = createRoutine(key); await store.save(schedule); openSchedule(schedule); }
+  const revision=accountRevision;
+  try { const schedule = createRoutine(key); await store.save(schedule); if(revision===accountRevision)openSchedule(schedule); }
   catch (error) { showError(error, 'We could not save a new schedule on this device. Check available storage and try again.'); }
 }
 function headerAccount(session) { $('#account-button').textContent = session ? 'Account' : 'Sign in'; }
@@ -76,7 +84,7 @@ function renderHome() {
     <div class="home-footer"><p>One reusable page. No daily resets, ticks, or tracking.</p><button class="text-button" id="home-import">Restore an editable backup</button></div></div>`;
   app.querySelectorAll('[data-starter]').forEach(button => button.onclick = () => startRoutine(button.dataset.starter));
   $('#home-import').onclick = () => $('#backup-input').click();
-  renderPreview(createRoutine('bedtime'), id => store.getPhoto(id)).then(svg => { if (screen === 'home') $('#hero-page')?.replaceChildren(svg); }).catch(() => {});
+  renderPreview(createRoutine('bedtime'), resolvePhoto).then(svg => { if (screen === 'home') $('#hero-page')?.replaceChildren(svg); }).catch(() => {});
 }
 
 function pictureHTML(picture, target) {
@@ -141,7 +149,7 @@ async function fillPictures() {
     const target=el.dataset.pictureTarget;
     const step=target==='reward'?current.reward:current.steps.find(s=>s.id===target);
     if(step?.picture.kind!=='photo') continue;
-    try { const asset=await store.getPhoto(step.picture.assetId); const canvas=await cropPhoto(asset,step.picture.crop,360,360); if(current?.id===id&&el.isConnected)el.replaceChildren(canvas); }
+    try { const asset=await resolvePhoto(step.picture.assetId); const canvas=await cropPhoto(asset,step.picture.crop,360,360); if(current?.id===id&&el.isConnected)el.replaceChildren(canvas); }
     catch { if(el.isConnected)el.innerHTML='<span class="hint">Photo unavailable.<br>Retry sync.</span>'; }
   }
 }
@@ -160,7 +168,7 @@ async function updatePreview() {
   document.querySelectorAll('[data-export]').forEach(button=>{button.disabled=!layout.ok;});
   if($('#paper-description'))$('#paper-description').textContent=schedule.print.paper==='letter'?'US Letter · portrait':'11 × 17 in · portrait';
   try {
-    const svg=await renderPreview(schedule,id=>store.getPhoto(id));
+    const svg=await renderPreview(schedule,resolvePhoto);
     if(version!==previewVersion || current?.id!==schedule.id)return;
     $('#live-preview')?.replaceChildren(svg);
     if($('#preview-dialog').open)$('#phone-preview').replaceChildren(svg.cloneNode(true));
@@ -186,9 +194,9 @@ async function output(kind,button) {
   if(!inspectLayout(snapshot).ok){toast('Adjust the page before printing. See the note beside the preview.');return;}
   const label=button.textContent;button.disabled=true;button.textContent=kind==='pdf'?'Making PDF…':'Preparing…';
   try {
-    if(kind==='pdf') { const blob=await createPdf(snapshot,id=>store.getPhoto(id));if(ownerRevision!==accountRevision)return;download(blob,'my-plan.pdf');toast('PDF ready. Look in your browser’s downloads.'); }
+    if(kind==='pdf') { const blob=await createPdf(snapshot,resolvePhoto);if(ownerRevision!==accountRevision)return;download(blob,'my-plan.pdf');toast('PDF ready. Look in your browser’s downloads.'); }
     else {
-      const svg=await renderPreview(snapshot,id=>store.getPhoto(id));
+      const svg=await renderPreview(snapshot,resolvePhoto);
       if(ownerRevision!==accountRevision)return;
       let surface=$('#print-surface');if(!surface){surface=document.createElement('div');surface.id='print-surface';surface.style.display='none';document.body.append(surface);}
       surface.replaceChildren(svg);
@@ -219,41 +227,41 @@ function choosePicture(action,target) {
     modal.querySelectorAll('[data-illustration]').forEach(button=>button.onclick=()=>{const id=button.dataset.illustration;closeModal();edit(()=>{const step=targetStep(target);if(step)step.picture={kind:'illustration',id};},{redraw:true});});
   } else if(action==='crop') {
     const step=targetStep(target);if(!step||step.picture.kind!=='photo')return;
-    store.getPhoto(step.picture.assetId).then(asset=>openCrop(asset,target,step.picture.crop)).catch(error=>showError(error,'This photo could not be opened. Retry sync.'));
+    Promise.resolve().then(async()=>{const id=current.id,revision=accountRevision,picture=clone(step.picture);const asset=await resolvePhoto(picture.assetId);if(current?.id===id&&revision===accountRevision&&targetStep(target)?.picture.assetId===picture.assetId)openCrop(asset,target,picture.crop);}).catch(error=>showError(error,'This photo could not be opened. Retry sync.'));
   } else {
     // Every preceding input event is already queued to IndexedDB. Cancellation changes nothing.
-    photoTarget={scheduleId:current.id,target};
+    photoTarget={scheduleId:current.id,target,revision:accountRevision};
     const input=action==='camera'?$('#camera-input'):$('#photo-input');input.value='';input.click();
   }
 }
 async function receivePhoto(event) {
   const file=event.target.files?.[0];const selection=photoTarget;event.target.value='';
-  if(!file || !selection || current?.id!==selection.scheduleId)return;
+  if(!file || !selection || current?.id!==selection.scheduleId || selection.revision!==accountRevision)return;
   toast('Getting your picture ready…');
-  try { const asset=await preparePhoto(file);if(current?.id===selection.scheduleId)openCrop(asset,selection.target); }
+  try { const asset=await preparePhoto(file);if(current?.id===selection.scheduleId&&selection.revision===accountRevision)openCrop(asset,selection.target); }
   catch(error){showError(error,'This picture could not be opened. Try a JPEG or PNG, or choose an illustration. Your existing picture is unchanged.');}
 }
 $('#camera-input').onchange=receivePhoto;$('#photo-input').onchange=receivePhoto;
 async function openCrop(asset,target,initial={x:.5,y:.5,zoom:1}) {
-  const scheduleId=current.id,crop={...initial};let generation=0,closed=false;
+  const scheduleId=current.id,revision=accountRevision,crop={...initial};let generation=0,closed=false,cropSession;
   const layout=inspectLayout(current); const image=target==='reward'?layout.reward?.image:layout.cards.find(card=>card.step.id===target)?.image;
   const aspect=image&&image.height>0?image.width/image.height:1.3;
   openModal('Make the picture fit',`<p class="dialog-copy">Drag to reposition, or use the sliders. The full picture stays available for recropping.</p><div class="crop-display" id="crop-display" aria-label="Crop preview"></div><label class="crop-field">Zoom<input id="crop-zoom" type="range" min="1" max="3" step="0.02" value="${crop.zoom}"></label><label class="crop-field">Left ↔ right<input id="crop-x" type="range" min="0" max="1" step="0.01" value="${crop.x}"></label><label class="crop-field">Top ↔ bottom<input id="crop-y" type="range" min="0" max="1" step="0.01" value="${crop.y}"></label><p class="hint">Your schedule preview will show the final page crop.</p><div class="dialog-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="use-picture">Use this picture</button></div>`);
-  modalCleanup=()=>{closed=true;};
+  modalCleanup=()=>{closed=true;cropSession?.dispose();};
   $('#crop-display').style.aspectRatio=String(aspect);
-  async function draw(){const n=++generation;try{const canvas=await cropPhoto(asset,crop,780,780/aspect);if(!closed&&n===generation)$('#crop-display')?.replaceChildren(canvas);}catch(error){showError(error,'This image could not be cropped. Try another photo.');}}
+  async function draw(){const n=++generation;try{if(!cropSession)return;const canvas=cropSession.render(crop,780,780/aspect);if(!closed&&n===generation)$('#crop-display')?.replaceChildren(canvas);}catch(error){showError(error,'This image could not be cropped. Try another photo.');}}
   ['x','y','zoom'].forEach(key=>$('#crop-'+key).oninput=event=>{crop[key]=Number(event.target.value);draw();});
   let pointer=null;const display=$('#crop-display');
   display.onpointerdown=event=>{pointer={id:event.pointerId,x:event.clientX,y:event.clientY,crop:{...crop}};display.setPointerCapture(event.pointerId);};
   display.onpointermove=event=>{if(!pointer)return;crop.x=Math.max(0,Math.min(1,pointer.crop.x-(event.clientX-pointer.x)/display.clientWidth));crop.y=Math.max(0,Math.min(1,pointer.crop.y-(event.clientY-pointer.y)/display.clientHeight));$('#crop-x').value=crop.x;$('#crop-y').value=crop.y;draw();};
   display.onpointerup=display.onpointercancel=()=>{pointer=null;};
-  $('#use-picture').onclick=async()=>{const button=$('#use-picture');button.disabled=true;button.textContent='Saving picture…';try{await store.putPhoto(asset);if(current?.id===scheduleId&&targetStep(target)){closeModal();edit(()=>{targetStep(target).picture={kind:'photo',assetId:asset.id,crop:{...crop}};},{redraw:true});toast('Your picture is in the schedule.');}}catch(error){button.disabled=false;button.textContent='Use this picture';showError(error,'The photo could not be saved. Free some device storage and try again. Your previous picture is unchanged.');}};
-  await draw();
+  $('#use-picture').onclick=async()=>{const button=$('#use-picture');button.disabled=true;button.textContent='Saving picture…';try{await store.putPhoto(asset);if(current?.id===scheduleId&&revision===accountRevision&&targetStep(target)){closeModal();edit(()=>{targetStep(target).picture={kind:'photo',assetId:asset.id,crop:{...crop}};},{redraw:true});toast('Your picture is in the schedule.');}}catch(error){button.disabled=false;button.textContent='Use this picture';showError(error,'The photo could not be saved. Free some device storage and try again. Your previous picture is unchanged.');}};
+  try{cropSession=await createCropSession(asset);if(closed){cropSession.dispose();return;}await draw();}catch(error){showError(error,'This photo could not be opened for cropping.');}
 }
 
 async function duplicate(id) {
-  app.inert=true;
-  try {if(current?.id===id)await store.save(clone(current));await store.flushLocal();const copy=await store.duplicate(id);openSchedule(copy);toast('A separate copy, ready to make your own.');}
+  const revision=accountRevision;app.inert=true;
+  try {if(current?.id===id)await store.save(clone(current));await store.flushLocal();if(revision!==accountRevision)return;const copy=await store.duplicate(id);if(revision!==accountRevision)return;openSchedule(copy);toast('A separate copy, ready to make your own.');}
   catch(error){showError(error,'The copy could not be saved. Please try again.');}
   finally {app.inert=false;}
 }
@@ -262,8 +270,8 @@ function confirmDelete(id) {
   openModal('Delete this schedule?',`<p class="dialog-copy">“${esc(schedule.title||'Untitled routine')}” will be removed from your schedules. You can export an editable backup first.</p><div class="dialog-actions"><button class="secondary" data-close>Keep schedule</button><button class="danger" id="confirm-delete">Delete schedule</button></div>`);
   $('#confirm-delete').onclick=async()=>{const button=$('#confirm-delete');button.disabled=true;try{await store.remove(id);closeModal();if(current?.id===id)current=null;renderLibrary();toast('Schedule deleted.');}catch(error){button.disabled=false;showError(error,'The schedule could not be deleted. Please try again.');}};
 }
-async function exportBackup(){if(!current)return;try{download(await store.exportBackup(clone(current)),'my-plan.myplan.json');toast('Editable backup downloaded, including pictures.');}catch(error){showError(error,'The backup could not be created. Retry sync so all pictures are available.');}}
-$('#backup-input').onchange=async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;try{const schedule=await store.importBackup(file);openSchedule(schedule);toast('Backup restored as a separate schedule.');}catch(error){showError(error,'This backup could not be restored. Your existing schedules are unchanged.');}};
+async function exportBackup(){if(!current)return;const revision=accountRevision;try{const blob=await store.exportBackup(clone(current));if(revision!==accountRevision)return;download(blob,'my-plan.myplan.json');toast('Editable backup downloaded, including pictures.');}catch(error){showError(error,'The backup could not be created. Retry sync so all pictures are available.');}}
+$('#backup-input').onchange=async event=>{const file=event.target.files?.[0];event.target.value='';if(!file)return;const revision=accountRevision;try{const schedule=await store.importBackup(file);if(revision!==accountRevision)return;openSchedule(schedule);toast('Backup restored as a separate schedule.');}catch(error){showError(error,'This backup could not be restored. Your existing schedules are unchanged.');}};
 function renderLibrary() {
   screen='library';current=null;previewVersion++;const version=++libraryVersion;const schedules=store.list();
   app.innerHTML=`<section class="library"><div class="section-heading"><div><div class="eyebrow">Ready whenever you are</div><h1>My schedules</h1><p>Reopen, change a little, or make a fresh copy.</p></div><button class="primary" id="new-schedule">＋ New</button></div>${schedules.length?`<div class="library-grid">${schedules.map(schedule=>`<article class="schedule-card"><div class="schedule-thumb" data-open="${schedule.id}" role="button" tabindex="0" aria-label="Open ${esc(schedule.title)}"><div class="paper-wrap" data-thumb="${schedule.id}"></div></div><h3>${esc(schedule.title||'Untitled routine')}</h3><p>${schedule.steps.length} steps · ${schedule.print.paper==='letter'?'US Letter':'11 × 17'}</p><div class="schedule-card-actions"><button class="primary" data-open="${schedule.id}">Edit</button><button data-duplicate="${schedule.id}">Duplicate</button><button class="danger" data-delete="${schedule.id}">Delete</button></div></article>`).join('')}</div>`:`<div class="empty-library">${illustrationSVG('star')}<h2>Your little plans live here.</h2><p>Start with a routine, make it yours, and come back to it whenever you like.</p><button class="primary" id="first-schedule">Make a schedule</button></div>`}<div class="home-footer"><p>${store.getSession()?'Private to your account. Never posted to a family feed.':'Stored in this browser. Sign in to save across devices, or keep an editable backup.'}</p><button class="text-button" id="library-import">Restore a backup</button></div></section>`;
@@ -271,13 +279,14 @@ function renderLibrary() {
   app.querySelectorAll('[data-open]').forEach(button=>{button.onclick=()=>openSchedule(store.get(button.dataset.open));if(button.tagName!=='BUTTON')button.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();button.click();}};});
   app.querySelectorAll('[data-duplicate]').forEach(button=>button.onclick=()=>duplicate(button.dataset.duplicate));
   app.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>confirmDelete(button.dataset.delete));
-  schedules.forEach(async schedule=>{try{const svg=await renderPreview(schedule,id=>store.getPhoto(id));if(screen==='library'&&version===libraryVersion)app.querySelector(`[data-thumb="${schedule.id}"]`)?.replaceChildren(svg);}catch{/* Missing photo is surfaced when the schedule opens. */}});
+  schedules.forEach(async schedule=>{try{const svg=await renderPreview(schedule,resolvePhoto);if(screen==='library'&&version===libraryVersion)app.querySelector(`[data-thumb="${schedule.id}"]`)?.replaceChildren(svg);}catch{/* Missing photo is surfaced when the schedule opens. */}});
   window.scrollTo(0,0);
 }
 async function showAccount() {
+  const revision=accountRevision;
   const session=store.getSession();
   if(session){
-    const guest=await store.hasGuestDrafts();
+    const guest=await store.hasGuestDrafts();if(revision!==accountRevision)return;
     openModal('Your private account',`<p class="dialog-copy">Signed in as ${esc(session.user.email || 'your account')}. Only this account can access its saved routines and photos.</p>${guest?'<p class="dialog-copy">There are schedules made on this device before sign-in. Add them to this account only if they belong to you.</p><button class="secondary" id="claim-drafts">Add this device’s drafts to my account</button>':''}<p class="account-note">A browser on another device will ask you to sign in here too. My Plan does not automatically use a Ma session.</p><div class="dialog-actions"><button class="secondary" id="sync-now">Sync now</button><button class="primary" id="sign-out">Sign out</button></div>`);
     $('#claim-drafts')?.addEventListener('click',async()=>{try{await store.claimGuestDrafts();closeModal();renderLibrary();toast('Device drafts added to your account.');}catch(error){showError(error,'The drafts could not be added. They are still saved on this device.');}});
     $('#sync-now').onclick=async()=>{await store.sync();closeModal();};
@@ -302,7 +311,7 @@ async function boot() {
   window.KapeworkShell?.init({appSlug:'myplan',mountId:'kw-shell-mount'});
   store=createStore({
     onStatus(status){$('#save-status').textContent=status.message;$('.status-bar').dataset.state=status.state;$('#retry-save').hidden=!['error','local'].includes(status.state)||!store?.getSession();},
-    onAuth(session){const nextId=session?.user?.id||null;headerAccount(session);if(knownAccountId!==nextId){accountRevision++;previewVersion++;libraryVersion++;current=null;history=[];if(modal.open)closeModal();if($('#preview-dialog').open)closePreview();$('#phone-preview').replaceChildren();$('#print-surface')?.remove();if(screen!=='home')renderLibrary();}knownAccountId=nextId;},
+    onAuth(session){const nextId=session?.user?.id||null;headerAccount(session);if(knownAccountId!==nextId){accountRevision++;photoAssets.clear();previewVersion++;libraryVersion++;current=null;history=[];if(modal.open)closeModal();if($('#preview-dialog').open)closePreview();$('#phone-preview').replaceChildren();$('#print-surface')?.remove();if(screen!=='home')renderLibrary();}knownAccountId=nextId;},
     onChange(event){if(event.type==='refresh'&&current?.id===event.id){if(event.schedule){current=clone(event.schedule);history=[];renderEditor(true);toast('Loaded the latest saved version.');}else{current=null;history=[];if($('#preview-dialog').open)closePreview();if(modal.open)closeModal();renderLibrary();notice('This schedule was deleted on another device. Other schedules are still here.');}}else if(screen==='library'&&['refresh','removed','conflict','saved'].includes(event.type))renderLibrary();},
     onConflict(event){notice(event.message||'Another device changed this schedule. Both versions are kept in My schedules.');if(current?.id===event.originalId&&event.schedule){current=clone(event.schedule);history=[];rememberCurrent();renderEditor(true);}},
   });

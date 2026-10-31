@@ -100,8 +100,9 @@ function blobBase64(blob) {
  * Save resolves after IndexedDB commits; cloud completion is reported separately.
  */
 export function createStore({ onChange = () => {}, onStatus = () => {}, onConflict = () => {},
-  onAuth = () => {}, client: suppliedClient } = {}) {
+  onAuth = () => {}, client: suppliedClient, dataClientFactory } = {}) {
   let db, client = suppliedClient, session = null, scope = 'guest';
+  let accountEpoch = 0, makeDataClient = dataClientFactory;
   let cache = new Map(), writes = Promise.resolve(), syncing = null, syncTimer;
   let authSubscription, channel, destroyed = false, initialized = false, localError = false;
   let latestStatus = { state: 'local', message: 'Saved on this device' };
@@ -135,6 +136,25 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   const requireAuth = owner => {
     if (!session || session.user.id !== owner) throw new Error('Sign in again to sync. Your edits are saved on this device.');
   };
+  const captureContext = () => ({ owner: scope, epoch: accountEpoch });
+  const requireContext = context => {
+    if (scope !== context.owner || accountEpoch !== context.epoch
+      || (session?.user?.id || 'guest') !== context.owner) {
+      throw new Error('The account changed. Reopen the schedule in its original account and try again.');
+    }
+  };
+  function dataClient(context) {
+    requireContext(context); requireAuth(context.owner);
+    if (!makeDataClient) return client; // Injected test/service adapter.
+    const token = session.access_token;
+    if (!token) throw new Error('Sign in again to sync. Your edits are saved on this device.');
+    // Each operation keeps its original credential even if Supabase Auth changes
+    // accounts while a fetch is queued. No session, refresh timer, or token is
+    // persisted by this data-only client; the next operation captures a new token.
+    return makeDataClient(config.supabaseUrl, config.supabaseAnonKey, {
+      accessToken: async () => token, global: { fetch: boundedFetch },
+    });
+  }
 
   function journalEdit(schedule, owner) {
     const old = cache.get(schedule.id);
@@ -225,7 +245,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
         tx.onerror = tx.onabort = () => reject(new Error('Interrupted edits could not be restored. Keep this browser’s data and try again.'));
       });
       clearJournal(entry);
-      if (result?.type === 'conflict') onConflict({ originalId: pending.schedule.id,
+      if (result?.type === 'conflict' && scope === owner && (session?.user?.id || 'guest') === owner) onConflict({ originalId: pending.schedule.id,
         copyId: result.row.id, schedule: clone(result.row.schedule),
         message: 'Recovered an interrupted edit. A newer version was also found, so both schedules are kept.' });
     }
@@ -239,12 +259,17 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
 
   async function setSession(next) {
     const nextScope = next?.user?.id || 'guest';
+    if ((session?.user?.id || 'guest') !== nextScope) accountEpoch++;
+    const epoch = accountEpoch;
     session = next;
     if (scope !== nextScope) {
       await writes;
+      if (epoch !== accountEpoch) return;
       scope = nextScope;
       await recoverJournals(scope);
+      if (epoch !== accountEpoch) return;
       await loadScope();
+      if (epoch !== accountEpoch) return;
       onChange({ type: 'auth' });
     }
     onAuth(next ? { user: { id: next.user.id, email: next.user.email } } : null);
@@ -261,6 +286,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
       try {
         if (!client) {
           const { createClient } = await import('../vendor/supabase.js');
+          makeDataClient = createClient;
           client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
             auth: { storageKey: 'kapework-myplan-auth', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
             global: { fetch: boundedFetch },
@@ -311,6 +337,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
 
   async function save(value) {
     if (!initialized) throw new Error('Saving is not ready yet. Please try again.');
+    requireContext(captureContext());
     const schedule = validateSchedule(value);
     const owner = scope;
     pendingLocalWrites++;
@@ -341,6 +368,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   }
 
   async function remove(id) {
+    requireContext(captureContext());
     const owner = scope;
     pendingLocalWrites++;
     status('saving', 'Saving…');
@@ -366,45 +394,68 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   }
 
   async function duplicate(id) {
+    const context = captureContext(); requireContext(context);
     await writes;
+    requireContext(context);
     const original = get(id);
     if (!original) throw new Error('This schedule is no longer available.');
-    return save(duplicateSchedule(original));
+    const copy = await save(duplicateSchedule(original));
+    requireContext(context);
+    return copy;
   }
 
   async function putPhoto(asset) {
+    const context = captureContext(); requireContext(context);
+    const owner = context.owner;
     await checkPhoto(asset);
-    const owner = scope;
-    await enqueue(() => write('photos', { ...asset, key: key(owner, asset.id), scope: owner, uploaded: false }));
+    requireContext(context);
+    await enqueue(() => {
+      requireContext(context);
+      return write('photos', { ...asset, key: key(owner, asset.id), scope: owner, uploaded: false });
+    });
+    requireContext(context);
     return { id: asset.id, blob: asset.blob, width: asset.width, height: asset.height };
   }
 
   async function getPhoto(id) {
-    const owner = scope;
+    const context = captureContext(); requireContext(context);
+    const owner = context.owner;
     const cached = await read('photos', id, owner);
+    requireContext(context);
     if (cached) return { id: cached.id, blob: cached.blob, width: cached.width, height: cached.height };
     requireAuth(owner);
-    const { data, error } = await client.storage.from(BUCKET).download(`${owner}/assets/${id}.jpg`);
+    const transport = dataClient(context);
+    const { data, error } = await transport.storage.from(BUCKET).download(`${owner}/assets/${id}.jpg`);
+    requireContext(context);
     if (error || !data) throw new Error('This picture is not available offline yet. Reconnect and try again.');
     const dimensions = await imageDimensions(data);
     const asset = await checkPhoto({ id, blob: data, ...dimensions });
-    await enqueue(() => write('photos', { ...asset, key: key(owner, id), scope: owner, uploaded: true }));
+    requireContext(context);
+    await enqueue(() => {
+      requireContext(context);
+      return write('photos', { ...asset, key: key(owner, id), scope: owner, uploaded: true });
+    });
+    requireContext(context);
     return asset;
   }
 
-  async function uploadPictures(schedule, owner) {
+  async function uploadPictures(schedule, context, transport) {
+    const owner = context.owner;
     for (const id of assetIds(schedule)) {
-      requireAuth(owner);
+      requireContext(context);
       const asset = await read('photos', id, owner);
+      requireContext(context);
       if (!asset) {
         // A schedule loaded from the server already refers to an uploaded photo.
-        const { error } = await client.storage.from(BUCKET).download(`${owner}/assets/${id}.jpg`);
+        const { error } = await transport.storage.from(BUCKET).download(`${owner}/assets/${id}.jpg`);
+        requireContext(context);
         if (error) throw new Error('A picture is missing. Keep this device open and try syncing again.');
         continue;
       }
       if (asset.uploaded) continue;
       const path = `${owner}/assets/${id}.jpg`;
-      const { error } = await client.storage.from(BUCKET).upload(path, asset.blob, { contentType: 'image/jpeg', upsert: false });
+      const { error } = await transport.storage.from(BUCKET).upload(path, asset.blob, { contentType: 'image/jpeg', upsert: false });
+      requireContext(context);
       // Immutable IDs make a repeated successful upload safe after an interruption.
       if (error && String(error.statusCode || error.status) !== '409' && error.error !== 'Duplicate') throw error;
       await write('photos', { ...asset, uploaded: true });
@@ -450,17 +501,22 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     });
   }
 
-  async function synchronize(owner) {
+  async function synchronize(context) {
+    const owner = context.owner;
     await writes;
-    requireAuth(owner);
+    requireContext(context);
+    const transport = dataClient(context);
     const pending = (await readScope('schedules', owner)).filter(row => row.dirty);
+    requireContext(context);
     if (pending.length) status('saving', 'Saving…');
     for (const local of pending) {
-      requireAuth(owner);
-      if (!local.deleted) await uploadPictures(local.schedule, owner);
-      const { data, error } = await client.rpc('myplan_save_schedule', {
+      requireContext(context);
+      if (!local.deleted) await uploadPictures(local.schedule, context, transport);
+      requireContext(context);
+      const { data, error } = await transport.rpc('myplan_save_schedule', {
         p_id: local.id, p_base_version: local.version, p_document: local.schedule, p_deleted: local.deleted,
       });
+      requireContext(context);
       if (error || !data) throw error || new Error('Sync unavailable');
       if (data.status === 'conflict') { await preserveConflict(local, data.row, owner); continue; }
       if (data.status !== 'saved' || !data.row) throw new Error('Unexpected save response');
@@ -474,9 +530,10 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
         if (scope === owner) cache.set(row.id, row);
       });
     }
-    requireAuth(owner);
-    const { data: remoteRows, error } = await client.from('myplan_schedules')
+    requireContext(context);
+    const { data: remoteRows, error } = await transport.from('myplan_schedules')
       .select('id,document,version,deleted,updated_at').eq('owner_id', owner);
+    requireContext(context);
     if (error) throw error;
     for (const remote of remoteRows || []) {
       await enqueue(async () => {
@@ -499,7 +556,8 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     if (syncing) return syncing;
     if (!client || !session || globalThis.navigator?.onLine === false) { reportLocal(); return; }
     const owner = session.user.id;
-    syncing = synchronize(owner).catch(() => {
+    const context = captureContext();
+    syncing = synchronize(context).catch(() => {
       if (owner === scope) status('local', 'Saved on this device—waiting to sync. Check your connection or sign in again.');
     }).finally(() => { syncing = null; });
     return syncing;
@@ -538,28 +596,39 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
 
   async function claimGuestDrafts() {
     if (!session) throw new Error('Sign in before saving device drafts to your account.');
-    const owner = scope;
+    const context = captureContext(); requireContext(context);
+    const owner = context.owner;
     const guestRows = (await readScope('schedules', 'guest')).filter(row => !row.deleted);
+    requireContext(context);
     for (const row of guestRows) {
-      requireAuth(owner);
+      requireContext(context);
       const schedule = duplicateSchedule(row.schedule);
       schedule.title = row.schedule.title;
       for (const id of assetIds(schedule)) {
         const asset = await read('photos', id, 'guest');
+        requireContext(context);
         if (!asset) throw new Error('A device draft picture is missing. Export the original draft before continuing.');
-        await write('photos', { ...asset, key: key(owner, id), scope: owner, uploaded: false });
+        await enqueue(() => {
+          requireContext(context);
+          return write('photos', { ...asset, key: key(owner, id), scope: owner, uploaded: false });
+        });
       }
+      requireContext(context);
       await save(schedule);
+      requireContext(context);
     }
     return guestRows.length;
   }
 
   async function exportBackup(value) {
+    const context = captureContext(); requireContext(context);
     const schedule = validateSchedule(value);
     const photos = [];
     for (const id of assetIds(schedule)) {
       const asset = await getPhoto(id);
+      requireContext(context);
       photos.push({ id, width: asset.width, height: asset.height, jpeg: await blobBase64(asset.blob) });
+      requireContext(context);
     }
     const backup = new Blob([JSON.stringify({ format: 'kapework-myplan', version: 1, schedule, photos })], { type: 'application/json' });
     if (backup.size > MAX_BACKUP_BYTES) throw new Error('This backup is too large to restore on a phone. Replace the largest photos with smaller pictures, then export again.');
@@ -567,9 +636,11 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
   }
 
   async function importBackup(file) {
+    const context = captureContext(); requireContext(context);
     if (!file || file.size > MAX_BACKUP_BYTES) throw new Error('Choose a My Plan backup smaller than 80 MB.');
     let backup;
     try { backup = JSON.parse(await file.text()); } catch { throw new Error('This is not a readable My Plan backup.'); }
+    requireContext(context);
     if (backup.format !== 'kapework-myplan' || backup.version !== 1 || !Array.isArray(backup.photos) || backup.photos.length > 25) {
       throw new Error('Choose an editable My Plan backup (.myplan.json), not a PDF.');
     }
@@ -587,6 +658,7 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
       const dimensions = await imageDimensions(blob);
       if (dimensions.width !== photo.width || dimensions.height !== photo.height) throw new Error('The backup picture dimensions do not match.');
       const asset = await checkPhoto({ id: uuid(), blob, ...dimensions });
+      requireContext(context);
       mapping.set(id, asset.id); assets.push(asset);
     }
     schedule.id = uuid();
@@ -596,8 +668,14 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     }
     // Validate all content before writing any part of the imported schedule.
     validateSchedule(schedule);
-    for (const asset of assets) await putPhoto(asset);
-    return save(schedule);
+    for (const asset of assets) {
+      requireContext(context);
+      await putPhoto(asset);
+    }
+    requireContext(context);
+    const restored = await save(schedule);
+    requireContext(context);
+    return restored;
   }
 
   function destroy() {

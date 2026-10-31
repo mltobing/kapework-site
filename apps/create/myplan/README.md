@@ -64,7 +64,7 @@ No Ma family membership, feed, table or media bucket is used. No privileged cred
 
 IndexedDB `kapework-myplan-v1` keeps schedules and JPEG blobs in separate stores, scoped to `guest` or the account UUID. Before a schedule edit is queued, a per-page/account text journal is written synchronously to localStorage; pictures stay in IndexedDB. A commit clears only its own exact journal request. On reopen, an interrupted edit is replayed only against its matching base; a newer committed version is kept alongside a recovered copy.
 
-Local commits and cloud success have distinct visible states. Cloud sync uploads pictures before saving the record. Network calls time out after 20 seconds and retry on reconnection, focus, manual sync or further edits. An expired session or failed upload leaves the local copy intact. A version conflict preserves both schedules; the open editor follows the conflict copy.
+Local commits and cloud success have distinct visible states. Cloud sync uploads pictures before saving the record. Network calls time out after 20 seconds and retry on reconnection, focus, manual sync or further edits. An expired session or failed upload leaves the local copy intact. Network operations bind their original account token and abort local changes after an account switch, including switches during uploads or imports. A version conflict preserves both schedules; the open editor follows the conflict copy.
 
 `Export editable backup` downloads `.myplan.json` containing the schedule, settings, original normalized JPEGs and crops. Import validates all content first, remaps identifiers and adds an independent schedule. The limit is 80 MiB. A PDF is not an editable backup. Sign-out hides account drafts but intentionally retains their recoverable local storage; users of shared devices should also clear site data when finished.
 
@@ -80,7 +80,7 @@ Print invokes the browser's print dialog with the same single-page SVG. The shee
 
 ## Validation on 31 October 2026
 
-- **515 automated tests passed:** 494 existing repository checks plus 21 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
+- **522 automated tests passed:** 494 existing repository checks plus 28 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
 - **19 live database assertions passed:** owner create/read/update/photo access, other-account and anonymous denial, validated input, immutable version conflict behaviour, private bucket and write grants. All fixtures rolled back.
 - **Chrome on macOS:** starter creation; insert/reorder/remove reflected in page order; reload and continued editing; independent copy; native synthetic JPEG selection, crop and recrop; backup export/import and intact crop; cancelled native photo picker without loss; actual PDF download; native print preview showing one sheet and no editor controls. A physical page was not printed.
 - **Responsive Chrome viewport:** narrow (375 CSS-pixel) editor has no horizontal overflow, prominent preview action, and return-to-edit flow. This is viewport testing, not an iPhone browser result.
