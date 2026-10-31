@@ -21,7 +21,7 @@
 # Netlify build environment. The committed shared/config.js is a placeholder
 # (empty ID) that is overwritten at deploy time.
 [build]
-  command = "node scripts/generate-config.js"
+  command = "npm test && node scripts/generate-config.js"
 
 # ── Secrets scanning ──────────────────────────────────────────────────────────
 # generate-config.js intentionally writes the *public* Supabase values
@@ -89,3 +89,21 @@
   for = "/shared/config.js"
   [headers.values]
     Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/apps/create/myplan/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+
+[[headers]]
+  for = "/myplan/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"

@@ -34,7 +34,9 @@ function mockGithubDispatch(status, jsonBody = null) {
   };
 }
 
-beforeEach(() => {
+beforeEach((t) => {
+  // Keep the existing August fixture inside the validation window on every run.
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-01T12:00:00Z') });
   mockGithubDispatch(204);
   lastFetchCall = null;
 });
