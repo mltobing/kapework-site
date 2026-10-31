@@ -10,7 +10,7 @@
  */
 
 const { requireEnvVars } = require('./_utils');
-const { hashSecret, serviceClient, parseCookies, DEVICE_COOKIE, json, corsHeaders } = require('./_ma-devices');
+const { hashSecret, serviceClient, parseCookies, DEVICE_COOKIE, json, corsHeaders, isAllowedMaOrigin } = require('./_ma-devices');
 const { amsDateKey, sanitizeEvent } = require('./_ma-today-derive');
 
 // Refresh last_seen_at / roll expiry at most once per hour to avoid a write on
@@ -20,6 +20,7 @@ const DEVICE_TTL_MS    = 365 * 24 * 60 * 60 * 1000;
 
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || '';
+  if (origin && !isAllowedMaOrigin(origin)) return json(403, { error: 'origin_not_allowed' }, origin);
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
     return json(405, { error: 'method_not_allowed' }, origin);

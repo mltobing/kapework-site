@@ -82,6 +82,9 @@ global.supabase = {
     },
 };
 
+// The browser uses the shared classic-script account adapter.
+window.KapeworkAuthCompat = global.supabase.createClient();
+
 // Now require the module
 const game = require('../app.js');
 

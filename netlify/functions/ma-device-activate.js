@@ -14,7 +14,7 @@
 
 const { checkRateLimit, getClientIp, requireEnvVars, sanitiseString, logError } = require('./_utils');
 const {
-  DEVICE_TTL_MS, hashSecret, randomToken, serviceClient, deviceCookie, json, corsHeaders,
+  DEVICE_TTL_MS, hashSecret, randomToken, serviceClient, deviceCookie, json, corsHeaders, isAllowedMaOrigin,
 } = require('./_ma-devices');
 const { recordActivity } = require('./_ma-activity');
 
@@ -25,6 +25,7 @@ const GENERIC_FAIL = { error: 'activation_failed' };
 
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || '';
+  if (origin && !isAllowedMaOrigin(origin)) return json(403, { error: 'origin_not_allowed' }, origin);
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'method_not_allowed' }, origin);
 

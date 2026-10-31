@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="description" content="How Kapework handles account information, app content, device storage, usage information and feedback.">
+  <title>Privacy · Kapework</title>
+  <link rel="stylesheet" href="/shared/kapework-shell.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="Kapework home">Kapework<span aria-hidden="true"></span></a>
+      <div id="privacy-menu"></div>
+    </header>
+    <main>
+      <p class="eyebrow">About your information</p>
+      <h1>Privacy</h1>
+      <p class="effective">Effective <time datetime="2026-10-31">31 October 2026</time></p>
+      <p class="intro">Kapework is a collection of apps. What is stored and who can see it depends on the app and the features you use.</p>
+
+      <section aria-labelledby="accounts">
+        <h2 id="accounts">Accounts and Google sign-in</h2>
+        <p>Google sign-in uses Supabase to establish your Kapework identity. It requests your Google account identifier, email address and basic profile information, which may include your name and profile image. It does not request access to Gmail, Drive or Calendar.</p>
+        <p>Sign-in sessions are stored in your browser so you can stay signed in. Different Kapework subdomains may ask you to sign in separately. An account does not make every app save or synchronise its content across devices.</p>
+      </section>
+
+      <section aria-labelledby="content">
+        <h2 id="content">Your app content</h2>
+        <p>Some apps keep work in browser storage; others use Supabase for account data and uploaded files. Netlify hosts Kapework and handles server requests. These services process information needed to provide their functions.</p>
+        <p>In My Plan, saved schedules and photos are private to the owning account. They are not automatically shared with Ma. My Plan also keeps recoverable drafts and photos on your device, including after sign-out. It does not send schedule text or pictures to the shared usage analytics.</p>
+        <p>Ma requires separate access granted by its owner. Google sign-in alone does not grant access. Information in Ma can be shared with authorised family members or caregivers according to the app’s access and audience settings. When Ma’s document-processing feature is configured and used, source text, PDFs or images are sent to Anthropic to produce proposed entries for review.</p>
+      </section>
+
+      <section aria-labelledby="usage">
+        <h2 id="usage">Usage information and feedback</h2>
+        <p>Apps using Kapework’s shared analytics send page and interaction events to Supabase. These can include the app, page URL, referring page, time, gameplay outcomes and duration. A pseudonymous device identifier persists in browser storage; a separate session identifier is created for each page load. These identifiers are not your name, but can connect activity over time.</p>
+        <p>Google Analytics may also receive usage events where it is configured. My Plan and Ma do not load the shared analytics. Server functions use IP addresses to limit excessive requests.</p>
+        <p>When you send feedback, the message, any reply email you provide, app and page URL, and an available device identifier are stored in Supabase. Feedback does not automatically attach your schedule or photos.</p>
+      </section>
+
+      <section aria-labelledby="choices">
+        <h2 id="choices">Keeping and removing information</h2>
+        <p>There is no single fixed retention period across all Kapework apps. Signing out does not erase local drafts. Clearing browser site data removes local copies and sign-in state, but does not delete cloud content; export anything you need first.</p>
+        <p>Deleting a My Plan schedule clears its saved document content and leaves a small record to prevent older offline copies from restoring it. Uploaded photos are currently retained, including photos no longer used by a schedule; automatic cleanup is not implemented. Downloaded PDFs and editable backups remain wherever you save or share them.</p>
+      </section>
+
+      <section aria-labelledby="contact">
+        <h2 id="contact">Questions or data requests</h2>
+        <p>Use <strong>Send feedback</strong> in the More options (⋮) menu to ask about your information, account access or deletion. Include an email address if you want a reply.</p>
+        <button class="contact-button" id="privacy-contact" type="button">Send feedback</button>
+      </section>
+    </main>
+    <footer><a href="/">← Back to Kapework</a></footer>
+  </div>
+  <script src="/shared/config.js"></script>
+  <script src="/shared/kapework-shell.js"></script>
+  <script src="./privacy.js"></script>
+</body>
+</html>

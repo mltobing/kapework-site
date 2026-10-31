@@ -9,13 +9,14 @@
 const { checkRateLimit, getClientIp, requireEnvVars, sanitiseString, logError } = require('./_utils');
 const {
   MA_ORIGIN, PAIRING_TTL_MS, hashSecret, randomToken, randomCode,
-  serviceClient, verifyOwner, json, corsHeaders,
+  serviceClient, verifyOwner, json, corsHeaders, isAllowedMaOrigin,
 } = require('./_ma-devices');
 
 const RATE_LIMIT = 10; // pairings/minute/IP
 
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || '';
+  if (origin && !isAllowedMaOrigin(origin)) return json(403, { error: 'origin_not_allowed' }, origin);
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'method_not_allowed' }, origin);
 

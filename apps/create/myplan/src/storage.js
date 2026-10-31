@@ -344,12 +344,10 @@ export function createStore({ onChange = () => {}, onStatus = () => {}, onConfli
     if (configured) {
       try {
         if (!client) {
-          const { createClient } = await import('../vendor/supabase.js');
+          const { createClient } = await import('/shared/vendor/supabase.js');
+          const { getClient } = await import('/shared/auth.js');
           makeDataClient = createClient;
-          client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
-            auth: { storageKey: 'kapework-myplan-auth', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-            global: { fetch: boundedFetch },
-          });
+          client = await getClient();
         }
         const { data, error } = await client.auth.getSession();
         if (error) throw error;

@@ -7,12 +7,13 @@
  */
 
 const { checkRateLimit, getClientIp, requireEnvVars } = require('./_utils');
-const { serviceClient, verifyOwner, json, corsHeaders } = require('./_ma-devices');
+const { serviceClient, verifyOwner, json, corsHeaders, isAllowedMaOrigin } = require('./_ma-devices');
 
 const RATE_LIMIT = 30;
 
 exports.handler = async (event) => {
   const origin = event.headers['origin'] || '';
+  if (origin && !isAllowedMaOrigin(origin)) return json(403, { error: 'origin_not_allowed' }, origin);
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: corsHeaders(origin), body: '' };
   if (event.httpMethod !== 'POST') return json(405, { error: 'method_not_allowed' }, origin);
 

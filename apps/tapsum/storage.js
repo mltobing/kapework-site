@@ -41,7 +41,7 @@ export async function pushToCloud(bestScore) {
   try {
     const cfg = window.KapeworkConfig ?? {};
     if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) return;
-    const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    const sb = await (await import('/shared/auth.js')).getClient();
     await sb.from('scores').upsert(
       { slug: SLUG, device_id: getDeviceId(), best_score: bestScore },
       { onConflict: 'slug,device_id' }

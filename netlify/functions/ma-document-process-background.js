@@ -16,7 +16,7 @@
  */
 
 const { requireEnvVars } = require('./_utils');
-const { serviceClient, verifyOwner } = require('./_ma-devices');
+const { serviceClient, verifyOwner, isAllowedMaOrigin, json } = require('./_ma-devices');
 const { processDocumentImport } = require('./_ma-document-processing');
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -34,6 +34,8 @@ function anthropicConfig() {
 }
 
 exports.handler = async (event) => {
+  const origin = event.headers?.origin || '';
+  if (origin && !isAllowedMaOrigin(origin)) return json(403, { error: 'origin_not_allowed' }, origin);
   const startedAt = Date.now();
 
   let body;
