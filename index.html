@@ -67,7 +67,7 @@ button, select, textarea { font: inherit; }
 }
 
 /* ─── Menu button + dropdown ─────────────────────────────────── */
-.menu-wrap { position: relative; }
+.menu-wrap { position: relative; display: flex; align-items: center; gap: 8px; }
 
 .menu-btn {
   background: var(--surface);
@@ -312,6 +312,7 @@ textarea:focus { outline: none; border-color: var(--cyan); }
   text-align: center;
 }
 </style>
+<link rel="stylesheet" href="/shared/auth-ui.css" data-kw-auth-style>
 </head>
 <body>
 <div class="page">
@@ -324,6 +325,7 @@ textarea:focus { outline: none; border-color: var(--cyan); }
     </div>
 
     <div class="menu-wrap">
+      <button type="button" class="kw-account-trigger" data-kw-account>Sign in</button>
       <button class="menu-btn" id="menu-btn" aria-label="Menu" aria-expanded="false">···</button>
       <div class="dropdown" id="dropdown" role="menu">
         <button class="dropdown-item" id="open-stats">
@@ -386,7 +388,7 @@ textarea:focus { outline: none; border-color: var(--cyan); }
 
   </div>
 
-  <footer class="site-footer">Kapework &mdash; small games, big ideas</footer>
+  <footer class="site-footer">Kapework &mdash; small games, big ideas · <a href="https://kapework.com/privacy/">Privacy</a></footer>
 </div>
 
 <!-- Stats modal -->
@@ -429,13 +431,10 @@ textarea:focus { outline: none; border-color: var(--cyan); }
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 'use strict';
 
 /* ─── Supabase ──────────────────────────────────────────────── */
-const SUPABASE_URL  = "https://fimsbfcvavpehryvvcho.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbXNiZmN2YXZwZWhyeXZ2Y2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzOTEwMDMsImV4cCI6MjA3MDk2NzAwM30.6uAm_bDPN9aetYaKWA7zCvS8XDEVhmKKxA7RA7YK4JQ";
 let sb = null;
 
 /* ─── Local state ───────────────────────────────────────────── */
@@ -624,13 +623,14 @@ document.addEventListener("visibilitychange", async () => {
 
 /* ─── Init ──────────────────────────────────────────────────── */
 window.addEventListener("load", async () => {
-  try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON); } catch (e) {}
+  try { sb = await (await import('/shared/auth.js')).getClient(); } catch (e) {}
   await loadManifest();
   await loadCounts();
   updateTiles();
 });
 </script>
 <script src="/shared/config.js"></script>
+<script type="module" src="/shared/auth-ui.js"></script>
 <script src="/shared/analytics.js"></script>
 </body>
 </html>

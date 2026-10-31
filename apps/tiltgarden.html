@@ -195,6 +195,7 @@ body{
           <div class="menu-stat">Placed <b id="stat-placed">0</b></div>
           <div class="menu-stat">Cleared <b id="stat-cleared">0</b></div>
           <div class="menu-stat">Sessions <b id="stat-sessions">0</b></div>
+          <button class="menu-feedback-btn" id="btn-account">Account / Sign in</button>
           <button class="menu-feedback-btn" id="btn-feedback">💬 Send feedback</button>
         </div>
       </div>
@@ -908,6 +909,10 @@ body{
 <script>
   KapeworkAnalytics.init('tiltgarden');
   KapeworkShell.init({ appSlug: 'tiltgarden' });
+  document.getElementById('btn-account').addEventListener('click', function () {
+    document.getElementById('menu-dropdown').classList.remove('open');
+    KapeworkShell.openAccount();
+  });
   document.getElementById('btn-feedback').addEventListener('click', function () {
     document.getElementById('menu-dropdown').classList.remove('open');
     KapeworkShell.openFeedback();

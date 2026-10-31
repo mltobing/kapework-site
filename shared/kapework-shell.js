@@ -30,6 +30,17 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   var _appSlug = 'unknown';
+  var _accountModule;
+  function accountModule() {
+    if (!_accountModule) _accountModule = import('/shared/auth-ui.js');
+    return _accountModule;
+  }
+  function openAccount() {
+    closeMenu();
+    accountModule().then(function (ui) { return ui.openAccount(); }).catch(function () {
+      _accountModule = null; showToast('Account sign-in could not open. Please try again.');
+    });
+  }
   var _menuOpen = false;
   var _feedbackOpen = false;
   var _menuEl = null;
@@ -234,6 +245,16 @@
       _menuEl.appendChild(btn);
     });
 
+    // Account is optional; guest gameplay remains available. My Plan has its own account control.
+    if (_appSlug !== 'myplan') {
+      var accountBtn = document.createElement('button');
+      accountBtn.className = 'kw-menu-item';
+      accountBtn.setAttribute('role', 'menuitem');
+      accountBtn.textContent = 'Account / Sign in';
+      accountBtn.addEventListener('click', openAccount);
+      _menuEl.appendChild(accountBtn);
+    }
+
     // Always-present Feedback item
     var fbBtn = document.createElement('button');
     fbBtn.className = 'kw-menu-item';
@@ -269,11 +290,23 @@
       var mountEl = document.getElementById(config.mountId);
       if (mountEl) {
         buildMenuButton(mountEl, config.menuItems || []);
+        if (['readysetread', 'numbercrunch', 'braingym', 'create', 'tools'].indexOf(_appSlug) !== -1) {
+          var accountTrigger = document.createElement('button');
+          accountTrigger.type = 'button';
+          accountTrigger.className = 'kw-account-trigger';
+          accountTrigger.setAttribute('data-kw-account', '');
+          accountTrigger.textContent = 'Sign in';
+          mountEl.parentNode.insertBefore(accountTrigger, mountEl);
+          accountModule().then(function (ui) { ui.bindAccountTriggers(); }).catch(function () {
+            _accountModule = null;
+            accountTrigger.addEventListener('click', openAccount, { once: true });
+          });
+        }
       } else {
         console.warn('KapeworkShell: mount element #' + config.mountId + ' not found');
       }
     }
   }
 
-  window.KapeworkShell = { init: init, openFeedback: openFeedback };
+  window.KapeworkShell = { init: init, openFeedback: openFeedback, openAccount: openAccount };
 }());

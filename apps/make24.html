@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/shared/auth-compat.js"></script>
     <script src="/shared/config.js"></script>
     <style>
         * {
@@ -741,6 +741,7 @@ body {
 ```
 
 </style>
+<link rel="stylesheet" href="/shared/auth-ui.css" data-kw-auth-style>
 </head>
 <body>
     <div class="header">
@@ -845,12 +846,12 @@ body {
 <script>
     // Prevent iOS overscroll artifacts
     document.addEventListener('touchmove', function(e) {
-        if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+        if (e.target.closest('.archive-list') || e.target.closest('.modal') || e.target.closest('.kw-auth-dialog')) return;
         e.preventDefault();
     }, { passive: false });
 
     document.body.addEventListener('touchmove', function(e) {
-        if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+        if (e.target.closest('.archive-list') || e.target.closest('.modal') || e.target.closest('.kw-auth-dialog')) return;
         e.preventDefault();
     }, { passive: false });
 
@@ -867,8 +868,7 @@ body {
     const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
 
     // Supabase client (auth-aware)
-    const { createClient } = supabase;
-    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const sb = window.KapeworkAuthCompat;
 
     // Constants
     const STORAGE_KEY = 'make24_v5';
@@ -1113,7 +1113,7 @@ body {
         }
     }
 
-    // Google sign-in via popup (stays in PWA context)
+    // Google sign-in through the shared same-origin PKCE callback
     async function signInWithGoogle() {
         const status = document.getElementById('syncStatus');
         status.textContent = 'Opening Google sign-in...';
@@ -1155,7 +1155,7 @@ body {
         const { error } = await sb.auth.signInWithOtp({
             email,
             options: {
-                shouldCreateUser: true
+                shouldCreateUser: false
             }
         });
 
@@ -1221,14 +1221,16 @@ body {
     }
 
     async function promptSignOut() {
-        const ok = confirm('Sign out? (Your local history stays on this device.)');
-        if (!ok) return;
-        const { error } = await sb.auth.signOut();
-        if (error) alert('Sign-out failed: ' + error.message);
-        await updateSyncUI();
+    if (!confirm('Sign out here? Your local history stays on this device.')) return;
+    const { error } = await sb.auth.signOut();
+    if (error) {
+        alert('Sign-out did not finish. Please try again.');
+        return;
     }
+    await updateSyncUI();
+}
 
-    // Nudge: gentle toast at streak milestones
+// Nudge: gentle toast at streak milestones
     async function maybeShowSyncNudge() {
         const { data: { session } } = await sb.auth.getSession();
         if (session) return;
@@ -2349,5 +2351,6 @@ body {
     }
 </script>
 
+<script type="module" src="/shared/auth-ui.js"></script>
 </body>
 </html>

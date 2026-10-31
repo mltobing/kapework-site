@@ -37,6 +37,7 @@
           <div class="menu-stat">Best score <b id="stat-best">0</b></div>
           <div class="menu-stat">Lines cleared <b id="stat-lines">0</b></div>
           <div class="menu-stat">Runs <b id="stat-runs">0</b></div>
+          <button class="menu-feedback-btn" id="btn-account">Account / Sign in</button>
           <button class="menu-feedback-btn" id="btn-feedback">💬 Send feedback</button>
         </div>
       </div>
@@ -112,6 +113,10 @@
 <script>
   KapeworkAnalytics.init('tiltrix');
   KapeworkShell.init({ appSlug: 'tiltrix' });
+  document.getElementById('btn-account').addEventListener('click', function () {
+    document.getElementById('menu-dropdown').classList.remove('open');
+    KapeworkShell.openAccount();
+  });
   document.getElementById('btn-feedback').addEventListener('click', function () {
     document.getElementById('menu-dropdown').classList.remove('open');
     KapeworkShell.openFeedback();

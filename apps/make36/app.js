@@ -1,11 +1,11 @@
 // Prevent iOS overscroll artifacts
 document.addEventListener('touchmove', function(e) {
-    if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+    if (e.target.closest('.archive-list') || e.target.closest('.modal') || e.target.closest('.kw-auth-dialog')) return;
     e.preventDefault();
 }, { passive: false });
 
 document.body.addEventListener('touchmove', function(e) {
-    if (e.target.closest('.archive-list') || e.target.closest('.modal')) return;
+    if (e.target.closest('.archive-list') || e.target.closest('.modal') || e.target.closest('.kw-auth-dialog')) return;
     e.preventDefault();
 }, { passive: false });
 
@@ -22,8 +22,7 @@ const SUPABASE_URL = (window.KapeworkConfig || {}).supabaseUrl     || '';
 const SUPABASE_KEY = (window.KapeworkConfig || {}).supabaseAnonKey || '';
 
 // Supabase client (auth-aware)
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.KapeworkAuthCompat;
 const APP_SLUG = 'make36';
 
 function analytics() { return window.KapeworkAnalytics || null; }
@@ -365,7 +364,7 @@ async function updateSyncUI() {
     }
 }
 
-// Google sign-in via popup (stays in PWA context)
+// Google sign-in through the shared same-origin PKCE callback
 async function signInWithGoogle() {
     const status = document.getElementById('syncStatus');
     status.textContent = 'Opening Google sign-in...';
@@ -407,7 +406,7 @@ async function sendOtpCode() {
     const { error } = await sb.auth.signInWithOtp({
         email,
         options: {
-            shouldCreateUser: true
+            shouldCreateUser: false
         }
     });
 
@@ -487,31 +486,11 @@ async function verifyOtpCode() {
 }
 
 async function promptSignOut() {
-    const ok = confirm('Sign out? (Your local history stays on this device.)');
-    if (!ok) return;
-    console.log('[SYNC DEBUG] promptSignOut: user confirmed, calling sb.auth.signOut()');
-    try {
-        const { error } = await sb.auth.signOut();
-        console.log('[SYNC DEBUG] signOut returned — error:', JSON.stringify(error));
-        if (error) {
-            console.error('[SYNC DEBUG] signOut returned error, trying local scope:', JSON.stringify(error));
-            // If global sign-out fails (e.g. network/token issue), force local sign-out
-            const { error: localErr } = await sb.auth.signOut({ scope: 'local' });
-            if (localErr) {
-                console.error('[SYNC DEBUG] local signOut also failed:', JSON.stringify(localErr));
-                alert('Sign-out failed: ' + error.message);
-            }
-        }
-    } catch (e) {
-        console.error('[SYNC DEBUG] signOut threw exception:', e);
-        // Force local sign-out even if global threw
-        try {
-            await sb.auth.signOut({ scope: 'local' });
-            console.log('[SYNC DEBUG] local signOut succeeded after exception');
-        } catch (e2) {
-            console.error('[SYNC DEBUG] local signOut also threw:', e2);
-            alert('Sign-out failed: ' + (e.message || e));
-        }
+    if (!confirm('Sign out here? Your local history stays on this device.')) return;
+    const { error } = await sb.auth.signOut();
+    if (error) {
+        alert('Sign-out did not finish. Please try again.');
+        return;
     }
     await updateSyncUI();
 }
@@ -561,16 +540,13 @@ async function getAuthHeaders() {
 async function ensureCanonicalDeviceId() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) {
-        console.log('[SYNC DEBUG] ensureCanonicalDeviceId: no session, skipping');
         return;
     }
     const localId = getDeviceId();
-    console.log('[SYNC DEBUG] ensureCanonicalDeviceId CALLING get_or_set_device_id with localId:', localId, 'auth user:', session.user.id);
     try {
         const { data, error } = await sb.rpc('get_or_set_device_id', { p_device_id: localId });
-        console.log('[SYNC DEBUG] get_or_set_device_id RETURNED — data:', JSON.stringify(data), 'error:', JSON.stringify(error));
         if (error) {
-            console.error('[SYNC DEBUG] get_or_set_device_id FAILED:', JSON.stringify(error));
+            console.error('Account sync did not finish.');
             // Fallback: the RPC likely failed because a row already exists for this user
             // (e.g. 23505 duplicate key). Query user_devices directly to get the canonical
             // device_id so sync functions can find the right player row.
@@ -582,44 +558,39 @@ async function ensureCanonicalDeviceId() {
                 );
                 if (res.ok) {
                     const rows = await res.json();
-                    console.log('[SYNC DEBUG] user_devices direct lookup returned:', JSON.stringify(rows));
                     if (rows && rows.length > 0 && rows[0].device_id) {
                         const canonicalId = rows[0].device_id;
                         if (canonicalId !== localId) {
                             localStorage.setItem('make36_device_id', canonicalId);
                             gameState.deviceId = canonicalId;
                             saveState();
-                            console.log('[SYNC DEBUG] Adopted canonical device ID from user_devices:', canonicalId, '(was:', localId, ')');
                         }
                     }
                 } else {
-                    console.error('[SYNC DEBUG] user_devices direct lookup failed:', res.status, await res.text());
+                    console.error('Account sync did not finish.');
                 }
             } catch (fe) {
-                console.error('[SYNC DEBUG] user_devices direct lookup exception:', fe);
+                console.error('Account sync did not finish.');
             }
             await registerDeviceFallback(session.user.id, localId);
             return;
         }
         const canonicalId = data;
-        console.log('[SYNC DEBUG] canonicalId:', canonicalId, 'localId:', localId, 'match:', canonicalId === localId);
         if (canonicalId && canonicalId !== localId) {
             // Server returned a different canonical ID — adopt it
             localStorage.setItem('make36_device_id', canonicalId);
             gameState.deviceId = canonicalId;
             saveState();
-            console.log('[SYNC DEBUG] Adopted canonical device ID:', canonicalId, '(was:', localId, ')');
             // Also register the local device ID so user_devices knows about this device
             await registerDeviceFallback(session.user.id, localId);
         }
-    } catch (e) { console.error('[SYNC DEBUG] ensureCanonicalDeviceId exception:', e); }
+    } catch (e) { console.error('Account sync did not finish.'); }
 }
 
 // Fallback: directly insert into user_devices if the RPC didn't register this device.
 // The server-side get_or_set_device_id returns the canonical ID for existing users
 // but may not insert a new row for the second device.
 async function registerDeviceFallback(userId, deviceId) {
-    console.log('[SYNC DEBUG] registerDeviceFallback: inserting device_id:', deviceId, 'for user:', userId);
     try {
         const headers = await getAuthHeaders();
         const response = await fetch(`${SUPABASE_URL}/rest/v1/user_devices`, {
@@ -629,12 +600,10 @@ async function registerDeviceFallback(userId, deviceId) {
         });
         if (!response.ok) {
             const body = await response.text();
-            console.error('[SYNC DEBUG] registerDeviceFallback FAILED:', response.status, body);
-        } else {
-            console.log('[SYNC DEBUG] registerDeviceFallback OK:', response.status);
+            console.error('Account sync did not finish.');
         }
     } catch (e) {
-        console.error('[SYNC DEBUG] registerDeviceFallback exception:', e);
+        console.error('Account sync did not finish.');
     }
 }
 
@@ -642,7 +611,6 @@ async function syncFromSupabase() {
     try {
         const headers = await getAuthHeaders();
         const { data: { session } } = await sb.auth.getSession();
-        console.log('[SYNC DEBUG] syncFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
 
         // When logged in, try to find the player by auth user_id first.
         // This ensures a second device sees the same player row (and streak)
@@ -650,30 +618,24 @@ async function syncFromSupabase() {
         let player = null;
         if (session?.user?.id) {
             const userUrl = `${SUPABASE_URL}/rest/v1/players?user_id=eq.${session.user.id}&select=id,current_streak,streak,freezes,device_id&limit=1`;
-            console.log('[SYNC DEBUG] syncFromSupabase: querying players by user_id:', session.user.id);
             const userRes = await fetch(userUrl, { headers });
             if (userRes.ok) {
                 const rows = await userRes.json();
-                console.log('[SYNC DEBUG] syncFromSupabase: user_id query returned', rows.length, 'rows:', JSON.stringify(rows));
                 if (rows && rows.length > 0) {
                     player = rows[0];
                     // Adopt the canonical device_id from the existing player row
                     // so that future syncs and trackPlay calls use the right ID
                     if (player.device_id && player.device_id !== gameState.deviceId) {
-                        console.log('[SYNC DEBUG] syncFromSupabase: adopting canonical device_id from player row:', player.device_id, '(was:', gameState.deviceId, ')');
                         localStorage.setItem('make36_device_id', player.device_id);
                         gameState.deviceId = player.device_id;
                         saveState();
                     }
                 }
-            } else {
-                console.log('[SYNC DEBUG] syncFromSupabase: user_id query failed:', userRes.status);
-            }
+        }
         }
 
         // Fallback: look up by device_id (anonymous play, or user_id lookup failed)
         if (!player) {
-            console.log('[SYNC DEBUG] syncFromSupabase: FALLBACK — querying get_or_create_player with device_id:', gameState.deviceId);
             const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_or_create_player`, {
                 method: 'POST',
                 headers,
@@ -684,13 +646,11 @@ async function syncFromSupabase() {
                 return;
             }
             player = await response.json();
-            console.log('[SYNC DEBUG] syncFromSupabase: fallback player:', JSON.stringify(player));
         }
 
         const serverStreak = Number(player?.current_streak ?? player?.streak ?? 0);
         const serverFreezes = Number(player?.freezes ?? 0);
         const localStreak = Number(gameState.streak ?? 0);
-        console.log('[SYNC DEBUG] syncFromSupabase: serverStreak:', serverStreak, 'localStreak:', localStreak, 'serverFreezes:', serverFreezes);
         if (localStreak === 0 || (Number.isFinite(serverStreak) && serverStreak > localStreak)) {
             gameState.streak = serverStreak;
             gameState.freezes = serverFreezes;
@@ -707,7 +667,6 @@ async function syncHistoryFromSupabase() {
     try {
         const headers = await getAuthHeaders();
         const { data: { session } } = await sb.auth.getSession();
-        console.log('[SYNC DEBUG] syncHistoryFromSupabase START — gameState.deviceId:', gameState.deviceId, 'auth user:', session?.user?.id || 'none');
 
         // Step 1: Get player_id — prefer user_id lookup when logged in,
         // fall back to device_id for anonymous play
@@ -717,14 +676,10 @@ async function syncHistoryFromSupabase() {
             const userRes = await fetch(userUrl, { headers });
             if (userRes.ok) {
                 const rows = await userRes.json();
-                console.log('[SYNC DEBUG] syncHistoryFromSupabase: user_id query returned', rows.length, 'rows');
                 if (rows && rows.length > 0) playerId = rows[0].id;
-            } else {
-                console.log('[SYNC DEBUG] syncHistoryFromSupabase: user_id query failed:', userRes.status);
-            }
+        }
         }
         if (!playerId) {
-            console.log('[SYNC DEBUG] syncHistoryFromSupabase: FALLBACK — querying players by device_id:', gameState.deviceId);
             const playerUrl = `${SUPABASE_URL}/rest/v1/players?device_id=eq.${encodeURIComponent(gameState.deviceId)}&select=id&limit=1`;
             const playerRes = await fetch(playerUrl, { headers });
             if (!playerRes.ok) {
@@ -732,11 +687,9 @@ async function syncHistoryFromSupabase() {
                 return;
             }
             const players = await playerRes.json();
-            console.log('[SYNC DEBUG] syncHistoryFromSupabase: device_id query returned', players.length, 'rows');
             if (!players || players.length === 0) return;
             playerId = players[0].id;
         }
-        console.log('[SYNC DEBUG] syncHistoryFromSupabase: using playerId:', playerId);
 
         // Step 2: Get all solved puzzles from daily_results
         const url = `${SUPABASE_URL}/rest/v1/daily_results?player_id=eq.${playerId}&solved=eq.true&select=puzzle_num,moves,solve_time_seconds,operators,undos,is_perfect,is_fast&order=puzzle_num.desc&limit=500`;
@@ -775,7 +728,6 @@ async function syncHistoryFromSupabase() {
         }
         saveState();
         const totalRows = rows.length;
-        console.log(`[SYNC DEBUG] syncHistoryFromSupabase: server returned ${totalRows} solved puzzles, merged ${merged} new entries`);
     } catch (e) {
         showSyncError('Could not reach server to sync history.');
         console.log('syncHistoryFromSupabase skipped:', e?.message || e);

@@ -152,6 +152,10 @@ function renderSignIn(appEl, { notice } = {}) {
 
         ${notice ? `<div class="auth-notice">${escapeHtml(notice)}</div>` : ''}
 
+        <button type="button" class="btn-primary btn-large" id="google-sign-in">Doorgaan met Google</button>
+        <p class="auth-note">Alleen mensen die toegang hebben gekregen, kunnen Ma openen.</p>
+        <div id="google-error" class="auth-error" role="status" hidden></div>
+
         <form class="auth-form" id="magic-form" novalidate>
           <div class="field">
             <label for="magic-email">E-mailadres</label>
@@ -202,6 +206,12 @@ function renderSignIn(appEl, { notice } = {}) {
     </div>
   `;
 
+  appEl.querySelector('#google-sign-in').onclick = async () => {
+    const button = appEl.querySelector('#google-sign-in');
+    button.disabled = true;
+    try { const { signInWithGoogle } = await import('/shared/auth.js'); await signInWithGoogle(); }
+    catch { const error = appEl.querySelector('#google-error'); error.hidden = false; error.textContent = 'Inloggen met Google is niet gelukt. Probeer opnieuw of gebruik een inloglink.'; button.disabled = false; }
+  };
   wireMagicForm(appEl);
   wirePasswordForm(appEl);
   wireAuthToggle(appEl);
@@ -518,40 +528,21 @@ async function switchView(container, route) {
 async function routeAfterAuth(appEl, user) {
   setState({ user, profile: null, familyId: null, accessType: null });
 
-  // 1. Profile — create it on first sign-in if missing.
-  let profile = null;
-  try {
-    profile = await fetchProfile(user.id);
-  } catch (err) {
-    console.error('[ma] Failed to load profile:', err);
-    renderLoadError(appEl);
-    return;
-  }
+  // Authenticate identity first, then require a current explicit Ma grant.
+  // A public Google account must not create a Ma profile or load family views.
+  let accessType = null, familyId = null;
+  try { ({ accessType, familyId } = await fetchAccessContext(user.id)); }
+  catch { renderLoadError(appEl); return; }
+  if (!familyId) { renderNoMembership(appEl); return; }
 
+  let profile = null;
+  try { profile = await fetchProfile(user.id); }
+  catch { renderLoadError(appEl); return; }
   if (!profile) {
     profile = await promptForProfile(appEl, user);
-    if (!profile) return; // signed out mid-prompt; auth listener handles it
+    if (!profile) return;
   }
-
-  // 2. Access — family membership (owner/member) or active care-team
-  // membership. Never inferred from the UI or an email address; resolved
-  // once here and carried in state for every view/query to read.
-  let accessType = null;
-  let familyId = null;
-  try {
-    ({ accessType, familyId } = await fetchAccessContext(user.id));
-  } catch (err) {
-    console.error('[ma] Failed to load access context:', err);
-    renderLoadError(appEl);
-    return;
-  }
-
   setState({ user, profile, familyId, accessType });
-
-  if (!familyId) {
-    renderNoMembership(appEl);
-    return;
-  }
 
   await renderShell(appEl, user, profile, familyId, accessType);
   _presenceHeartbeat.start(familyId);
@@ -576,7 +567,7 @@ const _presenceHeartbeat = createPresenceHeartbeat({
 
 async function handleSignOut() {
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
   } catch (err) {
     console.error('[ma] Sign out error:', err);
   }

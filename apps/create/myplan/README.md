@@ -24,7 +24,7 @@ Netlify's normal Git-connected pipeline runs the full tests before generating pu
 - `illustrations.js`: 23 original, embedded SVG illustrations.
 - `images.js`: orientation-aware decode, max 2,000-pixel JPEG compression, metadata stripping, crop geometry.
 - `print.js`: shared page geometry, local font metrics, SVG page preview and actual embedded single-page PDF.
-- `storage.js`: all Supabase calls, durable local saves, account isolation, upload ordering, retries, optimistic concurrency and editable backups.
+- `storage.js`: schedule/photo persistence, durable local saves, account isolation, upload ordering, retries, optimistic concurrency and editable backups. Authentication uses the suite client in `/shared/auth.js`.
 - `main.js`: editor, schedule library, native pickers, crop dialog, mobile preview, authentication and output actions.
 - `sw.js`: caches only public application assets. No authenticated response, schedule or photo enters Cache Storage.
 
@@ -38,11 +38,11 @@ Netlify build variables:
 | `SUPABASE_ANON_KEY` | Public anonymous/publishable client key. Never a service-role credential. |
 | `MYPLAN_MAGIC_LINK_ENABLED` | Optional; exactly `true` enables email links **only after** the app redirect is verified in Supabase. Default off. |
 
-Password sign-in uses existing accounts and needs no redirect. Registration remains closed; My Plan does not call signup. The live project settings were checked on 31 October 2026: `disable_signup=true`, email authentication enabled, anonymous accounts disabled.
+Google sign-in uses the shared Kapework account service and a same-origin PKCE callback at `/shared/auth/callback.html`. New self-registration is Google-only once the provider and migration 016's Before User Created hook are configured. Existing-account password sign-in remains available; email OTP requests use `shouldCreateUser: false`. This source implementation does not establish that production activation is complete. See the [shared Google sign-in runbook](../../../docs/google-sign-in.md) for activation order, exact callbacks, the signup hook, and validation.
 
-My Plan uses its own auth storage key, `kapework-myplan-auth`. A Ma sign-in on a different subdomain does not automatically sign the user in here. Guest drafts are added to a signed-in account only by the explicit account-dialog action.
+The shared client uses Supabase's default auth storage key. A previous `kapework-myplan-auth` session is adopted only if no shared session already exists, then consumed so it cannot return after sign-out. Sessions remain separate by browser origin: a Ma sign-in on its subdomain does not automatically sign in here. Guest drafts are added to an account only by the explicit account-dialog action, including after Google returns.
 
-Before enabling magic links, verify the exact production redirect `https://create.kapework.com/myplan/` in Supabase Authentication URL Configuration and, if needed, the exact approved preview URL. Test a link opened on another device. Do not add a broad redirect wildcard or change registration policy. The redirect allowlist could not be inspected in this implementation session; links therefore remain disabled. No user credentials were requested or read.
+Before enabling magic links, verify the exact production email redirect `https://create.kapework.com/myplan/` and any exact approved preview URL in Supabase Authentication URL Configuration. PKCE links must open in the same browser that requested them; request a separate sign-in on another device. The Google callback allowlist does not replace the email-return entry. Keep `MYPLAN_MAGIC_LINK_ENABLED` off until that journey is tested; do not add broad redirect wildcards.
 
 Use separate staging Supabase configuration in the Netlify preview context when it is available. No separate staging database or authenticated Netlify settings session was available during this implementation. The additive production migration was explicitly approved by the owner and verified using rolled-back synthetic fixtures; that is not a claim of a separate database staging deployment.
 
@@ -80,7 +80,7 @@ The preview, crop dialog and PDF share geometry. Locally vendored jsPDF 4.2.1 an
 
 Print invokes the browser's print dialog with the same single-page SVG. The sheet excludes navigation, controls, dates, checkboxes and progress. Printer hardware margins and print-dialog overrides remain device-dependent; use portrait and actual size / fit-to-printable-area as needed.
 
-## Validation on 31 October 2026
+## Original My Plan release validation on 31 October 2026
 
 - **529 automated tests passed:** 494 existing repository checks plus 35 My Plan model, storage, JPEG backup and recovery-journal checks. The existing calendar-write test now freezes its clock so its August fixture does not expire; production calendar logic is unchanged.
 - **19 live database assertions passed:** owner create/read/update/photo access, other-account and anonymous denial, validated input, immutable version conflict behaviour, private bucket and write grants. All fixtures rolled back.

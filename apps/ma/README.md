@@ -20,11 +20,11 @@ Live at: **https://ma.kapework.com**
 | Layer       | Detail                                                       |
 |-------------|--------------------------------------------------------------|
 | Hosting     | Netlify static site, routed via the existing subdomain edge function |
-| Auth        | Supabase Auth — magic link (primary), email + password (fallback); signup closed |
+| Auth        | Shared Supabase client — Google plus existing-account email; Ma access requires an explicit family/care-team grant |
 | Trusted device | Care recipient's read-only `/vandaag` display, auth'd by an HttpOnly cookie via same-origin Netlify Functions (no Supabase session on that device) |
 | Database    | Supabase (PostgREST), tables prefixed `ma_`                  |
 | Storage     | Supabase private bucket `ma-media`                           |
-| Frontend    | Vanilla JS ES modules, no build step, imported from esm.sh   |
+| Frontend    | Vanilla JS ES modules, no build step; shared locally vendored Supabase SDK |
 
 The subdomain router at `netlify/edge-functions/subdomain-router.ts` automatically maps
 `ma.kapework.com/*` → `/apps/ma/*` — no router change is needed.
@@ -50,7 +50,7 @@ apps/ma/
 
   src/
     main.js             Boot: session check → auth screen or app shell
-    supabase.js         Supabase client (reads window.KapeworkConfig)
+    supabase.js         Adapter to the shared /shared/auth.js Supabase client
     state.js            Reactive state store (user, profile, familyId)
     router.js           Hash-based tab router (+ non-nav 'devices' route)
     api.js              All Supabase table queries
@@ -679,15 +679,16 @@ client-side invite flow was judged out of scope (see "Follow-up risks"). An
 admin provisions a caregiver by hand, in the Supabase SQL editor:
 
 ```sql
--- 1. Create the Supabase Auth user first (Dashboard → Authentication → Add user,
---    or supabase.auth.admin.createUser via the service role) — get their user_id.
+-- 1. Identify the existing Supabase Auth user (Google or a provisioned account).
+--    Verify their user_id in the administrative dashboard before granting access.
 -- 2. Grant care-team access for a family:
 insert into ma_care_team_members (family_id, user_id, created_by)
 values ('<family-uuid>', '<caregiver-auth-user-uuid>', '<admin-auth-user-uuid>');
 ```
 
-The caregiver then signs in the same way family members do (magic link) — their
-`ma_profiles` row is created automatically on first sign-in, same as anyone else.
+The caregiver then signs in with Google or an existing-account email method.
+Their explicit care-team grant is checked before a `ma_profiles` row can be
+created on first sign-in. Public account creation alone cannot create a Ma profile.
 No email/name goes in this repository or in fixtures.
 
 To revoke, set both `revoked_at` **and** `revoked_by` — access is checked live
@@ -741,11 +742,18 @@ attachment upload (`storage.js`) is completely unaffected by it.
 
 1. **Netlify domain alias** — add `ma.kapework.com` as a domain alias in the Netlify site settings
 2. **DNS** — add a CNAME record `ma → <netlify-site>.netlify.app` in the Kapework DNS config
-3. **Supabase URL allowlist** — add `https://ma.kapework.com` to the list of allowed redirect URLs in Supabase Auth settings
+3. **Supabase URL allowlist** — retain the existing Ma email-return URL and add
+   `https://ma.kapework.com/shared/auth/callback.html` for Google. Keep exact
+   URLs; follow the [shared sign-in runbook](../../docs/google-sign-in.md).
 4. **Environment variables** — ensure `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
    `SUPABASE_SERVICE_ROLE_KEY`, and `MA_DEVICE_TOKEN_PEPPER` are set in Netlify
    (mark the last two as **secrets**; they are Functions-only).
-5. **Migrations** — apply DB migrations **before** the deploy that ships code
+5. **Public Google registration** — before enabling it, apply
+   `016_ma_account_access.sql`, attach its Before User Created hook, and run
+   `supabase-migrations/verify/016_ma_account_access_verify.sql` as a complete
+   rollback transaction. Deploy Ma origin checks before opening registrations.
+   This runbook instruction does not assert that activation is already complete.
+6. **Migrations** — apply DB migrations **before** the deploy that ships code
    depending on them, in order. Trusted devices need `005_ma_trusted_devices.sql`;
    Logboek + care team need `006_ma_logboek_care_team.sql` applied on top of it.
    Logboek edit/trash and Beheer's manual sync request need
@@ -1803,16 +1811,13 @@ this feature.
 
 ## Accounts
 
-Signup is **closed**: sign-in only works for accounts an admin has pre-created.
-For each family member, provision (real addresses live only in the Supabase
-dashboard and Netlify config — never in this public repo):
+Kapework supports public Google account creation, while **Ma remains grant-only**. A general account does not enter the family app, create a Ma profile, or obtain family/photo access. Google activation requires migration 016's server-enforced signup hook and the configuration in the [shared sign-in runbook](../../docs/google-sign-in.md); implementation in source is not a claim that those live settings are complete.
 
-1. A Supabase Auth user (their email address).
-2. A matching `ma_profiles` row (created automatically on first sign-in, or by hand).
-3. An `ma_family_members` row linking that `user_id` to the family.
+For each family member, an administrator verifies their Supabase Auth user ID and creates an `ma_family_members` grant for the correct family. Their own profile is prompted for only after that grant is confirmed. Caregivers instead receive an active `ma_care_team_members` grant. Real addresses and user IDs belong in administrative systems, never public source or fixtures.
 
-Sign-in is passwordless by default (magic link); email + password remains as a
-demoted fallback.
+New email invitations are blocked by the Before User Created hook. Exceptional owner-created email accounts use the privileged Admin API; existing email sign-in remains available. Creating an Auth account still does not grant Ma membership.
+
+`src/supabase.js` obtains the same client as other apps on the current origin from `/shared/auth.js`. The default session storage key preserves existing Ma accounts; a sign-in on a different Kapework subdomain still requires its own origin session. Google returns through `/shared/auth/callback.html`. Existing-account magic links and password fallback remain; OTP requests never create an account. PKCE magic links must open in the requesting browser, so another device should request its own link. Local sign-out does not delete server content or other origins' sessions.
 
 The care recipient does **not** get an account — their device is paired instead
 (see “Trusted devices”, below).

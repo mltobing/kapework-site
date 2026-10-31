@@ -62,15 +62,33 @@ async function verifyOwner(supabase, authHeader, familyId) {
 
 // ── Response helpers ────────────────────────────────────────────────────────────
 
+function isAllowedMaOrigin(origin) {
+  if (origin === MA_ORIGIN) return true;
+  // Netlify Dev's documented default port is an explicit local-only exception.
+  // These origins are never allowed by the production function environment.
+  if (process.env.NETLIFY_DEV === 'true'
+    && (origin === 'http://localhost:8888' || origin === 'http://127.0.0.1:8888')) return true;
+  // A PR preview may call only its own exact Netlify-provided origin. This
+  // exception is absent in production; it cannot read a production Ma cookie.
+  if (process.env.CONTEXT === 'deploy-preview' && process.env.DEPLOY_PRIME_URL) {
+    try {
+      const preview = new URL(process.env.DEPLOY_PRIME_URL);
+      return preview.protocol === 'https:' && preview.hostname.endsWith('.netlify.app')
+        && origin === preview.origin;
+    } catch { return false; }
+  }
+  return false;
+}
+
 function corsHeaders(origin) {
-  const safe = /^https:\/\/([\w-]+\.)?kapework\.com$/.test(origin || '') ? origin : MA_ORIGIN;
-  return {
-    'Access-Control-Allow-Origin':      safe,
-    'Access-Control-Allow-Methods':     'POST, GET, OPTIONS',
-    'Access-Control-Allow-Headers':     'Content-Type, Authorization',
-    'Access-Control-Allow-Credentials': 'true',
-    'Vary':                             'Origin',
-  };
+  const headers = { 'Vary': 'Origin' };
+  if (origin && isAllowedMaOrigin(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+  return headers;
 }
 
 function json(statusCode, obj, origin, extraHeaders) {
@@ -99,6 +117,7 @@ module.exports = {
   parseCookies,
   deviceCookie,
   verifyOwner,
+  isAllowedMaOrigin,
   corsHeaders,
   json,
 };
