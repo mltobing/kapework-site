@@ -33,14 +33,14 @@ select pg_temp.ma_expect('signup hook is only callable by Auth',
   has_function_privilege('supabase_auth_admin', 'public.kapework_before_user_created(jsonb)', 'execute')
   and not has_function_privilege('anon', 'public.kapework_before_user_created(jsonb)', 'execute')
   and not has_function_privilege('authenticated', 'public.kapework_before_user_created(jsonb)', 'execute'));
-set local role supabase_auth_admin;
+-- The hosted SQL runner cannot assume supabase_auth_admin. Invoke the pure
+-- payload tests as migration administrator; privilege assertions above check Auth.
 select pg_temp.ma_expect('new Google account is allowed',
   public.kapework_before_user_created('{"user":{"app_metadata":{"provider":"google"}}}') = '{}'::jsonb);
 select pg_temp.ma_expect('new email account is blocked even with spoofed user metadata',
   (public.kapework_before_user_created('{"user":{"app_metadata":{"provider":"email"},"user_metadata":{"provider":"google"}}}')->'error'->>'http_code') = '403');
 select pg_temp.ma_expect('missing provider fails closed',
   (public.kapework_before_user_created('{}')->'error'->>'http_code') = '403');
-reset role;
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
 select u.id, 'authenticated', 'authenticated', 'ma-access-verify-' || u.id || '@example.invalid',
@@ -185,5 +185,8 @@ select pg_temp.ma_expect('anonymous cannot execute Ma access or mutation helpers
 select pg_temp.ma_expect('anonymous cannot read synthetic Ma content',
   not exists(select 1 from public.ma_posts where family_id=(select family_id from ma_access_verify_ids)));
 reset role;
+
+select jsonb_build_object('status','passed','assertions',36,'fixtures',to_jsonb(ids)) as verification
+from ma_access_verify_ids ids;
 
 rollback;
