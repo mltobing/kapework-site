@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRoutine, createStep, duplicateSchedule, validateSchedule } from '../src/model.js';
+import { createRoutine, createStep, duplicateSchedule, validateSchedule, getStepIllustration, withPhoto, withIllustration, withoutPhoto } from '../src/model.js';
 import { cropSourceRect } from '../src/images.js';
 
 test('starters remain generic, editable sequences with comfortable bedtime count', () => {
@@ -34,12 +34,71 @@ test('duplicate has independent nested crops, settings, steps and reward', () =>
   assert.notEqual(copy.id, original.id);
   assert.ok(copy.steps.every((s, i) => s.id !== original.steps[i].id));
   assert.equal(copy.steps[0].picture.assetId, original.steps[0].picture.assetId);
+  assert.equal(copy.steps[0].picture.illustrationId, 'bath');
   copy.steps[0].picture.crop.x = 1;
   copy.reward.picture.crop.zoom = 3;
   copy.print.paper = 'tabloid';
   assert.equal(original.steps[0].picture.crop.x, .2);
   assert.equal(original.reward.picture.crop.zoom, 1.5);
   assert.equal(original.print.paper, 'letter');
+});
+
+test('legacy photos acquire a stable generic illustration without changing their asset or crop', () => {
+  const original = createRoutine('bedtime');
+  const assetId = crypto.randomUUID(), crop = { x: .1, y: .7, zoom: 2.4 };
+  original.steps[1].picture = { kind: 'photo', assetId, crop };
+  original.steps[2].picture = { kind: 'photo', assetId, crop };
+  original.steps[2].label = 'Our special activity';
+  const normalized = validateSchedule(original);
+  assert.deepEqual(normalized.steps[1].picture, { kind: 'photo', assetId, crop, illustrationId: 'teeth' });
+  assert.equal(normalized.steps[2].picture.illustrationId, 'star');
+  assert.equal(original.steps[1].picture.illustrationId, undefined, 'validation does not rewrite its input');
+  normalized.steps[1].label = 'A new family label';
+  assert.equal(validateSchedule(normalized).steps[1].picture.illustrationId, 'teeth');
+  assert.equal(getStepIllustration({ label: '  BRUSH   TEETH ', picture: { kind: 'photo', assetId, crop } }), 'teeth');
+});
+
+test('adding, replacing, recropping and removing a photo preserve its chosen illustration', () => {
+  const step = createStep('Our activity', 'heart');
+  const firstId = crypto.randomUUID(), nextId = crypto.randomUUID();
+  step.picture = withPhoto(step, { assetId: firstId, crop: { x: .2, y: .8, zoom: 2 } });
+  assert.equal(getStepIllustration(step), 'heart');
+  const before = structuredClone(step);
+  const changed = withIllustration(step, 'read');
+  assert.deepEqual(step, before, 'illustration changes do not mutate a live step');
+  assert.equal(changed.assetId, firstId);
+  assert.deepEqual(changed.crop, step.picture.crop);
+  step.picture = changed;
+  step.picture = withPhoto(step, { assetId: nextId, crop: { x: .6, y: .3, zoom: 1.8 } });
+  assert.equal(step.picture.illustrationId, 'read');
+  assert.equal(step.picture.assetId, nextId);
+  step.picture = withPhoto(step, { ...step.picture, crop: { x: 1, y: 0, zoom: 3 } });
+  assert.deepEqual(step.picture.crop, { x: 1, y: 0, zoom: 3 });
+  assert.deepEqual(withoutPhoto(step), { kind: 'illustration', id: 'read' });
+});
+
+test('explicit photo illustrations survive reward and duplicate normalization independently', () => {
+  const original = createRoutine('blank');
+  const step = createStep('Custom task', 'water');
+  step.picture = withPhoto(step, { assetId: crypto.randomUUID(), crop: { x: .3, y: .8, zoom: 2.1 } });
+  original.steps.push(step);
+  original.reward = { label: 'Reward', caption: 'When we finish', picture: withPhoto({ picture: { kind: 'illustration', id: 'heart' } }, { assetId: crypto.randomUUID() }) };
+  const copy = duplicateSchedule(original);
+  assert.equal(copy.steps[0].picture.illustrationId, 'water');
+  assert.equal(copy.reward.picture.illustrationId, 'heart');
+  copy.steps[0].picture.illustrationId = 'star';
+  copy.steps[0].picture.crop.zoom = 3;
+  assert.equal(original.steps[0].picture.illustrationId, 'water');
+  assert.equal(original.steps[0].picture.crop.zoom, 2.1);
+});
+
+test('supplied photo illustration identifiers must be known strings', () => {
+  for (const invalid of [null, '', 'toString', 'constructor', 'unknown', 1, {}, ['teeth']]) {
+    const plan = createRoutine('bedtime');
+    plan.steps[0].picture = { kind: 'photo', assetId: crypto.randomUUID(), crop: { x: .5, y: .5, zoom: 1 }, illustrationId: invalid };
+    assert.throws(() => validateSchedule(plan), /illustration/);
+    assert.throws(() => withIllustration(createStep(), invalid), /illustration/);
+  }
 });
 
 test('validation preserves photo crops and drops unsupported private links', () => {

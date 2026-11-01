@@ -9,12 +9,44 @@ const routines = {
  bedtime:['Our bedtime',[['Bath','bath'],['Brush teeth','teeth'],['Pajamas','pajamas'],['Play time','play'],['Get into bed','bed'],['Read a story','read'],['Prayers','prayers'],['Sleep','sleep']]],
  blank:['Our plan',[]],
 };
+// Legacy photos replaced the starter illustration. Recover only a known generic
+// starter label; custom labels receive a neutral star the parent can change.
+const illustrationByLabel = new Map(Object.values(routines).flatMap(([, steps]) =>
+  steps.map(([label, id]) => [label.toLowerCase(), id])));
+const validIllustration = id => {
+  if (!illustrationIds.includes(id)) throw new Error('Unknown illustration.');
+  return id;
+};
+export function getStepIllustration(step) {
+  const value = step?.picture;
+  if (value?.kind === 'illustration') return validIllustration(value.id);
+  if (value?.kind === 'photo' && Object.hasOwn(value, 'illustrationId')) {
+    return validIllustration(value.illustrationId);
+  }
+  const label = typeof step?.label === 'string' ? step.label.trim().replace(/\s+/g, ' ').toLowerCase() : '';
+  return illustrationByLabel.get(label) || 'star';
+}
+// Return picture values, without mutating the step. Photo replacement and
+// recropping always retain the illustration already selected for that step.
+export function withPhoto(step, photo) {
+  return picture({kind:'photo',assetId:photo.assetId,crop:photo.crop,
+    illustrationId:getStepIllustration(step)}, step?.label);
+}
+export function withIllustration(step, id) {
+  validIllustration(id);
+  return step?.picture?.kind === 'photo'
+    ? picture({...step.picture,illustrationId:id}, step.label)
+    : {kind:'illustration',id};
+}
+export function withoutPhoto(step) {
+  return {kind:'illustration',id:getStepIllustration(step)};
+}
 export function createRoutine(key='blank') { const [title,steps]=routines[key]||routines.blank;return {id:crypto.randomUUID(),title,steps:steps.map(([label,icon])=>createStep(label,icon)),reward:null,print:{paper:'letter',theme:'sage'}}; }
 export const createSchedule=createRoutine;
 export function duplicateSchedule(schedule) {const copy=validateSchedule(schedule);copy.id=crypto.randomUUID();copy.title=`${copy.title.slice(0,73)} (copy)`;copy.steps.forEach(s=>s.id=crypto.randomUUID());return copy;}
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const bounded=(v,max,name)=>{if(typeof v!=='string'||v.length>max||/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(v))throw new Error(`Invalid ${name}.`);return v;};
 const validId=(v)=>{if(typeof v!=='string'||!uuid.test(v))throw new Error('Invalid schedule or picture identifier.');return v;};
-function picture(v){if(!v||typeof v!=='object')throw new Error('Each step needs a picture.');if(v.kind==='illustration'&&illustrationIds.includes(v.id))return {kind:'illustration',id:v.id};if(v.kind==='photo'){const crop=v.crop||{x:.5,y:.5,zoom:1};if(![crop.x,crop.y,crop.zoom].every(Number.isFinite)||crop.x<0||crop.x>1||crop.y<0||crop.y>1||crop.zoom<1||crop.zoom>3)throw new Error('Invalid picture crop.');return {kind:'photo',assetId:validId(v.assetId),crop:{x:crop.x,y:crop.y,zoom:crop.zoom}};}throw new Error('Unknown illustration or picture type.');}
-function step(v,withId=true){if(!v||typeof v!=='object')throw new Error('Invalid step.');return {...(withId?{id:validId(v.id)}:{}),label:bounded(v.label,LIMITS.label,'step label'),caption:bounded(v.caption??'',LIMITS.caption,'caption'),picture:picture(v.picture)};}
+function picture(v,label){if(!v||typeof v!=='object')throw new Error('Each step needs a picture.');if(v.kind==='illustration'&&illustrationIds.includes(v.id))return {kind:'illustration',id:v.id};if(v.kind==='photo'){const crop=v.crop||{x:.5,y:.5,zoom:1};if(![crop.x,crop.y,crop.zoom].every(Number.isFinite)||crop.x<0||crop.x>1||crop.y<0||crop.y>1||crop.zoom<1||crop.zoom>3)throw new Error('Invalid picture crop.');return {kind:'photo',assetId:validId(v.assetId),crop:{x:crop.x,y:crop.y,zoom:crop.zoom},illustrationId:getStepIllustration({label,picture:v})};}throw new Error('Unknown illustration or picture type.');}
+function step(v,withId=true){if(!v||typeof v!=='object')throw new Error('Invalid step.');return {...(withId?{id:validId(v.id)}:{}),label:bounded(v.label,LIMITS.label,'step label'),caption:bounded(v.caption??'',LIMITS.caption,'caption'),picture:picture(v.picture,v.label)};}
 export function validateSchedule(v){if(!v||typeof v!=='object'||!Array.isArray(v.steps)||v.steps.length>LIMITS.steps)throw new Error('Invalid schedule; use at most 24 steps.');if(!v.print||!Object.hasOwn(paperSizes,v.print.paper)||!Object.hasOwn(themes,v.print.theme))throw new Error('Invalid print settings.');const steps=v.steps.map(s=>step(s));if(new Set(steps.map(s=>s.id)).size!==steps.length)throw new Error('Step identifiers must be unique.');return {id:validId(v.id),title:bounded(v.title,LIMITS.title,'title'),steps,reward:v.reward==null?null:step(v.reward,false),print:{paper:v.print.paper,theme:v.print.theme}};}

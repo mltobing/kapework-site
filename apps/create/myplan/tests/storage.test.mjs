@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { IDBFactory } from 'fake-indexeddb';
 import { createStore } from '../src/storage.js';
-import { createRoutine } from '../src/model.js';
+import { createRoutine, validateSchedule } from '../src/model.js';
 
 globalThis.BroadcastChannel = undefined;
 Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true });
@@ -89,7 +89,7 @@ test('local draft and actual photo reopen without an account or network', async 
   await first.save(plan);
   first.destroy();
   const reopened = await device(t, {}, false);
-  assert.deepEqual(reopened.get(plan.id), plan);
+  assert.deepEqual(reopened.get(plan.id), validateSchedule(plan));
   assert.deepEqual(await (await reopened.getPhoto(photo.id)).blob.arrayBuffer(), await photo.blob.arrayBuffer());
   assert.equal(reopened.getStatus().message, 'Saved on this device');
 });
@@ -119,7 +119,7 @@ test('failed photo upload keeps recoverable draft and does not save broken cloud
   cloud.failUpload = true;
   await store.sync();
   assert.equal(cloud.rows.size, 0);
-  assert.deepEqual(store.get(plan.id), plan);
+  assert.deepEqual(store.get(plan.id), validateSchedule(plan));
   assert.match(store.getStatus().message, /waiting to sync/);
   cloud.failUpload = false;
   await store.sync();
@@ -156,7 +156,7 @@ test('two devices preserve both versions after conflicting edits', async t => {
   const conflicts = [];
   const b = await device(t, { client: cloud.client(), onConflict: event => conflicts.push(event) });
   await b.sync();
-  assert.deepEqual(b.get(plan.id), plan);
+  assert.deepEqual(b.get(plan.id), validateSchedule(plan));
   const remoteEdit = a.get(plan.id), localEdit = b.get(plan.id);
   remoteEdit.title = 'Device A';
   localEdit.title = 'Device B';
@@ -187,23 +187,41 @@ test('deletion on another device preserves unsynced edits as a conflict copy', a
   assert.equal(cloud.rows.get(plan.id).deleted, true);
 });
 
-test('portable backup restores real JPEG bytes and crops using independent identifiers', async t => {
+test('portable backup restores JPEG bytes, crops and selected illustrations using independent identifiers', async t => {
   const store = await device(t);
   const plan = createRoutine('bedtime'), photo = await picture();
   await store.putPhoto(photo);
-  plan.steps[0].picture = { kind: 'photo', assetId: photo.id, crop: { x: .15, y: .85, zoom: 2.6 } };
+  plan.steps[0].picture = { kind: 'photo', assetId: photo.id, crop: { x: .15, y: .85, zoom: 2.6 }, illustrationId: 'water' };
   plan.reward = { label: 'Story together', caption: 'When we finish our plan', picture: clone(plan.steps[0].picture) };
+  plan.reward.picture.illustrationId = 'heart';
   await store.save(plan);
   const backup = await store.exportBackup(plan), restored = await store.importBackup(backup);
   assert.notEqual(restored.id, plan.id);
   assert.notEqual(restored.steps[0].picture.assetId, photo.id);
   assert.deepEqual(restored.steps[0].picture.crop, plan.steps[0].picture.crop);
   assert.deepEqual(restored.reward.picture.crop, plan.reward.picture.crop);
+  assert.equal(restored.steps[0].picture.illustrationId, 'water');
+  assert.equal(restored.reward.picture.illustrationId, 'heart');
   assert.equal(restored.reward.picture.assetId, restored.steps[0].picture.assetId);
   assert.deepEqual(await (await store.getPhoto(restored.steps[0].picture.assetId)).blob.arrayBuffer(), await photo.blob.arrayBuffer());
   restored.steps[0].picture.crop.x = 1;
   await store.save(restored);
   assert.equal(store.get(plan.id).steps[0].picture.crop.x, .15);
+});
+
+test('legacy version-one backup without illustrationId restores all photo bytes and crop positions', async t => {
+  const store = await device(t), plan = createRoutine('bedtime'), photo = await picture();
+  plan.steps[1].picture = { kind: 'photo', assetId: photo.id, crop: { x: .9, y: .1, zoom: 2.8 } };
+  const legacy = { format: 'kapework-myplan', version: 1, schedule: plan,
+    photos: [{ id: photo.id, width: photo.width, height: photo.height, jpeg: Buffer.from(await photo.blob.arrayBuffer()).toString('base64') }] };
+  const restored = await store.importBackup(new Blob([JSON.stringify(legacy)]));
+  assert.equal(restored.steps[1].picture.illustrationId, 'teeth');
+  assert.deepEqual(restored.steps[1].picture.crop, plan.steps[1].picture.crop);
+  assert.notEqual(restored.steps[1].picture.assetId, photo.id);
+  assert.deepEqual(await (await store.getPhoto(restored.steps[1].picture.assetId)).blob.arrayBuffer(), await photo.blob.arrayBuffer());
+  const exported = JSON.parse(await (await store.exportBackup(restored)).text());
+  assert.equal(exported.version, 1);
+  assert.equal(exported.schedule.steps[1].picture.illustrationId, 'teeth');
 });
 
 test('invalid backup is rejected without changing existing schedules', async t => {
